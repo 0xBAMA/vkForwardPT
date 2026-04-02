@@ -44,17 +44,12 @@ struct frameData_t {
 	DescriptorAllocatorGrowable frameDescriptors;
 };
 
-struct pointState {
-	glm::vec4 position;
-	glm::vec4 velocity;
-	glm::vec4 acceleration;
-	glm::vec4 mass; // mass + padding
-};
-
 // common configuration across all shaders
 struct GlobalData {
 	glm::uvec2 floatBufferResolution;
 	glm::uvec2 presentBufferResolution;
+
+	glm::vec2 mouseLoc;
 
 	glm::mat4 rotation{ 1.0f };
 	glm::mat4 inverseRotation{ 1.0f };
@@ -63,13 +58,18 @@ struct GlobalData {
 	int reset = 0;
 	float aspectRatio;
 	float invAspectRatio;
-	int numPoints;
-	int numForces;
 };
 
 // smallest scope CPU->GPU passing of information
 struct PushConstants {
 	uint32_t wangSeed;
+};
+
+struct raySegment {
+	float wavelength;
+	float brightness;
+	glm::vec2 a;	// first point
+	glm::vec2 b;	// second point
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -116,26 +116,21 @@ public:
 	GlobalData globalData; // goes into the UBO
 
 	// the simulation buffer resolution
-	VkExtent2D ImageBufferResolution{ 1280, 720 };
+	VkExtent2D ImageBufferResolution;
 	AllocatedImage XYZImage;
+
+	// rays
+	uint32_t numRays = 64 * 32;
+	uint32_t numBounces = 32;
+	AllocatedBuffer rayBuffer;
 
 	// wrapping the compute passes which are involved
 	ComputeEffect Raytrace;
 	ComputeEffect BufferPresent;
 
 	// abusing the ComputeEffect struct for a raster pipeline
-	uint32_t numPointSprites = 16 * 200;
-	uint32_t numForces;
-	AllocatedImage pointSpriteColorAttachment;
-	AllocatedImage pointSpriteDepthAttachment;
-	ComputeEffect pointSpriteRaster;
-	ComputeEffect pointSpriteDeferredShading;
-
-	// for the N body simulation
-	AllocatedBuffer ForceBuffer;
-	AllocatedBuffer PointBuffer;
-	ComputeEffect nbodyForceUpdate;
-	ComputeEffect nbodyAccelUpdate;
+	AllocatedImage lineColorAttachment;
+	ComputeEffect lineRaster;
 
 	// engine triggers
 	bool resizeRequest { false };

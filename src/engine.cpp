@@ -40,8 +40,10 @@ void PrometheusInstance::Init () {
 	int numDisplays;
 	SDL_DisplayID *displays = SDL_GetDisplays( &numDisplays );
 	SDL_GetDisplayBounds( displays[ 0 ], &viewRect );
-	windowExtent.width = 3 * viewRect.w / 4;
-	windowExtent.height = 3 * viewRect.h / 4;
+
+	// accumulator image is going to be 1:1 with the swapchain image
+	ImageBufferResolution.width = windowExtent.width = 3 * viewRect.w / 4;
+	ImageBufferResolution.height = windowExtent.height = 3 * viewRect.h / 4;
 
 	window = SDL_CreateWindow(
 		"Prometheus",
@@ -101,12 +103,14 @@ void PrometheusInstance::Draw () {
 	// update the UBO contents
 	globalData.floatBufferResolution = glm::uvec2( ImageBufferResolution.width, ImageBufferResolution.height );
 	globalData.presentBufferResolution = glm::uvec2( drawExtent.width, drawExtent.height );
+
+	static float mouseX, mouseY;
+	SDL_GetMouseState( &mouseX, &mouseY );
+	globalData.mouseLoc = glm::vec2( mouseX, mouseY );
 	globalData.inverseRotation = glm::inverse( globalData.rotation ); // need to maintain this value because it's not updated in the event loop
 	globalData.aspectRatio = float( ImageBufferResolution.height ) / float( ImageBufferResolution.width );
 	globalData.invAspectRatio = float( ImageBufferResolution.width ) / float( ImageBufferResolution.height );
 	globalData.frameNumber = frameNumber;
-	globalData.numPoints = numPointSprites;
-	globalData.numForces = numPointSprites * ( numPointSprites + 1 ) / 2;
 
 	// write directly from the memory on the PrometheusInstance
 	GlobalData* uniformData = ( GlobalData * ) GlobalUBO.allocation->GetMappedData();
@@ -125,20 +129,14 @@ void PrometheusInstance::Draw () {
 	vkutil::transition_image( cmd, drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 
 	// and the point sprite raster stuff
-	vkutil::transition_image( cmd, pointSpriteColorAttachment.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
-	vkutil::transition_image( cmd, pointSpriteDepthAttachment.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL );
+	vkutil::transition_image( cmd, lineColorAttachment.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
 
 	// compute shader to do one update of the raytrace process
 	// Raytrace.invoke( cmd );
 
-	// updating the positions of the points
-	nbodyForceUpdate.invoke( cmd );
-	nbodyAccelUpdate.invoke( cmd );
+	// line drawing
 
-	pointSpriteRaster.invoke( cmd );
-	pointSpriteDeferredShading.invoke( cmd );
-
-	// compute shader to put the resolved final image into the drawImage...
+	// compute shader to accumulate the raster result + put the resolved final image into the drawImage...
 	BufferPresent.invoke( cmd );
 
 	// transition the images for the copy
@@ -521,241 +519,23 @@ void PrometheusInstance::initResources () {
 	XYZImage = createImage( bufferExtent, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT );
 
 	// create the raster attachments
-	pointSpriteColorAttachment = createImage( { ImageBufferResolution.width, ImageBufferResolution.height, 1 }, VK_FORMAT_R32_UINT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT );
-	pointSpriteDepthAttachment = createImage( { ImageBufferResolution.width, ImageBufferResolution.height, 1 }, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT );
+	lineColorAttachment = createImage( { ImageBufferResolution.width, ImageBufferResolution.height, 1 }, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT );
 
-	// buffers associated with the point sprites
-	numForces = ( numPointSprites * ( numPointSprites - 1 ) ) / 2;
-	PointBuffer = createBuffer( numPointSprites * sizeof( pointState ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY );
-	ForceBuffer = createBuffer( numForces * sizeof( glm::vec4 ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY );
+	// buffer for the rays
+	rayBuffer = createBuffer( numBounces * numRays * sizeof( raySegment ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY );
 
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
 		// destroying buffers
 		destroyBuffer( GlobalUBO );
-		destroyBuffer( PointBuffer );
-		destroyBuffer( ForceBuffer );
 
 		// destroying images
 		destroyImage( XYZImage );
-		destroyImage( pointSpriteColorAttachment );
-		destroyImage( pointSpriteDepthAttachment );
+		destroyImage( lineColorAttachment );
 	});
 }
 
 void PrometheusInstance::initComputePasses () {
-
-	{ // Force  Update
-		{ // descriptor layout
-			DescriptorLayoutBuilder builder;
-			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
-			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the SSBO with body locations
-			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the SSBO with the body-to-body forces
-			nbodyForceUpdate.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
-		}
-
-		{ // pipeline layout + compute pipeline
-			VkPushConstantRange pushConstant{};
-			pushConstant.offset = 0;
-			pushConstant.size = sizeof( PushConstants );
-			pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-			VkPipelineLayoutCreateInfo computeLayout{};
-			computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			computeLayout.pNext = nullptr;
-			computeLayout.pSetLayouts = &nbodyForceUpdate.descriptorSetLayout;
-			computeLayout.setLayoutCount = 1;
-			computeLayout.pPushConstantRanges = &pushConstant;
-			computeLayout.pushConstantRangeCount = 1;
-
-			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &nbodyForceUpdate.pipelineLayout ) );
-
-			VkShaderModule ForceUpdateShader;
-			if ( !vkutil::load_shader_module("../shaders/forceUpdate.comp.glsl.spv", device, &ForceUpdateShader ) ) {
-				fmt::print( "Error when building the Point Update Compute Shader\n" );
-			}
-
-			VkPipelineShaderStageCreateInfo stageinfo{};
-			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			stageinfo.pNext = nullptr;
-			stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-			stageinfo.module = ForceUpdateShader;
-			stageinfo.pName = "main";
-
-			VkComputePipelineCreateInfo computePipelineCreateInfo{};
-			computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-			computePipelineCreateInfo.pNext = nullptr;
-			computePipelineCreateInfo.layout = nbodyForceUpdate.pipelineLayout;
-			computePipelineCreateInfo.stage = stageinfo;
-
-			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &nbodyForceUpdate.pipeline ) );
-			vkDestroyShaderModule( device, ForceUpdateShader, nullptr );
-
-			// deletors for the pipeline layout + pipeline
-			mainDeletionQueue.push_function( [ & ] () {
-				vkDestroyDescriptorSetLayout( device, nbodyForceUpdate.descriptorSetLayout, nullptr );
-				vkDestroyPipelineLayout( device, nbodyForceUpdate.pipelineLayout, nullptr );
-				vkDestroyPipeline( device, nbodyForceUpdate.pipeline, nullptr );
-			});
-		}
-
-		// invoke() lambda
-		nbodyForceUpdate.invoke = [ & ] ( VkCommandBuffer cmd ){
-			// dynamic descriptor allocation, to bind a texture
-			nbodyForceUpdate.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, nbodyForceUpdate.descriptorSetLayout );
-			{
-				DescriptorWriter writer;
-				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
-				writer.write_buffer( 1, PointBuffer.buffer, numPointSprites * sizeof( pointState ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
-				writer.write_buffer( 2, ForceBuffer.buffer, numForces * sizeof( glm::vec4 ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
-				writer.update_set( device, nbodyForceUpdate.descriptorSet );
-			}
-
-			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, nbodyForceUpdate.pipeline );
-
-			// bind the descriptor set, as just recorded
-			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, nbodyForceUpdate.pipelineLayout, 0, 1, &nbodyForceUpdate.descriptorSet, 0, nullptr );
-
-			// get a new wang RNG seed
-			nbodyForceUpdate.pushConstants.wangSeed = genWangSeed();
-
-			// send the current value of the push constants
-			vkCmdPushConstants( cmd, nbodyForceUpdate.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &nbodyForceUpdate.pushConstants );
-
-			// dispatch for all the pixels
-			vkCmdDispatch( cmd, ( numForces + 15 ) / 16, 1, 1 );
-
-			// also needs to include access barrier for the resolve image
-			VkBufferMemoryBarrier2 barrier {
-				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
-
-				.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.buffer = ForceBuffer.buffer,
-				.offset = 0,
-				.size = VK_WHOLE_SIZE,
-			};
-
-			VkDependencyInfo barrierDependency {
-				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-				.bufferMemoryBarrierCount = 1,
-				.pBufferMemoryBarriers = &barrier
-			};
-
-			vkCmdPipelineBarrier2( cmd, &barrierDependency );
-		};
-	}
-
-	{ // Acceleration  Update
-		{ // descriptor layout
-			DescriptorLayoutBuilder builder;
-			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
-			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the SSBO with body locations
-			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the SSBO with the body-to-body forces
-			nbodyAccelUpdate.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
-		}
-
-		{ // pipeline layout + compute pipeline
-			VkPushConstantRange pushConstant{};
-			pushConstant.offset = 0;
-			pushConstant.size = sizeof( PushConstants );
-			pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-			VkPipelineLayoutCreateInfo computeLayout{};
-			computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			computeLayout.pNext = nullptr;
-			computeLayout.pSetLayouts = &nbodyAccelUpdate.descriptorSetLayout;
-			computeLayout.setLayoutCount = 1;
-			computeLayout.pPushConstantRanges = &pushConstant;
-			computeLayout.pushConstantRangeCount = 1;
-
-			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &nbodyAccelUpdate.pipelineLayout ) );
-
-			VkShaderModule PointUpdateShader;
-			if ( !vkutil::load_shader_module("../shaders/pointUpdate.comp.glsl.spv", device, &PointUpdateShader ) ) {
-				fmt::print( "Error when building the Point Update Compute Shader\n" );
-			}
-
-			VkPipelineShaderStageCreateInfo stageinfo{};
-			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			stageinfo.pNext = nullptr;
-			stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-			stageinfo.module = PointUpdateShader;
-			stageinfo.pName = "main";
-
-			VkComputePipelineCreateInfo computePipelineCreateInfo{};
-			computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-			computePipelineCreateInfo.pNext = nullptr;
-			computePipelineCreateInfo.layout = nbodyAccelUpdate.pipelineLayout;
-			computePipelineCreateInfo.stage = stageinfo;
-
-			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &nbodyAccelUpdate.pipeline ) );
-			vkDestroyShaderModule( device, PointUpdateShader, nullptr );
-
-			// deletors for the pipeline layout + pipeline
-			mainDeletionQueue.push_function( [ & ] () {
-				vkDestroyDescriptorSetLayout( device, nbodyAccelUpdate.descriptorSetLayout, nullptr );
-				vkDestroyPipelineLayout( device, nbodyAccelUpdate.pipelineLayout, nullptr );
-				vkDestroyPipeline( device, nbodyAccelUpdate.pipeline, nullptr );
-			});
-		}
-
-		// invoke() lambda
-		nbodyAccelUpdate.invoke = [ & ] ( VkCommandBuffer cmd ){
-			// dynamic descriptor allocation, to bind a texture
-			nbodyAccelUpdate.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, nbodyAccelUpdate.descriptorSetLayout );
-			{
-				DescriptorWriter writer;
-				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
-				writer.write_buffer( 1, PointBuffer.buffer, numPointSprites * sizeof( pointState ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
-				writer.write_buffer( 2, ForceBuffer.buffer, numForces * sizeof( glm::vec4 ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
-				writer.update_set( device, nbodyAccelUpdate.descriptorSet );
-			}
-
-			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, nbodyAccelUpdate.pipeline );
-
-			// bind the descriptor set, as just recorded
-			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, nbodyAccelUpdate.pipelineLayout, 0, 1, &nbodyAccelUpdate.descriptorSet, 0, nullptr );
-
-			// get a new wang RNG seed
-			nbodyAccelUpdate.pushConstants.wangSeed = genWangSeed();
-
-			// send the current value of the push constants
-			vkCmdPushConstants( cmd, nbodyAccelUpdate.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &nbodyAccelUpdate.pushConstants );
-
-			// dispatch for all the pixels
-			vkCmdDispatch( cmd, numPointSprites / 16, 1, 1 );
-
-			// also needs to include access barrier for the resolve image
-			VkBufferMemoryBarrier2 barrier {
-				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
-
-				.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.buffer = PointBuffer.buffer,
-				.offset = 0,
-				.size = VK_WHOLE_SIZE,
-			};
-
-			VkDependencyInfo barrierDependency {
-				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-				.bufferMemoryBarrierCount = 1,
-				.pBufferMemoryBarriers = &barrier
-			};
-
-			vkCmdPipelineBarrier2( cmd, &barrierDependency );
-		};
-	}
-
-	/*
 	{ // Raytrace update
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
@@ -835,7 +615,7 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdDispatch( cmd, ImageBufferResolution.width / 16, ImageBufferResolution.height / 16, 1 );
 
 			// also needs to include access barrier for the resolve image
-			VkImageMemoryBarrier2 barrier {
+			VkImageMemoryBarrier2 imageBarrier {
 				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
 
 				.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
@@ -854,16 +634,32 @@ void PrometheusInstance::initComputePasses () {
 				}
 			};
 
+			VkBufferMemoryBarrier2 bufferBarrier {
+				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+
+				.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+
+				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
+
+				.buffer = rayBuffer.buffer,
+				.offset = 0,
+				.size = VK_WHOLE_SIZE,
+			}
+
 			VkDependencyInfo barrierDependency {
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
 				.imageMemoryBarrierCount = 1,
-				.pImageMemoryBarriers = &barrier
+				.pImageMemoryBarriers = &imageBarrier,
+
+				.bufferMemoryBarrierCount = 1,
+				.pBufferMemoryBarriers = &bufferBarrier,
 			};
 
 			vkCmdPipelineBarrier2( cmd, &barrierDependency );
 		};
 	}
-	*/
 
 	{ // trying to setup the point sprites
 
@@ -875,8 +671,8 @@ void PrometheusInstance::initComputePasses () {
 
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
-			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the SSBO with point locations
-			pointSpriteRaster.descriptorSetLayout = builder.build( device,  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT );
+			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // Ray state buffer
+			lineRaster.descriptorSetLayout = builder.build( device,  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT );
 		}
 
 		{ // pipeline layout + pipeline build
@@ -888,73 +684,65 @@ void PrometheusInstance::initComputePasses () {
 			VkPipelineLayoutCreateInfo rasterLayout{};
 			rasterLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			rasterLayout.pNext = nullptr;
-			rasterLayout.pSetLayouts = &pointSpriteRaster.descriptorSetLayout;
+			rasterLayout.pSetLayouts = &lineRaster.descriptorSetLayout;
 			rasterLayout.setLayoutCount = 1;
 			rasterLayout.pPushConstantRanges = &pushConstant;
 			rasterLayout.pushConstantRangeCount = 1;
 
-			VK_CHECK( vkCreatePipelineLayout( device, &rasterLayout, nullptr, &pointSpriteRaster.pipelineLayout ) );
+			VK_CHECK( vkCreatePipelineLayout( device, &rasterLayout, nullptr, &lineRaster.pipelineLayout ) );
 
-			VkShaderModule pointSpriteFragShader;
-			if ( !vkutil::load_shader_module( "../shaders/pointSprite.frag.glsl.spv", device, &pointSpriteFragShader ) ) {
-				fmt::print( "Error when building the Agent Raster fragment shader module\n" );
-			} else {
-				fmt::print( "Agent Raster fragment shader successfully loaded\n" );
+			VkShaderModule lineFragShader;
+			if ( !vkutil::load_shader_module( "../shaders/lineDraw.frag.glsl.spv", device, &lineFragShader ) ) {
+				fmt::print( "Error when building the Line Draw Fragment shader module\n" );
 			}
 
-			VkShaderModule pointSpriteVertexShader;
-			if ( !vkutil::load_shader_module( "../shaders/pointSprite.vert.glsl.spv", device, &pointSpriteVertexShader ) ) {
-				fmt::print( "Error when building the Agent Raster vertex shader module\n" );
-			} else {
-				fmt::print( "Agent Raster vertex shader successfully loaded\n" );
+			VkShaderModule lineVertexShader;
+			if ( !vkutil::load_shader_module( "../shaders/lineDraw.vert.glsl.spv", device, &lineVertexShader ) ) {
+				fmt::print( "Error when building the Line Draw Vertex shader module\n" );
 			}
 
 			PipelineBuilder pipelineBuilder;
-			pipelineBuilder._pipelineLayout = pointSpriteRaster.pipelineLayout;
-			pipelineBuilder.set_shaders( pointSpriteVertexShader, pointSpriteFragShader );
+			pipelineBuilder._pipelineLayout = lineRaster.pipelineLayout;
+			pipelineBuilder.set_shaders( lineVertexShader, lineFragShader );
 			pipelineBuilder.set_input_topology( VK_PRIMITIVE_TOPOLOGY_POINT_LIST );
 			pipelineBuilder.set_polygon_mode( VK_POLYGON_MODE_FILL );
 			pipelineBuilder.set_cull_mode( VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE );
 			pipelineBuilder.set_multisampling_none();
 			pipelineBuilder.disable_blending();
-			pipelineBuilder.enable_depthtest( true, VK_COMPARE_OP_GREATER_OR_EQUAL );
-			pipelineBuilder.set_color_attachment_format( pointSpriteColorAttachment.imageFormat );
-			pipelineBuilder.set_depth_format( pointSpriteDepthAttachment.imageFormat );
-			pointSpriteRaster.pipeline = pipelineBuilder.build_pipeline( device );
+			pipelineBuilder.disable_depthtest();
+			pipelineBuilder.set_color_attachment_format( lineColorAttachment.imageFormat );
+			lineRaster.pipeline = pipelineBuilder.build_pipeline( device );
 
 			// cleanup
-			vkDestroyShaderModule( device, pointSpriteFragShader, nullptr );
-			vkDestroyShaderModule( device, pointSpriteVertexShader, nullptr );
+			vkDestroyShaderModule( device, lineFragShader, nullptr );
+			vkDestroyShaderModule( device, lineVertexShader, nullptr );
 
 			mainDeletionQueue.push_function( [ & ] ()  {
-				vkDestroyDescriptorSetLayout( device, pointSpriteRaster.descriptorSetLayout, nullptr );
-				vkDestroyPipeline( device, pointSpriteRaster.pipeline, nullptr );
-				vkDestroyPipelineLayout( device, pointSpriteRaster.pipelineLayout, nullptr );
+				vkDestroyDescriptorSetLayout( device, lineRaster.descriptorSetLayout, nullptr );
+				vkDestroyPipeline( device, lineRaster.pipeline, nullptr );
+				vkDestroyPipelineLayout( device, lineRaster.pipelineLayout, nullptr );
 			});
 		}
 
-		pointSpriteRaster.invoke = [ & ] ( VkCommandBuffer cmd ) {
+		lineRaster.invoke = [ & ] ( VkCommandBuffer cmd ) {
 			// additive raster for the agent locations
 			VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-			// VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( pointSpriteColorAttachment.imageView, &clearColor, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
-			// VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info( pointSpriteDepthAttachment.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL );
-			VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( pointSpriteColorAttachment.imageView, &clearColor, VK_IMAGE_LAYOUT_GENERAL );
-			VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info( pointSpriteDepthAttachment.imageView, VK_IMAGE_LAYOUT_GENERAL );
-			VkRenderingInfo renderInfo = vkinit::rendering_info( ImageBufferResolution, &colorAttachment, &depthAttachment );
+			VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( lineColorAttachment.imageView, &clearColor, VK_IMAGE_LAYOUT_GENERAL );
+			VkRenderingInfo renderInfo = vkinit::rendering_info( ImageBufferResolution, &colorAttachment, nullptr );
 
 			vkCmdBeginRendering( cmd, &renderInfo );
-			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pointSpriteRaster.pipeline );
+			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, lineRaster.pipeline );
 
-			// dynamic descriptor allocation, to bind a texture
-			pointSpriteRaster.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, pointSpriteRaster.descriptorSetLayout );
+			// dynamic descriptor allocation
+			lineRaster.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, lineRaster.descriptorSetLayout );
 			{
 				DescriptorWriter writer;
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
-				writer.write_buffer( 1, PointBuffer.buffer, numPointSprites * sizeof( pointState ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
-				writer.update_set( device, pointSpriteRaster.descriptorSet );
+				writer.write_buffer( 1, rayBuffer.buffer, numBounces * numRays * sizeof( raySegment ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.update_set( device, lineRaster.descriptorSet );
 			}
 
-			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pointSpriteRaster.pipelineLayout, 0, 1, &pointSpriteRaster.descriptorSet, 0, nullptr );
+			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, lineRaster.pipelineLayout, 0, 1, &lineRaster.descriptorSet, 0, nullptr );
 
 			//set dynamic viewport and scissor
 			VkViewport viewport = {};
@@ -974,11 +762,11 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdSetScissor( cmd, 0, 1, &scissor );
 
 			// draw all the agents as points
-			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,  pointSpriteRaster.pipelineLayout, 0, 1, &pointSpriteRaster.descriptorSet, 0, nullptr );
-			vkCmdPushConstants( cmd, pointSpriteRaster.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &pointSpriteRaster.pushConstants );
+			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,  lineRaster.pipelineLayout, 0, 1, &lineRaster.descriptorSet, 0, nullptr );
+			vkCmdPushConstants( cmd, lineRaster.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &lineRaster.pushConstants );
 
 			// launch a draw command to do the fullscreen triangle
-			vkCmdDraw( cmd, numPointSprites, 1, 0, 0 );
+			vkCmdDraw( cmd, ( numRays * numBounces ), 1, 0, 0 );
 			vkCmdEndRendering( cmd );
 
 			VkImageMemoryBarrier2 barrierC {
@@ -994,139 +782,7 @@ void PrometheusInstance::initComputePasses () {
 				.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
 
-				.image = pointSpriteColorAttachment.image,
-				.subresourceRange = {
-					VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
-				}
-			};
-
-			VkImageMemoryBarrier2 barrierD {
-				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-
-				.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				// now the blur has finished, we are using the filtered reads until the next agent raster
-				.oldLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
-
-				.image = pointSpriteDepthAttachment.image,
-				.subresourceRange = {
-					VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1
-				}
-			};
-
-			VkImageMemoryBarrier2 barriers[] = { barrierC, barrierD };
-			VkDependencyInfo barrierDependency {
-				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-				.imageMemoryBarrierCount = 2,
-				.pImageMemoryBarriers = barriers
-			};
-
-			vkCmdPipelineBarrier2( cmd, &barrierDependency );
-		};
-	}
-
-	{ // Deferred shading for the point sprites
-		{ // descriptor layout
-			DescriptorLayoutBuilder builder;
-			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
-			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // Color Attachment
-			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // Depth Attachment
-			builder.add_binding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // shaded image
-			pointSpriteDeferredShading.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
-		}
-
-		{ // pipeline layout + compute pipeline
-			VkPushConstantRange pushConstant{};
-			pushConstant.offset = 0;
-			pushConstant.size = sizeof( PushConstants );
-			pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-			VkPipelineLayoutCreateInfo computeLayout{};
-			computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			computeLayout.pNext = nullptr;
-			computeLayout.pSetLayouts = &pointSpriteDeferredShading.descriptorSetLayout;
-			computeLayout.setLayoutCount = 1;
-			computeLayout.pPushConstantRanges = &pushConstant;
-			computeLayout.pushConstantRangeCount = 1;
-
-			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &pointSpriteDeferredShading.pipelineLayout ) );
-
-			VkShaderModule deferredShader;
-			if ( !vkutil::load_shader_module("../shaders/pointSpriteShading.comp.glsl.spv", device, &deferredShader ) ) {
-				fmt::print( "Error when building the Point Sprite Deferred Shading Compute Shader\n" );
-			}
-
-			VkPipelineShaderStageCreateInfo stageinfo{};
-			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			stageinfo.pNext = nullptr;
-			stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-			stageinfo.module = deferredShader;
-			stageinfo.pName = "main";
-
-			VkComputePipelineCreateInfo computePipelineCreateInfo{};
-			computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-			computePipelineCreateInfo.pNext = nullptr;
-			computePipelineCreateInfo.layout = pointSpriteDeferredShading.pipelineLayout;
-			computePipelineCreateInfo.stage = stageinfo;
-
-			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &pointSpriteDeferredShading.pipeline ) );
-			vkDestroyShaderModule( device, deferredShader, nullptr );
-
-			// deletors for the pipeline layout + pipeline
-			mainDeletionQueue.push_function( [ & ] () {
-				vkDestroyDescriptorSetLayout( device, pointSpriteDeferredShading.descriptorSetLayout, nullptr );
-				vkDestroyPipelineLayout( device, pointSpriteDeferredShading.pipelineLayout, nullptr );
-				vkDestroyPipeline( device, pointSpriteDeferredShading.pipeline, nullptr );
-			});
-		}
-
-		// invoke() lambda
-		pointSpriteDeferredShading.invoke = [ & ]( VkCommandBuffer cmd ) {
-			pointSpriteDeferredShading.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, pointSpriteDeferredShading.descriptorSetLayout );
-			{
-				DescriptorWriter writer;
-				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
-				writer.write_image( 1, pointSpriteColorAttachment.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
-				writer.write_image( 2, pointSpriteDepthAttachment.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
-				writer.write_image( 3, XYZImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
-				writer.update_set( device, pointSpriteDeferredShading.descriptorSet );
-			}
-
-			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pointSpriteDeferredShading.pipeline );
-
-			// bind the descriptor set, as just recorded
-			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pointSpriteDeferredShading.pipelineLayout, 0, 1, &pointSpriteDeferredShading.descriptorSet, 0, nullptr );
-
-			// get a new wang RNG seed
-			pointSpriteDeferredShading.pushConstants.wangSeed = genWangSeed();
-
-			// send the current value of the push constants
-			vkCmdPushConstants( cmd, pointSpriteDeferredShading.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &pointSpriteDeferredShading.pushConstants );
-
-			// and the actual compute dispatch for the simulation agents
-			vkCmdDispatch( cmd, ( ImageBufferResolution.width + 15 ) / 16, ( ImageBufferResolution.height + 15 ) / 16, 1 );
-
-			/*
-			// also needs to include access barrier for the resolve image
-			VkImageMemoryBarrier2 barrier {
-				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-
-				.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				// now the blur has finished, we are using the filtered reads until the next agent raster
-				.oldLayout = VK_IMAGE_LAYOUT_GENERAL,
-				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
-
-				.image = XYZImage.image,
+				.image = lineColorAttachment.image,
 				.subresourceRange = {
 					VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
 				}
@@ -1135,11 +791,10 @@ void PrometheusInstance::initComputePasses () {
 			VkDependencyInfo barrierDependency {
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
 				.imageMemoryBarrierCount = 1,
-				.pImageMemoryBarriers = &barrier
+				.pImageMemoryBarriers = &barrierC
 			};
 
 			vkCmdPipelineBarrier2( cmd, &barrierDependency );
-			*/
 		};
 	}
 
