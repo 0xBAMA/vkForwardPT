@@ -9,27 +9,34 @@ layout ( local_size_x = 16, local_size_y = 16 ) in;
 #include "random.h"
 
 // the accumulator image
-layout ( rgba32f, set = 0, binding = 1 ) uniform image2D image;
+//layout ( rgba32f, set = 0, binding = 1 ) uniform image2D image;
+
+struct raySegment {
+	float wavelength;
+	float brightness;
+	vec2 a;	// first point
+	vec2 b;	// second point
+};
+
+layout( set = 0, binding = 1, std430 ) buffer rayBuffer {
+	raySegment rays[];
+};
 
 void main () {
 	// pixel index
-	ivec2 loc = ivec2( gl_GlobalInvocationID.xy );
+	uint loc = uint( gl_GlobalInvocationID.x );
+	uint baseIdx = loc * GlobalData.numBounces;
 
 	// seeding RNG
-	seed = PushConstants.wangSeed + 69420 * loc.x + 8675309 * loc.y;
+	seed = PushConstants.wangSeed + 8675309 * loc.x;
 
-	// generate a color value
-	vec3 color = getColorSample( loc );
-
-	vec4 data = vec4( color, 1.0f );
-	if ( GlobalData.reset == 0 ) {
-		// Average with the prior value
-		vec4 prevColor = imageLoad( image, loc );
-		float sampleCount = prevColor.a + 1.0f;
-		const float mixFactor = 1.0f / sampleCount;
-		data = vec4( ( any( isnan( color.rgb ) ) ) ? vec3( 0.0f ) : mix( prevColor.rgb, color.rgb, mixFactor ), sampleCount );
+	// doing the raytrace process...
+		// as a placeholder, generating random rays
+	// for ( int i = 0; i < GlobalData.numBounces; i++ ) {
+	for ( int i = 0; i < 32; i++ ) {
+		// rays[ baseIdx + i ].a = vec2( NormalizedRandomFloat(), NormalizedRandomFloat() ) * GlobalData.floatBufferResolution;
+		// rays[ baseIdx + i ].b = vec2( NormalizedRandomFloat(), NormalizedRandomFloat() ) * GlobalData.floatBufferResolution;
+		rays[ baseIdx + i ].a = vec2( NormalizedRandomFloat(), NormalizedRandomFloat() );
+		rays[ baseIdx + i ].b = vec2( NormalizedRandomFloat(), NormalizedRandomFloat() );
 	}
-
-	// store back to the running image
-	imageStore( image, loc, vec4( data ) );
 }

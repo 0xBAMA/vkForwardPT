@@ -21,6 +21,9 @@ layout( set = 0, binding = 0 ) uniform globalData {
 	int reset;
 	float aspectRatio;
 	float invAspectRatio;
+
+	int numRays;
+	int numBounces;
 } GlobalData;
 //=========================================================
 

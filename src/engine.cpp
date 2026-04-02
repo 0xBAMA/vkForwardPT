@@ -101,16 +101,17 @@ void PrometheusInstance::Draw () {
 	drawExtent.width = uint32_t( std::min( swapchainExtent.width, drawImage.imageExtent.width ) * renderScale );
 
 	// update the UBO contents
-	globalData.floatBufferResolution = glm::uvec2( ImageBufferResolution.width, ImageBufferResolution.height );
-	globalData.presentBufferResolution = glm::uvec2( drawExtent.width, drawExtent.height );
-
 	static float mouseX, mouseY;
 	SDL_GetMouseState( &mouseX, &mouseY );
 	globalData.mouseLoc = glm::vec2( mouseX, mouseY );
+	globalData.floatBufferResolution = glm::uvec2( ImageBufferResolution.width, ImageBufferResolution.height );
+	globalData.presentBufferResolution = glm::uvec2( drawExtent.width, drawExtent.height );
 	globalData.inverseRotation = glm::inverse( globalData.rotation ); // need to maintain this value because it's not updated in the event loop
 	globalData.aspectRatio = float( ImageBufferResolution.height ) / float( ImageBufferResolution.width );
 	globalData.invAspectRatio = float( ImageBufferResolution.width ) / float( ImageBufferResolution.height );
 	globalData.frameNumber = frameNumber;
+	globalData.numRays = numRays;
+	globalData.numBounces = numBounces;
 
 	// write directly from the memory on the PrometheusInstance
 	GlobalData* uniformData = ( GlobalData * ) GlobalUBO.allocation->GetMappedData();
@@ -127,14 +128,13 @@ void PrometheusInstance::Draw () {
 	// put the core images into a general format
 	vkutil::transition_image( cmd, XYZImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
-
-	// and the point sprite raster stuff
-	vkutil::transition_image( cmd, lineColorAttachment.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	vkutil::transition_image( cmd, lineColorAttachment.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 
 	// compute shader to do one update of the raytrace process
-	// Raytrace.invoke( cmd );
+	Raytrace.invoke( cmd );
 
 	// line drawing
+	lineRaster.invoke( cmd );
 
 	// compute shader to accumulate the raster result + put the resolved final image into the drawImage...
 	BufferPresent.invoke( cmd );
@@ -540,7 +540,7 @@ void PrometheusInstance::initComputePasses () {
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
-			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // the XYZ accumulator
+			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the ray buffer
 			Raytrace.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
 		}
 
@@ -596,7 +596,7 @@ void PrometheusInstance::initComputePasses () {
 			{
 				DescriptorWriter writer;
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
-				writer.write_image( 1, XYZImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
+				writer.write_buffer( 1, rayBuffer.buffer, numBounces * numRays * sizeof( raySegment ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
 				writer.update_set( device, Raytrace.descriptorSet );
 			}
 
@@ -612,27 +612,7 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdPushConstants( cmd, Raytrace.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &Raytrace.pushConstants );
 
 			// dispatch for all the pixels
-			vkCmdDispatch( cmd, ImageBufferResolution.width / 16, ImageBufferResolution.height / 16, 1 );
-
-			// also needs to include access barrier for the resolve image
-			VkImageMemoryBarrier2 imageBarrier {
-				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-
-				.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				// now the blur has finished, we are using the filtered reads until the next agent raster
-				.oldLayout = VK_IMAGE_LAYOUT_GENERAL,
-				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
-
-				.image = XYZImage.image,
-				.subresourceRange = {
-					VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
-				}
-			};
+			vkCmdDispatch( cmd, numRays / 32, 1, 1 );
 
 			VkBufferMemoryBarrier2 bufferBarrier {
 				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
@@ -646,13 +626,10 @@ void PrometheusInstance::initComputePasses () {
 				.buffer = rayBuffer.buffer,
 				.offset = 0,
 				.size = VK_WHOLE_SIZE,
-			}
+			};
 
 			VkDependencyInfo barrierDependency {
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-				.imageMemoryBarrierCount = 1,
-				.pImageMemoryBarriers = &imageBarrier,
-
 				.bufferMemoryBarrierCount = 1,
 				.pBufferMemoryBarriers = &bufferBarrier,
 			};
@@ -661,8 +638,7 @@ void PrometheusInstance::initComputePasses () {
 		};
 	}
 
-	{ // trying to setup the point sprites
-
+	{ // Line Rasterization
 		{ // descriptor layout
 			// we're eventually going to just want 32-bit uint IDs out of this process, but for now I think color makes sense...
 				// we of course also need depth for the z-testing.
@@ -704,11 +680,11 @@ void PrometheusInstance::initComputePasses () {
 			PipelineBuilder pipelineBuilder;
 			pipelineBuilder._pipelineLayout = lineRaster.pipelineLayout;
 			pipelineBuilder.set_shaders( lineVertexShader, lineFragShader );
-			pipelineBuilder.set_input_topology( VK_PRIMITIVE_TOPOLOGY_POINT_LIST );
+			pipelineBuilder.set_input_topology( VK_PRIMITIVE_TOPOLOGY_LINE_LIST );
 			pipelineBuilder.set_polygon_mode( VK_POLYGON_MODE_FILL );
 			pipelineBuilder.set_cull_mode( VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE );
 			pipelineBuilder.set_multisampling_none();
-			pipelineBuilder.disable_blending();
+			pipelineBuilder.enable_blending_additive();
 			pipelineBuilder.disable_depthtest();
 			pipelineBuilder.set_color_attachment_format( lineColorAttachment.imageFormat );
 			lineRaster.pipeline = pipelineBuilder.build_pipeline( device );
@@ -779,7 +755,7 @@ void PrometheusInstance::initComputePasses () {
 				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
 
 				// now the blur has finished, we are using the filtered reads until the next agent raster
-				.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				.oldLayout = VK_IMAGE_LAYOUT_GENERAL,
 				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
 
 				.image = lineColorAttachment.image,
@@ -859,7 +835,8 @@ void PrometheusInstance::initComputePasses () {
 				DescriptorWriter writer;
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 				writer.write_image( 1, drawImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
-				writer.write_image( 2, XYZImage.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				// writer.write_image( 2, XYZImage.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				writer.write_image( 2, lineColorAttachment.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
 				writer.update_set( device, BufferPresent.descriptorSet );
 			}
 

@@ -58,6 +58,9 @@ struct GlobalData {
 	int reset = 0;
 	float aspectRatio;
 	float invAspectRatio;
+
+	int numRays;
+	int numBounces;
 };
 
 // smallest scope CPU->GPU passing of information
