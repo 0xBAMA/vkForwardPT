@@ -528,6 +528,7 @@ void PrometheusInstance::initResources () {
 	mainDeletionQueue.push_function([ & ] () {
 		// destroying buffers
 		destroyBuffer( GlobalUBO );
+		destroyBuffer( rayBuffer );
 
 		// destroying images
 		destroyImage( XYZImage );
