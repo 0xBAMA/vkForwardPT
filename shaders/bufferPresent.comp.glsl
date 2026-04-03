@@ -18,5 +18,6 @@ void main () {
 	vec2 loc = ( gl_GlobalInvocationID.xy + vec2( 0.5f ) ) / imageSize( image ).xy;
 
 	// Sample the image and store the result
-	imageStore( image, ivec2( gl_GlobalInvocationID.xy ), texture( state, loc ) );
+	imageStore( image, ivec2( gl_GlobalInvocationID.xy ), texture( state, loc )
+		/ vec4( vec3( GlobalData.numRays * GlobalData.numBounces * 0.1f ), 1.0f ) );
 }
