@@ -3,7 +3,7 @@
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_buffer_reference : require
 
-layout ( local_size_x = 16, local_size_y = 16 ) in;
+layout ( local_size_x = 64 ) in;
 
 #include "common.h"
 #include "random.h"
@@ -32,11 +32,9 @@ void main () {
 
 	// doing the raytrace process...
 		// as a placeholder, generating random rays
-	// for ( int i = 0; i < GlobalData.numBounces; i++ ) {
-	for ( int i = 0; i < 32; i++ ) {
-		// rays[ baseIdx + i ].a = vec2( NormalizedRandomFloat(), NormalizedRandomFloat() ) * GlobalData.floatBufferResolution;
-		// rays[ baseIdx + i ].b = vec2( NormalizedRandomFloat(), NormalizedRandomFloat() ) * GlobalData.floatBufferResolution;
-		rays[ baseIdx + i ].a = vec2( NormalizedRandomFloat(), NormalizedRandomFloat() );
-		rays[ baseIdx + i ].b = vec2( NormalizedRandomFloat(), NormalizedRandomFloat() );
+	 for ( int i = 0; i < GlobalData.numBounces; i++ ) {
+		rays[ baseIdx + i ].a = vec2( remap( NormalizedRandomFloat(), 0.0f, 1.0f, -1.0f, 1.0f ), remap( NormalizedRandomFloat(), 0.0f, 1.0f, -1.0f, 1.0f ) );
+		rays[ baseIdx + i ].b = vec2( remap( NormalizedRandomFloat(), 0.0f, 1.0f, -1.0f, 1.0f ), remap( NormalizedRandomFloat(), 0.0f, 1.0f, -1.0f, 1.0f ) );
+		rays[ baseIdx + i ].wavelength = remap( NormalizedRandomFloat(), 0.0f, 1.0f, 380.0f, 780.0f );
 	}
 }

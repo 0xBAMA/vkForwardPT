@@ -14,16 +14,13 @@ layout( set = 0, binding = 0 ) uniform globalData {
 
 	vec2 mouseLoc;
 
-	mat4 rotation;
-	mat4 inverseRotation;
+	int numRays;
+	int numBounces;
 
 	int frameNumber;
 	int reset;
-	float aspectRatio;
-	float invAspectRatio;
 
-	int numRays;
-	int numBounces;
+	// nsight: vec2u; vec2u; vec2; int; int; int; int;
 } GlobalData;
 //=========================================================
 
@@ -40,4 +37,11 @@ layout( set = 0, binding = 0 ) uniform globalData {
 const float pi = 3.141592f;
 const float tau = 2.0f * pi;
 const float sqrtpi = 1.7724538509f;
+#endif
+
+#ifndef REMAP_DEFINED
+#define REMAP_DEFINED
+float remap ( float value, float inLow, float inHigh, float outLow, float outHigh ) {
+	return outLow + ( value - inLow ) * ( outHigh - outLow ) / ( inHigh - inLow );
+}
 #endif

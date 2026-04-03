@@ -5,8 +5,10 @@
 
 #include "common.h"
 
+layout ( location = 0 ) in flat vec3 colorRGB;
+
 layout ( location = 0 ) out vec4 outFragColor;
 
 void main () {
-	outFragColor = vec4( 1.0f, 1.0f, 0.0f, 1.0f );
+	outFragColor = vec4( colorRGB, 1.0f );
 }

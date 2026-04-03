@@ -106,12 +106,7 @@ void PrometheusInstance::Draw () {
 	globalData.mouseLoc = glm::vec2( mouseX, mouseY );
 	globalData.floatBufferResolution = glm::uvec2( ImageBufferResolution.width, ImageBufferResolution.height );
 	globalData.presentBufferResolution = glm::uvec2( drawExtent.width, drawExtent.height );
-	globalData.inverseRotation = glm::inverse( globalData.rotation ); // need to maintain this value because it's not updated in the event loop
-	globalData.aspectRatio = float( ImageBufferResolution.height ) / float( ImageBufferResolution.width );
-	globalData.invAspectRatio = float( ImageBufferResolution.width ) / float( ImageBufferResolution.height );
 	globalData.frameNumber = frameNumber;
-	globalData.numRays = numRays;
-	globalData.numBounces = numBounces;
 
 	// write directly from the memory on the PrometheusInstance
 	GlobalData* uniformData = ( GlobalData * ) GlobalUBO.allocation->GetMappedData();
@@ -211,34 +206,10 @@ void PrometheusInstance::MainLoop () {
 
 			const bool* kb = SDL_GetKeyboardState( NULL );
 			const float amount = SDL_GetModState() & SDL_KMOD_LSHIFT ? 0.1f : 0.01f;
-			if ( kb[ SDL_SCANCODE_RIGHT ] || kb[ SDL_SCANCODE_D ] ) {
-				globalData.rotation = glm::rotate( globalData.rotation, amount, glm::vec3( 0.0f, 1.0f, 0.0f ) );
-				globalData.reset = 1;
-			}
-			if ( kb[ SDL_SCANCODE_LEFT ] || kb[ SDL_SCANCODE_A ] ) {
-				globalData.rotation = glm::rotate( globalData.rotation, -amount, glm::vec3( 0.0f, 1.0f, 0.0f ) );
-				globalData.reset = 1;
-			}
-			if ( kb[ SDL_SCANCODE_UP ] || kb[ SDL_SCANCODE_W ] ) {
-				globalData.rotation = glm::rotate( globalData.rotation, amount, glm::vec3( 1.0f, 0.0f, 0.0f ) );
-				globalData.reset = 1;
-			}
-			if ( kb[ SDL_SCANCODE_DOWN ] || kb[ SDL_SCANCODE_S ] ) {
-				globalData.rotation = glm::rotate( globalData.rotation, -amount, glm::vec3( 1.0f, 0.0f, 0.0f ) );
-				globalData.reset = 1;
-			}
-			if ( kb[ SDL_SCANCODE_PAGEUP ] || kb[ SDL_SCANCODE_Q ] ) {
-				globalData.rotation = glm::rotate( globalData.rotation, -amount, glm::vec3( 0.0f, 0.0f, 1.0f ) );
-				globalData.reset = 1;
-			}
-			if ( kb[ SDL_SCANCODE_PAGEDOWN ] || kb[ SDL_SCANCODE_E ] ) {
-				globalData.rotation = glm::rotate( globalData.rotation, amount, glm::vec3( 0.0f, 0.0f, 1.0f ) );
-				globalData.reset = 1;
-			}
-			if ( kb[ SDL_SCANCODE_R ] ) {
-				globalData.rotation = glm::scale( globalData.rotation, glm::vec3( 0.9f ) );
-				globalData.reset = 1;
-			}
+			// if ( kb[ SDL_SCANCODE_RIGHT ] || kb[ SDL_SCANCODE_D ] ) {
+				// globalData.rotation = glm::rotate( globalData.rotation, amount, glm::vec3( 0.0f, 1.0f, 0.0f ) );
+				// globalData.reset = 1;
+			// }
 
 			//send SDL event to imgui for handling
 			ImGui_ImplSDL3_ProcessEvent( &e );
@@ -522,7 +493,7 @@ void PrometheusInstance::initResources () {
 	lineColorAttachment = createImage( { ImageBufferResolution.width, ImageBufferResolution.height, 1 }, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT );
 
 	// buffer for the rays
-	rayBuffer = createBuffer( numBounces * numRays * sizeof( raySegment ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY );
+	rayBuffer = createBuffer( globalData.numBounces * globalData.numRays * sizeof( raySegment ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY );
 
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
@@ -597,7 +568,7 @@ void PrometheusInstance::initComputePasses () {
 			{
 				DescriptorWriter writer;
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
-				writer.write_buffer( 1, rayBuffer.buffer, numBounces * numRays * sizeof( raySegment ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.write_buffer( 1, rayBuffer.buffer, globalData.numBounces * globalData.numRays * sizeof( raySegment ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
 				writer.update_set( device, Raytrace.descriptorSet );
 			}
 
@@ -613,7 +584,7 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdPushConstants( cmd, Raytrace.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &Raytrace.pushConstants );
 
 			// dispatch for all the pixels
-			vkCmdDispatch( cmd, numRays / 32, 1, 1 );
+			vkCmdDispatch( cmd, globalData.numRays / 64, 1, 1 );
 
 			VkBufferMemoryBarrier2 bufferBarrier {
 				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
@@ -715,7 +686,7 @@ void PrometheusInstance::initComputePasses () {
 			{
 				DescriptorWriter writer;
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
-				writer.write_buffer( 1, rayBuffer.buffer, numBounces * numRays * sizeof( raySegment ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.write_buffer( 1, rayBuffer.buffer, globalData.numBounces * globalData.numRays * sizeof( raySegment ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
 				writer.update_set( device, lineRaster.descriptorSet );
 			}
 
@@ -743,7 +714,7 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdPushConstants( cmd, lineRaster.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &lineRaster.pushConstants );
 
 			// launch a draw command to do the fullscreen triangle
-			vkCmdDraw( cmd, ( numRays * numBounces ), 1, 0, 0 );
+			vkCmdDraw( cmd, 2 * ( globalData.numRays * globalData.numBounces ), 1, 0, 0 );
 			vkCmdEndRendering( cmd );
 
 			VkImageMemoryBarrier2 barrierC {

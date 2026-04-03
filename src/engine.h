@@ -51,16 +51,11 @@ struct GlobalData {
 
 	glm::vec2 mouseLoc;
 
-	glm::mat4 rotation{ 1.0f };
-	glm::mat4 inverseRotation{ 1.0f };
+	int numRays{ 64 * 32 };
+	int numBounces{ 32 };
 
-	int frameNumber;
-	int reset = 0;
-	float aspectRatio;
-	float invAspectRatio;
-
-	int numRays;
-	int numBounces;
+	int frameNumber{ 0 };
+	int reset{ 0 };
 };
 
 // smallest scope CPU->GPU passing of information
@@ -123,8 +118,6 @@ public:
 	AllocatedImage XYZImage;
 
 	// rays
-	uint32_t numRays = 64 * 32;
-	uint32_t numBounces = 32;
 	AllocatedBuffer rayBuffer;
 
 	// wrapping the compute passes which are involved
