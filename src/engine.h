@@ -51,7 +51,7 @@ struct GlobalData {
 
 	glm::vec2 mouseLoc;
 
-	int numRays{ 64 * 32 };
+	int numRays{ 64 * 1 };
 	int numBounces{ 32 };
 
 	int frameNumber{ 0 };
@@ -122,6 +122,7 @@ public:
 
 	// wrapping the compute passes which are involved
 	ComputeEffect Raytrace;
+	ComputeEffect Accumulate;
 	ComputeEffect BufferPresent;
 
 	// abusing the ComputeEffect struct for a raster pipeline

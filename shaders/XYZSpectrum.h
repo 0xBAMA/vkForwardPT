@@ -480,14 +480,28 @@ vec3 wavelengthColor ( float wavelength ) { // units are nanometers, color value
     return mix( cie_1964( floor( wavelength ) ),  cie_1964( ceil( wavelength ) ), fract( wavelength ) );
 }
 
+// Used to convert from linear RGB to XYZ space
+const mat3 RGB_2_XYZ = ( mat3(
+	0.4124564, 0.2126729, 0.0193339,
+	0.3575761, 0.7151522, 0.1191920,
+	0.1804375, 0.0721750, 0.9503041
+) );
+
+// Used to convert from XYZ to linear RGB space
+const mat3 XYZ_2_RGB = ( mat3(
+	3.2404542, -0.9692660, 0.0556434,
+	-1.5371385, 1.8760108, -0.2040259,
+	-0.4985314, 0.0415560, 1.0572252
+) );
+
 vec3 wl_rgb ( float lambda ) {
    vec3 xyz = wavelengthColor( lambda );
    float x = xyz.x;
    float y = xyz.y;
    float z = xyz.z;
    vec3 rgb;
-   rgb.r =  3.2404542*x - 1.5371385*y - 0.4985314*z;
-   rgb.g = -0.9692660*x + 1.8760108*y + 0.0415560*z;
-   rgb.b =  0.0556434*x - 0.2040259*y + 1.0572252*z;
-   return clamp(rgb, 0., 1.);
+   // rgb.r =  3.2404542*x - 1.5371385*y - 0.4985314*z;
+   // rgb.g = -0.9692660*x + 1.8760108*y + 0.0415560*z;
+   // rgb.b =  0.0556434*x - 0.2040259*y + 1.0572252*z;
+   return clamp( XYZ_2_RGB * rgb, 0., 1.);
 }

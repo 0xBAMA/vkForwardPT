@@ -131,6 +131,9 @@ void PrometheusInstance::Draw () {
 	// line drawing
 	lineRaster.invoke( cmd );
 
+	// accumulate the result into a buffer
+	Accumulate.invoke( cmd );
+
 	// compute shader to accumulate the raster result + put the resolved final image into the drawImage...
 	BufferPresent.invoke( cmd );
 
@@ -490,7 +493,7 @@ void PrometheusInstance::initResources () {
 	XYZImage = createImage( bufferExtent, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT );
 
 	// create the raster attachments
-	lineColorAttachment = createImage( { ImageBufferResolution.width, ImageBufferResolution.height, 1 }, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT );
+	lineColorAttachment = createImage( { ImageBufferResolution.width, ImageBufferResolution.height, 1 }, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT );
 
 	// buffer for the rays
 	rayBuffer = createBuffer( globalData.numBounces * globalData.numRays * sizeof( raySegment ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY );
@@ -746,6 +749,87 @@ void PrometheusInstance::initComputePasses () {
 		};
 	}
 
+	{ // Accumulate
+		{ // descriptor layout
+			DescriptorLayoutBuilder builder;
+			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
+			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // draw image
+			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // XYZ Buffer
+			Accumulate.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
+		}
+
+		{ // pipeline layout + compute pipeline
+			VkPushConstantRange pushConstant{};
+			pushConstant.offset = 0;
+			pushConstant.size = sizeof( PushConstants );
+			pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+			VkPipelineLayoutCreateInfo computeLayout{};
+			computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			computeLayout.pNext = nullptr;
+			computeLayout.pSetLayouts = &Accumulate.descriptorSetLayout;
+			computeLayout.setLayoutCount = 1;
+			computeLayout.pPushConstantRanges = &pushConstant;
+			computeLayout.pushConstantRangeCount = 1;
+
+			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &Accumulate.pipelineLayout ) );
+
+			VkShaderModule AccumulateShader;
+			if ( !vkutil::load_shader_module("../shaders/accumulate.comp.glsl.spv", device, &AccumulateShader ) ) {
+				fmt::print( "Error when building the Accumulate Compute Shader\n" );
+			}
+
+			VkPipelineShaderStageCreateInfo stageinfo{};
+			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			stageinfo.pNext = nullptr;
+			stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+			stageinfo.module = AccumulateShader;
+			stageinfo.pName = "main";
+
+			VkComputePipelineCreateInfo computePipelineCreateInfo{};
+			computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+			computePipelineCreateInfo.pNext = nullptr;
+			computePipelineCreateInfo.layout = Accumulate.pipelineLayout;
+			computePipelineCreateInfo.stage = stageinfo;
+
+			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &Accumulate.pipeline ) );
+			vkDestroyShaderModule( device, AccumulateShader, nullptr );
+
+			// deletors for the pipeline layout + pipeline
+			mainDeletionQueue.push_function( [ & ] () {
+				vkDestroyDescriptorSetLayout( device, Accumulate.descriptorSetLayout, nullptr );
+				vkDestroyPipelineLayout( device, Accumulate.pipelineLayout, nullptr );
+				vkDestroyPipeline( device, Accumulate.pipeline, nullptr );
+			});
+		}
+
+		// invoke() lambda
+		Accumulate.invoke = [ & ]( VkCommandBuffer cmd ) {
+			Accumulate.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, Accumulate.descriptorSetLayout );
+			{
+				DescriptorWriter writer;
+				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
+				writer.write_image( 1, lineColorAttachment.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
+				writer.write_image( 2, XYZImage.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
+				writer.update_set( device, Accumulate.descriptorSet );
+			}
+
+			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, Accumulate.pipeline );
+
+			// bind the descriptor set, as just recorded
+			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, Accumulate.pipelineLayout, 0, 1, &Accumulate.descriptorSet, 0, nullptr );
+
+			// get a new wang RNG seed
+			Accumulate.pushConstants.wangSeed = genWangSeed();
+
+			// send the current value of the push constants
+			vkCmdPushConstants( cmd, Accumulate.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &Accumulate.pushConstants );
+
+			// and the actual compute dispatch for the simulation agents
+			vkCmdDispatch( cmd, ( drawExtent.width + 15 ) / 16, ( drawExtent.height + 15 ) / 16, 1 );
+		};
+	}
+
 	{ // Present
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
@@ -807,8 +891,7 @@ void PrometheusInstance::initComputePasses () {
 				DescriptorWriter writer;
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 				writer.write_image( 1, drawImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
-				// writer.write_image( 2, XYZImage.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
-				writer.write_image( 2, lineColorAttachment.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				writer.write_image( 2, XYZImage.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
 				writer.update_set( device, BufferPresent.descriptorSet );
 			}
 
