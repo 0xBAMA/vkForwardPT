@@ -150,7 +150,7 @@ void PrometheusInstance::Draw () {
 	vkutil::transition_image( cmd, swapchainImages[ swapchainImageIndex ], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
 
 	//draw imgui into the swapchain image
-	// drawImgui( cmd, swapchainImageViews[ swapchainImageIndex ] );
+	drawImgui( cmd, swapchainImageViews[ swapchainImageIndex ] );
 
 	// transition the image from layout general to ready-for-swapchain-handoff
 	vkutil::transition_image( cmd, swapchainImages[ swapchainImageIndex ], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR );
@@ -201,6 +201,8 @@ void PrometheusInstance::MainLoop () {
 	while ( !quit ) {
 		// event handling loop
 		while ( SDL_PollEvent( &e ) ) {
+			ImGui_ImplSDL3_ProcessEvent( &e );
+
 			if ( e.type == SDL_EVENT_QUIT ) {
 				quit = true;
 			}
@@ -234,7 +236,6 @@ void PrometheusInstance::MainLoop () {
 			// throttle the speed to avoid busy loop
 			std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 		} else {
-			/*
 			// imgui new frame
 			ImGui_ImplVulkan_NewFrame();
 			ImGui_ImplSDL3_NewFrame();
@@ -263,7 +264,6 @@ void PrometheusInstance::MainLoop () {
 
 			// make imgui calculate internal draw structures
 			ImGui::Render();
-			*/
 
 			// we're ready to draw the next frame
 			Draw();
@@ -1093,7 +1093,13 @@ void PrometheusInstance::initImgui () {
 
 	// 2: initialize imgui library
 	// this initializes the core structures of imgui
+	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
+
+	ImGuiIO& io = ImGui::GetIO();
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // optional
+
+	ImGui::StyleColorsDark();
 
 	// this initializes imgui for SDL
 	ImGui_ImplSDL3_InitForVulkan( window );
@@ -1109,13 +1115,14 @@ void PrometheusInstance::initImgui () {
 	init_info.ImageCount = 3;
 	init_info.UseDynamicRendering = true;
 
-	/*
-	//dynamic rendering parameters for imgui to use
-	init_info.PipelineRenderingCreateInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-	init_info.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-	init_info.PipelineRenderingCreateInfo.pColorAttachmentFormats = &swapchainImageFormat;
-	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-	*/
+	init_info.PipelineInfoMain = {};
+	init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+	VkPipelineRenderingCreateInfoKHR pipeline_rendering_info = {};
+	pipeline_rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+	pipeline_rendering_info.colorAttachmentCount = 1;
+	pipeline_rendering_info.pColorAttachmentFormats = &swapchainImageFormat;
+	init_info.PipelineInfoMain.PipelineRenderingCreateInfo = pipeline_rendering_info;
 
 	ImGui_ImplVulkan_Init( &init_info );
 
@@ -1123,6 +1130,9 @@ void PrometheusInstance::initImgui () {
 	mainDeletionQueue.push_function( [ = ] ()  {
 		ImGui_ImplVulkan_Shutdown();
 		vkDestroyDescriptorPool( device, imguiPool, nullptr );
+
+		ImGui_ImplSDL3_Shutdown();
+		ImGui::DestroyContext();
 	});
 }
 
