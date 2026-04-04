@@ -107,6 +107,7 @@ void PrometheusInstance::Draw () {
 	globalData.floatBufferResolution = glm::uvec2( ImageBufferResolution.width, ImageBufferResolution.height );
 	globalData.presentBufferResolution = glm::uvec2( drawExtent.width, drawExtent.height );
 	globalData.frameNumber = frameNumber;
+	globalData.framesSinceReset++;
 
 	// write directly from the memory on the PrometheusInstance
 	GlobalData* uniformData = ( GlobalData * ) GlobalUBO.allocation->GetMappedData();
@@ -115,6 +116,7 @@ void PrometheusInstance::Draw () {
 	// reset the reset flag
 	if ( globalData.reset != 0 ) {
 		globalData.reset = 0;
+		globalData.framesSinceReset = 0;
 	}
 
 	// start the command buffer recording
@@ -219,6 +221,12 @@ void PrometheusInstance::MainLoop () {
 
 			//send SDL event to imgui for handling
 			ImGui_ImplSDL3_ProcessEvent( &e );
+		}
+
+		static glm::vec2 lastMousePos = glm::vec2( 0.0f );
+		if ( distance( lastMousePos, globalData.mouseLoc ) > 8.0f ) {
+			globalData.reset = true;
+			lastMousePos = globalData.mouseLoc;
 		}
 
 		// handling minimized application
@@ -356,6 +364,8 @@ void PrometheusInstance::initVulkan () {
 	// Get the VkDevice handle used in the rest of a vulkan application
 	device = vkbDevice.device;
 	physicalDevice = physicalDeviceSelect.physical_device;
+
+
 
 	{
 		// reporting some platform info
@@ -1196,7 +1206,6 @@ void PrometheusInstance::createSwapchain ( uint32_t w, uint32_t h ) {
 	// build a image-view for the draw image to use for rendering
 	VkImageViewCreateInfo dview_info = vkinit::imageview_create_info( depthImage.imageFormat, depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT );
 	VK_CHECK( vkCreateImageView( device, &dview_info, nullptr, &depthImage.imageView ) );
-
 
 	// add to deletion queues
 	mainDeletionQueue.push_function( [ = ] () {

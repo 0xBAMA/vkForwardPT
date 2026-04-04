@@ -19,5 +19,8 @@ void main () {
 
 	// Sample the image and store the result
 	imageStore( image, ivec2( gl_GlobalInvocationID.xy ), texture( state, loc )
-		/ vec4( vec3( GlobalData.numRays * GlobalData.numBounces * 0.1f ), 1.0f ) );
+	// / vec4( vec3( GlobalData.numRays * GlobalData.numBounces * 0.005f ), 1.0f ) );
+	// / vec4( vec3( GlobalData.frameNumber * 10.0f ), 1.0f ) );
+	 / vec4( vec3( GlobalData.framesSinceReset * 2.0f ), 1.0f ) );
+//	/ vec4( vec3( 1000.0f ), 1.0f ) );
 }
