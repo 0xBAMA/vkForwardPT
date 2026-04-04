@@ -80,7 +80,7 @@ float hitRoughness = 0.0f;
 float hitAlbedo = 0.0f;
 
 // raymarch parameters
-const float epsilon = 0.1f;
+const float epsilon = 0.03f;
 const float maxDistance = 6000.0f;
 const int maxSteps = 200;
 
@@ -190,8 +190,10 @@ float de ( vec2 p ) {
 		{ // an example object (refractive)
 			uint seedCache = seed;
 			seed = 31415 * uint( gridIndex.x ) + uint( gridIndex.y ) * 42069 + 999999;
-			const vec3 noise = 0.5f * hash33( vec3( gridIndex.xy, 0.0f ) ) + vec3( 2.0f );
-			const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.z ) : ( ( distance( p, vec2( 0.0f ) ) - ( 2.40f * noise.y ) ) ) );
+			const vec3 noise = 0.5f * hash33( vec3( gridIndex.xy, 0.0f ) ) + vec3( 2.0f, 1.0f, 0.5f );
+			 const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.z ) : ( ( distance( p, vec2( 0.0f ) ) - ( 3.40f * noise.y ) ) ) );
+//			const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.z ) : ( ( rectangle( Rotate2D( 10.0f * noise.x ) * p, vec2( 2.40f * noise.y ) ) ) ) );
+//			const float d = ( invert ? -1.0f : 1.0f ) * ( distance( p, vec2( 0.0f ) ) - 4.0f );
 			seed = seedCache;
 			sceneDist = min( sceneDist, d );
 			if ( sceneDist == d && d < epsilon ) {
@@ -205,13 +207,13 @@ float de ( vec2 p ) {
 	if ( true ) {
 		const float d = min( min( min(
 		rectangle( pOriginal - vec2( 0.0f, 0.0f ), vec2( 4000.0f, 20.0f ) ),
-		rectangle( pOriginal - vec2( 0.0f, GlobalData.floatBufferResolution.x ), vec2( 4000.0f, 20.0f ) ) ),
+		rectangle( pOriginal - vec2( 0.0f, GlobalData.floatBufferResolution.y ), vec2( 4000.0f, 20.0f ) ) ),
 		rectangle( pOriginal - vec2( 0.0f, 0.0f ), vec2( 20.0f, 3000.0f ) ) ),
-		rectangle( pOriginal - vec2( GlobalData.floatBufferResolution.y, 0.0f ), vec2( 20.0f, 3000.0f ) ) );
+		rectangle( pOriginal - vec2( GlobalData.floatBufferResolution.x, 0.0f ), vec2( 20.0f, 3000.0f ) ) );
 		sceneDist = min( sceneDist, d );
 		if ( sceneDist == d && d < epsilon ) {
 			hitSurfaceType = MIRROR;
-			hitAlbedo = 0.3f;
+			hitAlbedo = 0.7f;
 		}
 	}
 
