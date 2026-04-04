@@ -51,7 +51,7 @@ struct GlobalData {
 
 	glm::vec2 mouseLoc;
 
-	int numRays{ 64 * 10 };
+	int numRays{ 64 * 150 };
 	int numBounces{ 256 };
 
 	int frameNumber{ 0 };
@@ -62,6 +62,7 @@ struct GlobalData {
 // smallest scope CPU->GPU passing of information
 struct PushConstants {
 	uint32_t wangSeed;
+	float rotate = 0.0f;
 };
 
 struct raySegment {

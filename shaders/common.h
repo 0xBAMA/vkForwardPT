@@ -3,6 +3,7 @@
 layout( push_constant ) uniform constants {
 // RNG seeding from the CPU
 	uint wangSeed;
+	float rotate;
 } PushConstants;
 
 //=========================================================

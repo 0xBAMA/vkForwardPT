@@ -286,9 +286,9 @@ void main () {
 		// importance sampled from the light
 
 	// placeholder mouse light, uniform point with uniform distribution
-	rayOrigin = GlobalData.mouseLoc;
-	rayDirection = normalize( CircleOffset().xy );
-	wavelength = remap( pow( NormalizedRandomFloat(), 0.6f ), 0.0f, 1.0f, 380.0f, 830.0f );
+	rayOrigin = GlobalData.mouseLoc + Rotate2D( PushConstants.rotate ) * vec2( 100.0f, 10.0f ) * UniformSampleHexagon().xy;
+	rayDirection = normalize( Rotate2D( PushConstants.rotate ) * vec2( 0.0f, 1.0f ) );
+	wavelength = remap( pow( NormalizedRandomFloat(), 2.f ), 0.0f, 1.0f, 380.0f, 830.0f );
 
 	// initial values... probably redundant
 	float transmission = 1.0f;

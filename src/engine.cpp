@@ -221,6 +221,15 @@ void PrometheusInstance::MainLoop () {
 				globalData.reset = 1;
 			}
 
+			if ( kb[ SDL_SCANCODE_D ] ) {
+				globalData.reset = 1;
+				Raytrace.pushConstants.rotate -= amount;
+			}
+			if ( kb[ SDL_SCANCODE_A ] ) {
+				globalData.reset = 1;
+				Raytrace.pushConstants.rotate += amount;
+			}
+
 			//send SDL event to imgui for handling
 			ImGui_ImplSDL3_ProcessEvent( &e );
 		}
