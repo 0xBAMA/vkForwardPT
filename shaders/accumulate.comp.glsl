@@ -14,9 +14,12 @@ layout ( rgba32f, set = 0, binding = 2 ) uniform image2D accumulator;
 void main () {
 	// get the sum
 	const ivec2 loc = ivec2( gl_GlobalInvocationID.xy );
-	const vec4 sum =
+	vec4 sum =
 		imageLoad( rasterImage, loc ) +
 		imageLoad( accumulator, loc );
+
+	if ( GlobalData.reset != 0 )
+		sum = vec4( 0.0f );
 
 	// store the result
 	imageStore( accumulator, loc, sum );

@@ -213,6 +213,9 @@ void PrometheusInstance::MainLoop () {
 				// globalData.rotation = glm::rotate( globalData.rotation, amount, glm::vec3( 0.0f, 1.0f, 0.0f ) );
 				// globalData.reset = 1;
 			// }
+			if ( kb[ SDL_SCANCODE_R ] ) {
+				globalData.reset = 1;
+			}
 
 			//send SDL event to imgui for handling
 			ImGui_ImplSDL3_ProcessEvent( &e );
