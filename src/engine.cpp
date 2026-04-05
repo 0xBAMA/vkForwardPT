@@ -224,7 +224,8 @@ void PrometheusInstance::MainLoop () {
 			}
 
 			const bool* kb = SDL_GetKeyboardState( NULL );
-			const float amount = SDL_GetModState() & SDL_KMOD_LSHIFT ? 0.1f : 0.01f;
+			const bool shift = SDL_GetModState() & SDL_KMOD_LSHIFT;
+			const float amount = shift ? 0.1f : 0.01f;
 			// if ( kb[ SDL_SCANCODE_RIGHT ] || kb[ SDL_SCANCODE_D ] ) {
 				// globalData.rotation = glm::rotate( globalData.rotation, amount, glm::vec3( 0.0f, 1.0f, 0.0f ) );
 				// globalData.reset = 1;
@@ -237,6 +238,7 @@ void PrometheusInstance::MainLoop () {
 				globalData.reset = 1;
 				Raytrace.pushConstants.rotate -= amount;
 			}
+
 			if ( kb[ SDL_SCANCODE_A ] ) {
 				globalData.reset = 1;
 				Raytrace.pushConstants.rotate += amount;
@@ -267,10 +269,17 @@ void PrometheusInstance::MainLoop () {
 			ImGui::NewFrame();
 
 			// some imgui UI to test
-			ImGui::ShowDemoWindow();
+			// ImGui::ShowDemoWindow();
 
 			if ( ImGui::Begin( "Edit" ) ) {
 				ImGui::SliderFloat( "Render Scale", &renderScale, 0.3f, 1.0f );
+
+				static ImTextureID myTextureID = ( ImTextureID ) ImGui_ImplVulkan_AddTexture(
+					defaultSamplerLinear,
+					lineColorAttachment.imageView,
+					VK_IMAGE_LAYOUT_GENERAL
+				);
+				ImGui::Image( myTextureID, ImVec2( 386, 256 ) );
 
 				if ( ImGui::Button( "Add Preset" ) ) {
 					// add the new one
