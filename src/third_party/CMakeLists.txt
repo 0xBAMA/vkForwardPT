@@ -56,6 +56,8 @@ target_include_directories(glm INTERFACE glm)
 
 #target_link_libraries(sdl2 INTERFACE SDL2 SDL2main)
 
+add_library( STB_ImageUtilsWrapper STATIC stb/impl.cc )
+
 add_library(imgui STATIC)
 
 target_include_directories(imgui PUBLIC imgui)
