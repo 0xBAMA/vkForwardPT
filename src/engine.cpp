@@ -30,6 +30,15 @@
 
 #include "third_party/stb/stb_image_write.h"
 
+
+inline std::string timeDateString () {
+	auto now = std::chrono::system_clock::now();
+	auto inTime_t = std::chrono::system_clock::to_time_t( now );
+	std::stringstream ssA;
+	ssA << std::put_time( std::localtime( &inTime_t ), "%Y-%m-%d at %H-%M-%S" );
+	return ssA.str();
+}
+
 //============================================================================================================================
 //============================================================================================================================
 // Initialization
@@ -231,6 +240,10 @@ void PrometheusInstance::MainLoop () {
 			if ( kb[ SDL_SCANCODE_A ] ) {
 				globalData.reset = 1;
 				Raytrace.pushConstants.rotate += amount;
+			}
+
+			if ( kb[ SDL_SCANCODE_T ] && shift ) {
+				saveImageToDisk( std::string( timeDateString() + ".png" ).c_str(), drawImage, { drawExtent.width, drawExtent.height, 1 } );
 			}
 
 			//send SDL event to imgui for handling
