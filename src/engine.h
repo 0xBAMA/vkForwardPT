@@ -158,6 +158,7 @@ public:
 	// some helper functions for allocating textures
 	AllocatedImage createImage ( VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false ); // storage image type
 	AllocatedImage createImage ( void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false ); // loaded from disk
+	void saveImageToDisk( const char* filename, AllocatedImage& image, VkExtent3D size );
 	void destroyImage ( const AllocatedImage& img );
 
 	// and some default textures

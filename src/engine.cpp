@@ -26,6 +26,9 @@
 #include "third_party/yaml-cpp/include/yaml-cpp/yaml.h"
 
 #include <glm/gtx/transform.hpp>
+#include <glm/gtc/packing.hpp>
+
+#include "third_party/stb/stb_image_write.h"
 
 //============================================================================================================================
 //============================================================================================================================
@@ -1025,6 +1028,52 @@ AllocatedImage PrometheusInstance::createImage ( void* data, VkExtent3D size, Vk
 	destroyBuffer( uploadbuffer );
 
 	return new_image;
+}
+
+void PrometheusInstance::saveImageToDisk( const char* filename, AllocatedImage& image, VkExtent3D size ) {
+	size_t pixelCount = size.width * size.height;
+	size_t dataSize = pixelCount * 4 * sizeof( uint16_t );
+
+	AllocatedBuffer readbackBuffer = createBuffer( dataSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_TO_CPU );
+
+	immediateSubmit( [&]( VkCommandBuffer cmd ) {
+		VkBufferImageCopy copyRegion = {};
+		copyRegion.bufferOffset = 0;
+		copyRegion.bufferRowLength = 0;
+		copyRegion.bufferImageHeight = 0;
+		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copyRegion.imageSubresource.mipLevel = 0;
+		copyRegion.imageSubresource.baseArrayLayer = 0;
+		copyRegion.imageSubresource.layerCount = 1;
+		copyRegion.imageExtent = size;
+
+		vkCmdCopyImageToBuffer( cmd, image.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readbackBuffer.buffer, 1, &copyRegion );
+
+		// vkutil::transition_image( cmd, image.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL );
+	} );
+
+	std::jthread writeThread = std::jthread( [ & ] ( ) {
+		uint16_t* src = ( uint16_t* ) readbackBuffer.info.pMappedData;
+		std::vector<uint8_t> out( pixelCount * 4 );
+
+		for ( size_t i = 0; i < pixelCount; i++ ) {
+			float r = glm::unpackHalf1x16( src[ i * 4 + 0 ] );
+			float g = glm::unpackHalf1x16( src[ i * 4 + 1 ] );
+			float b = glm::unpackHalf1x16( src[ i * 4 + 2 ] );
+
+			r = glm::clamp( r, 0.0f, 1.0f );
+			g = glm::clamp( g, 0.0f, 1.0f );
+			b = glm::clamp( b, 0.0f, 1.0f );
+
+			out[ i * 4 + 0 ] = ( uint8_t ) ( r * 255.0f );
+			out[ i * 4 + 1 ] = ( uint8_t ) ( g * 255.0f );
+			out[ i * 4 + 2 ] = ( uint8_t ) ( b * 255.0f );
+			out[ i * 4 + 3 ] = 255;
+		}
+
+		stbi_write_png( filename, size.width, size.height, 4, out.data(), size.width * 4 );
+		destroyBuffer( readbackBuffer );
+	});
 }
 
 void PrometheusInstance::destroyImage ( const AllocatedImage& img ) {
