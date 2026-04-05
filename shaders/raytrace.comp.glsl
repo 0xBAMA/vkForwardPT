@@ -82,7 +82,7 @@ float hitAlbedo = 0.0f;
 // raymarch parameters
 const float epsilon = 0.03f;
 const float maxDistance = 6000.0f;
-const int maxSteps = 200;
+const int maxSteps = 300;
 
 // getting the wavelength-dependent IoR for materials
 float evaluateCauchy ( float A, float B, float wms ) {
@@ -185,19 +185,21 @@ float de ( vec2 p ) {
 	if ( true ) {
 		p = Rotate2D( 0.3f ) * pOriginal;
 		vec2 gridIndex;
-		gridIndex.x = pModInterval1( p.x, 10.0f, -100.0f, 100.0f );
-		gridIndex.y = pModInterval1( p.y, 10.0f, -60.0f, 120.0f );
+		gridIndex.x = pModInterval1( p.x, 16.0f, -60.0f, 60.0f );
+		gridIndex.y = pModInterval1( p.y, 16.0f, -20.0f, 60.0f );
 		{ // an example object (refractive)
 			uint seedCache = seed;
 			seed = 31415 * uint( gridIndex.x ) + uint( gridIndex.y ) * 42069 + 999999;
 			const vec3 noise = 0.5f * hash33( vec3( gridIndex.xy, 0.0f ) ) + vec3( 2.0f, 1.0f, 0.5f );
-			 const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.z ) : ( ( distance( p, vec2( 0.0f ) ) - ( 3.40f * noise.y ) ) ) );
-//			const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.z ) : ( ( rectangle( Rotate2D( 10.0f * noise.x ) * p, vec2( 2.40f * noise.y ) ) ) ) );
-//			const float d = ( invert ? -1.0f : 1.0f ) * ( distance( p, vec2( 0.0f ) ) - 4.0f );
+			// const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.x ) : ( ( distance( p, vec2( 0.0f ) ) - ( 4.0f * noise.y ) ) ) );
+			// const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.z ) : ( ( rectangle( Rotate2D( 10.0f * noise.x ) * p, vec2( 2.40f * noise.y ) ) ) ) );
+			 const float d = ( invert ? -1.0f : 1.0f ) * ( distance( p, vec2( 0.0f ) ) - 4.0f );
+//			 const float d = ( invert ? -1.0f : 1.0f ) * ( rectangle( Rotate2D( 100.0f * noise.z ) * p, vec2( 4.0f, 3.0f ) ) );
 			seed = seedCache;
 			sceneDist = min( sceneDist, d );
 			if ( sceneDist == d && d < epsilon ) {
 				hitSurfaceType = SELLMEIER_BOROSILICATE_BK7;
+//				hitSurfaceType = CAUCHY_FUSEDSILICA;
 				hitAlbedo = 1.0f;
 			}
 		}
@@ -288,7 +290,7 @@ void main () {
 		// importance sampled from the light
 
 	// placeholder mouse light, uniform point with uniform distribution
-	rayOrigin = GlobalData.mouseLoc + Rotate2D( PushConstants.rotate ) * vec2( 100.0f, 10.0f ) * UniformSampleHexagon().xy;
+	rayOrigin = GlobalData.mouseLoc + 100.0f * Rotate2D( PushConstants.rotate ) * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 	rayDirection = normalize( Rotate2D( PushConstants.rotate ) * vec2( 0.0f, 1.0f ) );
 	wavelength = remap( pow( NormalizedRandomFloat(), 2.f ), 0.0f, 1.0f, 380.0f, 830.0f );
 
