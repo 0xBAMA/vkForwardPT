@@ -245,7 +245,7 @@ void PrometheusInstance::MainLoop () {
 			}
 
 			if ( kb[ SDL_SCANCODE_T ] && shift ) {
-				saveImageToDisk( std::string( timeDateString() + ".png" ).c_str(), drawImage, { drawExtent.width, drawExtent.height, 1 } );
+				screenshot();
 			}
 
 			//send SDL event to imgui for handling
@@ -1052,7 +1052,12 @@ AllocatedImage PrometheusInstance::createImage ( void* data, VkExtent3D size, Vk
 	return new_image;
 }
 
-void PrometheusInstance::saveImageToDisk( const char* filename, AllocatedImage& image, VkExtent3D size ) {
+// this is a pretty specialized screenshot function, because it operates on the half floats stored in the draw image
+void PrometheusInstance::screenshot() {
+	const char* filename = std::string( timeDateString() + ".png" ).c_str();
+	AllocatedImage& image = drawImage;
+	VkExtent3D size{ drawExtent.width, drawExtent.height, 1 };
+
 	size_t pixelCount = size.width * size.height;
 	size_t dataSize = pixelCount * 4 * sizeof( uint16_t );
 
@@ -1070,8 +1075,6 @@ void PrometheusInstance::saveImageToDisk( const char* filename, AllocatedImage& 
 		copyRegion.imageExtent = size;
 
 		vkCmdCopyImageToBuffer( cmd, image.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readbackBuffer.buffer, 1, &copyRegion );
-
-		// vkutil::transition_image( cmd, image.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL );
 	} );
 
 	std::jthread writeThread = std::jthread( [ & ] ( ) {
