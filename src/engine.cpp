@@ -1052,6 +1052,31 @@ AllocatedImage PrometheusInstance::createImage ( void* data, VkExtent3D size, Vk
 	return new_image;
 }
 
+void PrometheusInstance::updateImage( AllocatedImage& image, void* data, VkExtent3D size ) {
+	size_t dataSize = size.width * size.height * size.depth * 4;
+
+	AllocatedBuffer uploadbuffer = createBuffer( dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU );
+
+	memcpy( uploadbuffer.info.pMappedData, data, dataSize );
+
+	immediateSubmit( [&]( VkCommandBuffer cmd ) {
+		VkBufferImageCopy copyRegion = {};
+		copyRegion.bufferOffset = 0;
+		copyRegion.bufferRowLength = 0;
+		copyRegion.bufferImageHeight = 0;
+
+		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copyRegion.imageSubresource.mipLevel = 0;
+		copyRegion.imageSubresource.baseArrayLayer = 0;
+		copyRegion.imageSubresource.layerCount = 1;
+		copyRegion.imageExtent = size;
+
+		vkCmdCopyBufferToImage( cmd, uploadbuffer.buffer, image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion );
+	} );
+
+	destroyBuffer( uploadbuffer );
+}
+
 // this is a pretty specialized screenshot function, because it operates on the half floats stored in the draw image
 void PrometheusInstance::screenshot() {
 	const char* filename = std::string( timeDateString() + ".png" ).c_str();
