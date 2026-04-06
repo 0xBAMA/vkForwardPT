@@ -1079,7 +1079,8 @@ void PrometheusInstance::updateImage( AllocatedImage& image, void* data, VkExten
 
 // this is a pretty specialized screenshot function, because it operates on the half floats stored in the draw image
 void PrometheusInstance::screenshot() {
-	const char* filename = std::string( timeDateString() + ".png" ).c_str();
+	std::string filenameS = std::string( timeDateString() + ".png" );
+	const char* filename = filenameS.c_str();
 	AllocatedImage& image = drawImage;
 	VkExtent3D size{ drawExtent.width, drawExtent.height, 1 };
 
