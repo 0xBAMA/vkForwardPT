@@ -929,8 +929,8 @@ void PrometheusInstance::initComputePasses () {
 			// send the current value of the push constants
 			vkCmdPushConstants( cmd, Accumulate.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &Accumulate.pushConstants );
 
-			// and the actual compute dispatch for the simulation agents
-			vkCmdDispatch( cmd, ( drawExtent.width + 15 ) / 16, ( drawExtent.height + 15 ) / 16, 1 );
+			// and the actual compute dispatch for pixels - this is sized for the full buffer
+			vkCmdDispatch( cmd, ( ImageBufferResolution.width + 15 ) / 16, ( ImageBufferResolution.height + 15 ) / 16, 1 );
 
 			VkImageMemoryBarrier2 barrierC {
 				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
