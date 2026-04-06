@@ -39,6 +39,34 @@ inline std::string timeDateString () {
 	return ssA.str();
 }
 
+
+
+void PrometheusInstance::SetDebugName ( VkObjectType type, uint64_t handle, const char* name ) {
+	// Must call extension functions through a function pointer:
+	PFN_vkSetDebugUtilsObjectNameEXT pfnSetDebugUtilsObjectNameEXT = ( PFN_vkSetDebugUtilsObjectNameEXT ) vkGetInstanceProcAddr( instance, "vkSetDebugUtilsObjectNameEXT" );
+
+	// // Set a name on the image
+	// const VkDebugUtilsObjectNameInfoEXT imageNameInfo =
+	// {
+	// 	.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+	// 	.pNext = NULL,
+	// 	.objectType = VK_OBJECT_TYPE_IMAGE,
+	// 	.objectHandle = (uint64_t)image,
+	// 	.pObjectName = "Brick Diffuse Texture",
+	// };
+	//
+	// pfnSetDebugUtilsObjectNameEXT(device, &imageNameInfo);
+
+	VkDebugUtilsObjectNameInfoEXT info{};
+	info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+	info.pNext = NULL;
+	info.objectType = type;
+	info.objectHandle = handle;
+	info.pObjectName = name;
+
+	pfnSetDebugUtilsObjectNameEXT( device, &info );
+}
+
 //============================================================================================================================
 //============================================================================================================================
 // Initialization
@@ -93,7 +121,7 @@ void PrometheusInstance::Draw () {
 
 	//request image from the swapchain
 	uint32_t swapchainImageIndex;
-	VkResult e = vkAcquireNextImageKHR( device, swapchain, 1000000000, getCurrentFrame().swapchainSemaphore, nullptr, &swapchainImageIndex );
+	VkResult e = vkAcquireNextImageKHR( device, swapchain, 1000000000, getCurrentFrame().swapchainSemaphore, VK_NULL_HANDLE, &swapchainImageIndex );
 	if ( e == VK_ERROR_OUT_OF_DATE_KHR ) {
 		resizeRequest = true;
 		return; // we will skip trying to draw the rest of the frame, because we have detected a swapchain mismatch
@@ -486,7 +514,7 @@ void PrometheusInstance::initSyncStructures () {
 	}
 
 	swapchainPresentSemaphores.resize( swapchainImages.size() );
-	for ( int i = 0; i < swapchainImages.size(); i++ ) {
+	for ( size_t i = 0; i < swapchainImages.size(); i++ ) {
 		VK_CHECK( vkCreateSemaphore( device, &semaphoreCreateInfo, nullptr, &swapchainPresentSemaphores[ i ] ) );
 	}
 
@@ -531,19 +559,32 @@ void PrometheusInstance::initDescriptors  () {
 }
 
 void PrometheusInstance::initResources () {
+
 	// API resource allocation:
 	// create the buffer for the UBO
-	GlobalUBO = createBuffer( sizeof( GlobalData ), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU );
+	{
+		GlobalUBO = createBuffer( sizeof( GlobalData ), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GlobalUBO.buffer, "Global Data UBO" );
+	}
 
 	// create the accumulator texture
-	VkExtent3D bufferExtent = { ImageBufferResolution.width, ImageBufferResolution.height, 1 };
-	XYZImage = createImage( bufferExtent, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT );
+	{
+		VkExtent3D bufferExtent = { ImageBufferResolution.width, ImageBufferResolution.height, 1 };
+		XYZImage = createImage( bufferExtent, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT );
+		SetDebugName( VK_OBJECT_TYPE_IMAGE, ( uint64_t ) XYZImage.image, "Accumulator" );
+	}
 
 	// create the raster attachments
-	lineColorAttachment = createImage( { ImageBufferResolution.width, ImageBufferResolution.height, 1 }, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT );
+	{
+		lineColorAttachment = createImage( { ImageBufferResolution.width, ImageBufferResolution.height, 1 }, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT );
+		SetDebugName( VK_OBJECT_TYPE_IMAGE, ( uint64_t ) lineColorAttachment.image, "Line Color Attachment" );
+	}
 
 	// buffer for the rays
-	rayBuffer = createBuffer( globalData.numBounces * globalData.numRays * sizeof( raySegment ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY );
+	{
+		rayBuffer = createBuffer( globalData.numBounces * globalData.numRays * sizeof( raySegment ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) rayBuffer.buffer, "Ray Segment Buffer" );
+	}
 
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
@@ -558,12 +599,16 @@ void PrometheusInstance::initResources () {
 }
 
 void PrometheusInstance::initComputePasses () {
+
+
+
 	{ // Raytrace update
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
 			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the ray buffer
 			Raytrace.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
+			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) Raytrace.descriptorSetLayout, "Raytrace Descriptor Set Layout" );
 		}
 
 		{ // pipeline layout + compute pipeline
@@ -581,11 +626,13 @@ void PrometheusInstance::initComputePasses () {
 			computeLayout.pushConstantRangeCount = 1;
 
 			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &Raytrace.pipelineLayout ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE_LAYOUT, ( uint64_t ) Raytrace.pipelineLayout, "Raytrace Pipeline Layout" );
 
 			VkShaderModule RaytraceShader;
 			if ( !vkutil::load_shader_module("../shaders/raytrace.comp.glsl.spv", device, &RaytraceShader ) ) {
 				fmt::print( "Error when building the Raytrace Compute Shader\n" );
 			}
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) RaytraceShader, "Raytrace Shader Module" );
 
 			VkPipelineShaderStageCreateInfo stageinfo{};
 			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -601,6 +648,7 @@ void PrometheusInstance::initComputePasses () {
 			computePipelineCreateInfo.stage = stageinfo;
 
 			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &Raytrace.pipeline ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) Raytrace.pipeline, "Raytrace Compute Pipeline" );
 			vkDestroyShaderModule( device, RaytraceShader, nullptr );
 
 			// deletors for the pipeline layout + pipeline
@@ -642,8 +690,8 @@ void PrometheusInstance::initComputePasses () {
 				.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
 
-				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
+				.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
 
 				.buffer = rayBuffer.buffer,
 				.offset = 0,
@@ -671,6 +719,7 @@ void PrometheusInstance::initComputePasses () {
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
 			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // Ray state buffer
 			lineRaster.descriptorSetLayout = builder.build( device,  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT );
+			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) lineRaster.descriptorSetLayout, "Line Raster Descriptor Set Layout" );
 		}
 
 		{ // pipeline layout + pipeline build
@@ -688,16 +737,19 @@ void PrometheusInstance::initComputePasses () {
 			rasterLayout.pushConstantRangeCount = 1;
 
 			VK_CHECK( vkCreatePipelineLayout( device, &rasterLayout, nullptr, &lineRaster.pipelineLayout ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE_LAYOUT, ( uint64_t ) lineRaster.pipelineLayout, "Line Raster Pipeline Layout" );
 
 			VkShaderModule lineFragShader;
 			if ( !vkutil::load_shader_module( "../shaders/lineDraw.frag.glsl.spv", device, &lineFragShader ) ) {
 				fmt::print( "Error when building the Line Draw Fragment shader module\n" );
 			}
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) lineFragShader, "Line Fragment Shader Module" );
 
 			VkShaderModule lineVertexShader;
 			if ( !vkutil::load_shader_module( "../shaders/lineDraw.vert.glsl.spv", device, &lineVertexShader ) ) {
 				fmt::print( "Error when building the Line Draw Vertex shader module\n" );
 			}
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) lineVertexShader, "Line Vertex Shader Module" );
 
 			PipelineBuilder pipelineBuilder;
 			pipelineBuilder._pipelineLayout = lineRaster.pipelineLayout;
@@ -710,6 +762,7 @@ void PrometheusInstance::initComputePasses () {
 			pipelineBuilder.disable_depthtest();
 			pipelineBuilder.set_color_attachment_format( lineColorAttachment.imageFormat );
 			lineRaster.pipeline = pipelineBuilder.build_pipeline( device );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) lineRaster.pipeline, "Line Raster Pipeline" );
 
 			// cleanup
 			vkDestroyShaderModule( device, lineFragShader, nullptr );
@@ -770,11 +823,11 @@ void PrometheusInstance::initComputePasses () {
 			VkImageMemoryBarrier2 barrierC {
 				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
 
-				.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+				.srcStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
 				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
 
 				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
+				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
 
 				// now the blur has finished, we are using the filtered reads until the next agent raster
 				.oldLayout = VK_IMAGE_LAYOUT_GENERAL,
@@ -800,9 +853,10 @@ void PrometheusInstance::initComputePasses () {
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
-			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // draw image
+			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // draw image
 			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // XYZ Buffer
 			Accumulate.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
+			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) Accumulate.descriptorSetLayout, "Accumulate Descriptor Set Layout" );
 		}
 
 		{ // pipeline layout + compute pipeline
@@ -820,11 +874,13 @@ void PrometheusInstance::initComputePasses () {
 			computeLayout.pushConstantRangeCount = 1;
 
 			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &Accumulate.pipelineLayout ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE_LAYOUT, ( uint64_t ) Accumulate.pipelineLayout, "Accumulate Pipeline Layout" );
 
 			VkShaderModule AccumulateShader;
 			if ( !vkutil::load_shader_module("../shaders/accumulate.comp.glsl.spv", device, &AccumulateShader ) ) {
 				fmt::print( "Error when building the Accumulate Compute Shader\n" );
 			}
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) AccumulateShader, "Accumulate Shader Module" );
 
 			VkPipelineShaderStageCreateInfo stageinfo{};
 			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -840,6 +896,7 @@ void PrometheusInstance::initComputePasses () {
 			computePipelineCreateInfo.stage = stageinfo;
 
 			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &Accumulate.pipeline ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) Accumulate.pipeline, "Accumulate Compute Pipeline" );
 			vkDestroyShaderModule( device, AccumulateShader, nullptr );
 
 			// deletors for the pipeline layout + pipeline
@@ -856,8 +913,8 @@ void PrometheusInstance::initComputePasses () {
 			{
 				DescriptorWriter writer;
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
-				writer.write_image( 1, lineColorAttachment.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
-				writer.write_image( 2, XYZImage.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
+				writer.write_image( 1, lineColorAttachment.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				writer.write_image( 2, XYZImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
 				writer.update_set( device, Accumulate.descriptorSet );
 			}
 
@@ -874,6 +931,33 @@ void PrometheusInstance::initComputePasses () {
 
 			// and the actual compute dispatch for the simulation agents
 			vkCmdDispatch( cmd, ( drawExtent.width + 15 ) / 16, ( drawExtent.height + 15 ) / 16, 1 );
+
+			VkImageMemoryBarrier2 barrierC {
+				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+
+				.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+
+				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+
+				// now the blur has finished, we are using the filtered reads until the next agent raster
+				.oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
+
+				.image = drawImage.image,
+				.subresourceRange = {
+					VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
+				}
+			};
+
+			VkDependencyInfo barrierDependency {
+				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrierC
+			};
+
+			vkCmdPipelineBarrier2( cmd, &barrierDependency );
 		};
 	}
 
@@ -884,6 +968,7 @@ void PrometheusInstance::initComputePasses () {
 			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // draw image
 			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // XYZ Buffer -> linear filter
 			BufferPresent.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
+			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) BufferPresent.descriptorSetLayout, "Buffer Present Descriptor Set Layout" );
 		}
 
 		{ // pipeline layout + compute pipeline
@@ -901,11 +986,13 @@ void PrometheusInstance::initComputePasses () {
 			computeLayout.pushConstantRangeCount = 1;
 
 			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &BufferPresent.pipelineLayout ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE_LAYOUT, ( uint64_t ) BufferPresent.pipelineLayout, "Buffer Present Pipeline Layout" );
 
 			VkShaderModule BufferPresentShader;
 			if ( !vkutil::load_shader_module("../shaders/bufferPresent.comp.glsl.spv", device, &BufferPresentShader ) ) {
 				fmt::print( "Error when building the Buffer Present Compute Shader\n" );
 			}
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) BufferPresentShader, "Buffer Present Shader Module" );
 
 			VkPipelineShaderStageCreateInfo stageinfo{};
 			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -921,6 +1008,7 @@ void PrometheusInstance::initComputePasses () {
 			computePipelineCreateInfo.stage = stageinfo;
 
 			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &BufferPresent.pipeline ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) BufferPresent.pipeline, "Buffer Present Compute Pipeline" );
 			vkDestroyShaderModule( device, BufferPresentShader, nullptr );
 
 			// deletors for the pipeline layout + pipeline
@@ -1338,7 +1426,7 @@ void PrometheusInstance::createSwapchain ( uint32_t w, uint32_t h ) {
 
 void PrometheusInstance::destroySwapchain () {
 	vkDestroySwapchainKHR( device, swapchain, nullptr );
-	for (int i = 0; i < swapchainImageViews.size(); i++ ) {
+	for ( size_t i = 0; i < swapchainImageViews.size(); i++ ) {
 		// we are only destroying the imageViews, the images are owned by the OS
 		vkDestroyImageView( device, swapchainImageViews[ i ], nullptr );
 	}

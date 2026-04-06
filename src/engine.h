@@ -158,9 +158,11 @@ public:
 	// some helper functions for allocating textures
 	AllocatedImage createImage ( VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false ); // storage image type
 	AllocatedImage createImage ( void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false ); // loaded from disk
-	void updateImage( AllocatedImage& image, void* data, VkExtent3D size ); //
+	void updateImage( AllocatedImage& image, void* data, VkExtent3D size );
 	void screenshot(); // save the contents of the framebuffer
 	void destroyImage ( const AllocatedImage& img );
+
+	void SetDebugName( VkObjectType type, uint64_t handle, const char* name );
 
 	// and some default textures
 	AllocatedImage whiteImage;
