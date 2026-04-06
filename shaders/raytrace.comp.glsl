@@ -355,10 +355,12 @@ void main () {
 			r.wavelength = wavelength;
 			rays[ baseIdx + i ] = r;
 
-			// evaluating the russian roulette termination
-			if ( NormalizedRandomFloat() > energy )
-				deadRay = true;
-			energy *= 1.0f / energy; // compensation term
+			// evaluating the russian roulette termination... disabled for now, because I don't think it's correct
+//					if ( NormalizedRandomFloat() > energy )
+//						deadRay = true;
+//					energy *= 1.0f / min( energy, 1.0f ); // compensation term
+
+			if ( energy < 0.001f ) deadRay = true;
 
 			// evaluating the albedo's effect on transmission + energy
 			transmission *= result.albedo;
