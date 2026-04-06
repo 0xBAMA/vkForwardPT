@@ -167,6 +167,33 @@ float rectangle ( vec2 samplePosition, vec2 halfSize ) {
 	return outsideDistance + insideDistance;
 }
 
+float sdParabola( in vec2 pos, in float wi, in float he ) {
+	// "width" and "height" of a parabola segment
+	pos.x = abs(pos.x);
+
+	float ik = wi*wi/he;
+	float p = ik*(he-pos.y-0.5*ik)/3.0;
+	float q = pos.x*ik*ik*0.25;
+	float h = q*q - p*p*p;
+
+	float x;
+	if( h>0.0 ) // 1 root
+	{
+		float r = sqrt(h);
+		x = pow(q+r,1.0/3.0) + pow(abs(q-r),1.0/3.0)*sign(p);
+	}
+	else        // 3 roots
+	{
+		float r = sqrt(p);
+		x = 2.0*r*cos(acos(q/(p*r))/3.0); // see https://www.shadertoy.com/view/WltSD7 for an implementation of cos(acos(x)/3) without trigonometrics
+	}
+
+	x = min(x,wi);
+
+	return length(pos-vec2(x,he-x*x/ik)) *
+	sign(ik*(pos.y-he)+pos.x*pos.x);
+}
+
 // for the walls
 float rayPlaneIntersect ( in vec3 rayOrigin, in vec3 rayDirection ) {
 	const vec3 normal = vec3( 0.0f, 1.0f, 0.0f );
@@ -182,6 +209,14 @@ float de ( vec2 p ) {
 	hitSurfaceType = NOHIT;
 	hitRoughness = 0.0f;
 
+	{
+		const float d = abs( sdParabola( p - vec2( GlobalData.floatBufferResolution.xy ) * vec2( 0.5f, 0.7f ), 200.0f, 300.0f ) ) - 15.0f;
+		sceneDist = min( sceneDist, d );
+		if ( sceneDist == d && d < epsilon ) {
+			hitSurfaceType = MIRROR;
+			hitAlbedo = 1.0f;
+		}
+	}
 	if ( true ) {
 		p = Rotate2D( 0.3f ) * pOriginal;
 		vec2 gridIndex;
