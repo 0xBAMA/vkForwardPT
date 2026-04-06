@@ -24,5 +24,5 @@ void main () {
 	raySegment r = rays[ idx ];
 
 	gl_Position = vec4( ( gl_VertexIndex % 2 == 0 ) ? r.a : r.b, 0.5f, 1.0f );
-	colorRGB = wl_rgb( r.wavelength );
+	colorRGB = wl_rgb( r.wavelength ) * r.brightness;
 }
