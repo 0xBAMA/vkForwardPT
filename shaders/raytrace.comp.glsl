@@ -6,8 +6,8 @@
 layout ( local_size_x = 64 ) in;
 
 #include "common.h"
-#include "random.h"
-#include "hg_sdf.glsl"
+#include "lib/random.h"
+#include "lib/hg_sdf.glsl"
 
 struct raySegment {
 	float wavelength;

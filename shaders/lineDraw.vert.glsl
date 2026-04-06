@@ -4,7 +4,7 @@
 #extension GL_EXT_buffer_reference : require
 
 #include "common.h"
-#include "XYZSpectrum.h"
+#include "lib/XYZSpectrum.h"
 
 struct raySegment {
 	float wavelength;
