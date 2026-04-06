@@ -210,7 +210,7 @@ float de ( vec2 p ) {
 	hitRoughness = 0.0f;
 
 	{
-		const float d = abs( sdParabola( p - vec2( GlobalData.floatBufferResolution.xy ) * vec2( 0.5f, 0.7f ), 200.0f, 300.0f ) ) - 15.0f;
+		const float d = abs( sdParabola( p - vec2( GlobalData.floatBufferResolution.xy ) * vec2( 0.5f, 0.7f ), 500.0f, 200.0f ) ) - 15.0f;
 		sceneDist = min( sceneDist, d );
 		if ( sceneDist == d && d < epsilon ) {
 			hitSurfaceType = MIRROR;
@@ -228,7 +228,7 @@ float de ( vec2 p ) {
 			const vec3 noise = 0.5f * hash33( vec3( gridIndex.xy, 0.0f ) ) + vec3( 2.0f, 1.0f, 0.5f );
 			// const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.x ) : ( ( distance( p, vec2( 0.0f ) ) - ( 4.0f * noise.y ) ) ) );
 			// const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.z ) : ( ( rectangle( Rotate2D( 10.0f * noise.x ) * p, vec2( 2.40f * noise.y ) ) ) ) );
-			 const float d = ( invert ? -1.0f : 1.0f ) * ( distance( p, vec2( 0.0f ) ) - 4.0f );
+			 const float d = ( invert ? -1.0f : 1.0f ) * ( distance( p, vec2( 0.0f ) ) - 3.0f * noise.x );
 //			 const float d = ( invert ? -1.0f : 1.0f ) * ( rectangle( Rotate2D( 100.0f * noise.z ) * p, vec2( 4.0f, 3.0f ) ) );
 			seed = seedCache;
 			sceneDist = min( sceneDist, d );
@@ -249,8 +249,8 @@ float de ( vec2 p ) {
 		rectangle( pOriginal - vec2( GlobalData.floatBufferResolution.x, 0.0f ), vec2( 20.0f, 3000.0f ) ) );
 		sceneDist = min( sceneDist, d );
 		if ( sceneDist == d && d < epsilon ) {
-			hitSurfaceType = MIRROR;
-			hitAlbedo = 0.7f;
+			hitSurfaceType = DIFFUSE;
+			hitAlbedo = 0.8f;
 		}
 	}
 
@@ -325,9 +325,9 @@ void main () {
 		// importance sampled from the light
 
 	// placeholder mouse light, uniform point with uniform distribution
-	rayOrigin = GlobalData.mouseLoc + 100.0f * Rotate2D( PushConstants.rotate ) * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
+	rayOrigin = GlobalData.mouseLoc + 50.0f * Rotate2D( PushConstants.rotate ) * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 	rayDirection = normalize( Rotate2D( PushConstants.rotate ) * vec2( 0.0f, 1.0f ) );
-	wavelength = remap( pow( NormalizedRandomFloat(), 2.f ), 0.0f, 1.0f, 380.0f, 830.0f );
+	wavelength = remap( pow( NormalizedRandomFloat(), 1.3f ), 0.0f, 1.0f, 380.0f, 830.0f );
 
 	// initial values... probably redundant
 	float transmission = 1.0f;
