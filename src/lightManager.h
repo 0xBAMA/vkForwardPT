@@ -87,8 +87,10 @@ public:
 
 	Light () {
 		// ImGUI needs distinct strings... can use an int, just assign at construction time
+		uniqueID += 42069;
 		myUniqueID = uniqueID;
-		uniqueID++;
+
+		Update();
 	}
 
 	// state flags for the manager
@@ -96,7 +98,7 @@ public:
 	bool deleteFlag { false }; // need to delete this light
 
 	// called inside of the light manager ImGui Draw function
-	void ImGuiDrawLightInfo () {
+	void ImGuiDrawLightInfo ( bool mouseLight = false ) {
 	// use myUniqueID in the labels, disambiguates between otherwise identical labels for ImGui
 		const std::string lString = std::string( "##" ) + std::to_string( myUniqueID );
 
@@ -108,7 +110,7 @@ public:
 
 		// source PDF picker
 		ImGui::Combo( ( std::string( "Light Type" ) + lString ).c_str(), &PDFPick, sourcePDFLabels, numSourcePDFs ); // may eventually do some kind of scaled gaussians for user-configurable RGB triplets...
-		dirtyFlag |= ImGui::IsItemEdited();
+		if ( ImGui::IsItemEdited() ) dirtyFlag = true;
 
 		ImGui::SameLine(); // pick a random source PDF
 		if ( ImGui::Button( ( "Randomize" + lString ).c_str() ) ) {
@@ -128,7 +130,7 @@ public:
 
 			// show gel picker
 			ImGui::Combo( ( "Gel" + lString ).c_str(), &filterStack[ i ], gelFilterLabels, numGelFilters );
-			dirtyFlag |= ImGui::IsItemEdited();
+			if ( ImGui::IsItemEdited() ) dirtyFlag = true;
 
 			ImGui::SameLine();
 			if ( ImGui::Button( ( "Randomize" + lString ).c_str() ) ) {
@@ -167,8 +169,10 @@ public:
 		// emitter parameters... tbd
 
 		// option to remove -> set deleteFlag
-		if ( ImGui::Button( "Remove" ) ) {
-			deleteFlag = true;
+		if ( !mouseLight ) {
+			if ( ImGui::Button( "Remove" ) ) {
+				deleteFlag = true;
+			}
 		}
 	}
 
@@ -393,7 +397,15 @@ public:
 
 	void ImGuiDrawLightList () {
 		// configuration for the mouse light
+		ImGui::Separator();
+		ImGui::Text( "Mouse Light" );
+		ImGui::Separator();
+		MouseLight->ImGuiDrawLightInfo( true );
 
+		// something to make it stand out from the user light list:
+		ImGui::Separator();
+		ImGui::Text( "User Lights (max 255)" );
+		ImGui::Separator();
 
 		// and then for a growable list of lights after that
 		for ( auto & light : lights ) {
