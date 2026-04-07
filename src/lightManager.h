@@ -333,7 +333,7 @@ public:
 	}
 
 	// spectral distribution
-	int PDFPick{ 0 };
+	int PDFPick{ 12 };
 	std::vector< int > filterStack;
 
 	// the solved iCDF, needed by the light manager

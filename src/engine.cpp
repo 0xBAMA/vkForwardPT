@@ -333,7 +333,7 @@ void PrometheusInstance::MainLoop () {
 			ImGui::Render();
 
 			// some stuff to do, if we need to update buffers or textures associated with the lights
-			lightManagerMaintainence();
+			lightManagerMaintenance();
 
 			// we're ready to draw the next frame
 			Draw();
@@ -603,6 +603,9 @@ void PrometheusInstance::initResources () {
 		// destroying images
 		destroyImage( XYZImage );
 		destroyImage( lineColorAttachment );
+		destroyImage( PreviewAtlas );
+		destroyImage( SpectrumISImage );
+		destroyImage( PickISImage );
 	});
 }
 
@@ -612,6 +615,9 @@ void PrometheusInstance::initComputePasses () {
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
 			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the ray buffer
+			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // the iCDF texture for light spectra
+			// builder.add_binding( 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // the discrete IS texture for lights
+			// builder.add_binding( 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // the parameters for the light emitters
 			Raytrace.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
 			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) Raytrace.descriptorSetLayout, "Raytrace Descriptor Set Layout" );
 		}
@@ -672,6 +678,8 @@ void PrometheusInstance::initComputePasses () {
 				DescriptorWriter writer;
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 				writer.write_buffer( 1, rayBuffer.buffer, globalData.numBounces * globalData.numRays * sizeof( raySegment ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.write_image( 2, SpectrumISImage.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				// writer.write_image( 3, pick.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE );
 				writer.update_set( device, Raytrace.descriptorSet );
 			}
 
@@ -1052,11 +1060,50 @@ void PrometheusInstance::initComputePasses () {
 	}
 }
 
-void PrometheusInstance::lightManagerMaintainence () {
+void PrometheusInstance::lightManagerMaintenance () {
 	// three resources need to be kept up:
 		// spectral sampling IS
 		// light pick IS
 		// light parameters buffer
+
+	static bool firstTime = true;
+
+	static int lastSeenNumLights = 0;
+	uint8_t numLights = lightManager.lights.size() + 1;
+
+	// if we see a change in the light list, we need to rebuild
+	if ( lastSeenNumLights != numLights ) {
+		if ( !firstTime ) {
+			// delete the existing textures
+			destroyImage( PreviewAtlas );
+			destroyImage( SpectrumISImage );
+			destroyImage( PickISImage );
+		}
+		// create the new textures at current sizes
+		PreviewAtlas = createImage( { 554, 64u * numLights, 1 }, VK_FORMAT_R8G8B8A8_UINT,  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT );
+		SpectrumISImage = createImage( { 1024, numLights, 1 }, VK_FORMAT_R32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT );
+		PickISImage = createImage( { 256, 256, 1 }, VK_FORMAT_R8_UINT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT );
+		firstTime = false;
+
+		// we have memory allocated, now need to do the updates
+		lightManager.needsUpdate = true;
+		lastSeenNumLights = numLights;
+	}
+
+	if ( lightManager.needsUpdate ) {
+		// ensure that we have up-to-date data prepared
+		lightManager.Update();
+
+		// and send this prepared texture data to the GPU
+		updateImage( PreviewAtlas, lightManager.concatenatedPreviews.data(), 4 );	// data comes in as R8B8G8A8 (4 bytes)
+		updateImage( SpectrumISImage, lightManager.iCDFTexture.data(), 4 );			// data comes in as R32 (4 bytes)
+		updateImage( PickISImage, lightManager.pickTexture.data(), 1 );				// data comes in as R8 (1 byte)
+
+		// wipe buffers
+		globalData.reset = 1;
+	}
+
+	// and then we need to update the parameters buffer for the emitters
 }
 
 AllocatedBuffer PrometheusInstance::createBuffer ( size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage ) {
@@ -1152,12 +1199,13 @@ AllocatedImage PrometheusInstance::createImage ( void* data, VkExtent3D size, Vk
 	return new_image;
 }
 
-void PrometheusInstance::updateImage( AllocatedImage& image, void* data ) {
-	size_t dataSize = image.imageExtent.width * image.imageExtent.height * image.imageExtent.depth * 4;
+void PrometheusInstance::updateImage( AllocatedImage& image, void* data, int bytesPerTexel ) {
+	size_t dataSize = image.imageExtent.width * image.imageExtent.height * image.imageExtent.depth * bytesPerTexel;
 
 	AllocatedBuffer uploadbuffer = createBuffer( dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU );
 
 	memcpy( uploadbuffer.info.pMappedData, data, dataSize );
+
 
 	immediateSubmit( [&]( VkCommandBuffer cmd ) {
 		VkBufferImageCopy copyRegion = {};
@@ -1171,7 +1219,9 @@ void PrometheusInstance::updateImage( AllocatedImage& image, void* data ) {
 		copyRegion.imageSubresource.layerCount = 1;
 		copyRegion.imageExtent = image.imageExtent;
 
+		vkutil::transition_image( cmd, image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
 		vkCmdCopyBufferToImage( cmd, uploadbuffer.buffer, image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion );
+		vkutil::transition_image( cmd, image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL );
 	} );
 
 	destroyBuffer( uploadbuffer );
@@ -1349,11 +1399,10 @@ void PrometheusInstance::initLights () {
 	// setting up some of the global resources used by the lights
 	lightManager.Initialize();
 
-	// adding a placeholder light
 	// AllocatedImage previewImage = createImage( { 450 + 104, 64, 1 }, VK_FORMAT_R8G8B8A8_SNORM, VK_IMAGE_USAGE_SAMPLED_BIT );
-	lightManager.lights.push_back( Light() );
 
-
+	// do the work to populate the textures initially
+	lightManagerMaintenance();
 }
 
 //==============================================================================================
