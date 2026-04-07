@@ -332,6 +332,9 @@ void PrometheusInstance::MainLoop () {
 			// make imgui calculate internal draw structures
 			ImGui::Render();
 
+			// some stuff to do, if we need to update buffers or textures associated with the lights
+			lightManagerMaintainence();
+
 			// we're ready to draw the next frame
 			Draw();
 		}
@@ -1047,6 +1050,13 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdDispatch( cmd, ( drawExtent.width + 15 ) / 16, ( drawExtent.height + 15 ) / 16, 1 );
 		};
 	}
+}
+
+void PrometheusInstance::lightManagerMaintainence () {
+	// three resources need to be kept up:
+		// spectral sampling IS
+		// light pick IS
+		// light parameters buffer
 }
 
 AllocatedBuffer PrometheusInstance::createBuffer ( size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage ) {

@@ -233,6 +233,7 @@ private:
 	void initImgui ();
 	void initResources ();
 	void initLights();
+	void lightManagerMaintainence();
 
 	// main loop helpers
 	void drawImgui ( VkCommandBuffer cmd, VkImageView targetImageView );
