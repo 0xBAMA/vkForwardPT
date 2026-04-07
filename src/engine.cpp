@@ -19,17 +19,16 @@
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
 
-#include "third_party/imgui/imgui.h"
-#include "third_party/imgui/imgui_impl_sdl3.h"
-#include "third_party/imgui/imgui_impl_vulkan.h"
+#include <third_party/imgui/imgui.h>
+#include <third_party/imgui/imgui_impl_sdl3.h>
+#include <third_party/imgui/imgui_impl_vulkan.h>
 
-#include "third_party/yaml-cpp/include/yaml-cpp/yaml.h"
+#include <third_party/yaml-cpp/include/yaml-cpp/yaml.h>
 
 #include <glm/gtx/transform.hpp>
 #include <glm/gtc/packing.hpp>
 
-#include "third_party/stb/stb_image_write.h"
-
+#include <third_party/stb/stb_image_write.h>
 
 inline std::string timeDateString () {
 	auto now = std::chrono::system_clock::now();
@@ -38,8 +37,6 @@ inline std::string timeDateString () {
 	ssA << std::put_time( std::localtime( &inTime_t ), "%Y-%m-%d at %H-%M-%S" );
 	return ssA.str();
 }
-
-
 
 void PrometheusInstance::SetDebugName ( VkObjectType type, uint64_t handle, const char* name ) {
 	// Must call extension functions through a function pointer:
