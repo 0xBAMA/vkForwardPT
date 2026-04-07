@@ -8,6 +8,10 @@
 #include <third_party/nlohmann/json.hpp>
 using json = nlohmann::json;
 
+#include "third_party/imgui/imgui_impl_vulkan.h"
+
+#include "third_party/Jakob2019Spectral/supplement/rgb2spec.h"
+//======================================================================================================================
 // for handing out unique identifiers
 static int uniqueID { 0 };
 

@@ -74,6 +74,10 @@ target_sources(imgui PRIVATE
   imgui/imgui_impl_sdl3.cpp
 )
 
+add_library( JakobReflectance STATIC
+	Jakob2019Spectral/supplement/rgb2spec.cc
+)
+
 target_link_libraries( imgui PUBLIC Vulkan::Vulkan SDL3::SDL3 )
 
 target_include_directories(stb_image INTERFACE stb_image)
