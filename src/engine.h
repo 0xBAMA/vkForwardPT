@@ -10,6 +10,8 @@
 #include <vk_pipelines.h>
 #include <vk_loader.h>
 
+#include "lightManager.h"
+
 struct DeletionQueue {
 	std::deque< std::function< void() > > deletors;
 
