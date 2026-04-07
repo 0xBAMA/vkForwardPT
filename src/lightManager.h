@@ -89,10 +89,6 @@ public:
 		// ImGUI needs distinct strings... can use an int, just assign at construction time
 		myUniqueID = uniqueID;
 		uniqueID++;
-
-		// need to create a Vulkan texture for the spectral preview
-
-		// need to create an ImGui textureID for this new image
 	}
 
 	// state flags for the manager
@@ -101,14 +97,79 @@ public:
 
 	// called inside of the light manager ImGui Draw function
 	void ImGuiDrawLightInfo () {
-	// use myUniqueID in the labels e.g. string( "label##" + to_string( myUniqueID ) ).c_str()
+	// use myUniqueID in the labels, disambiguates between otherwise identical labels for ImGui
+		const std::string lString = std::string( "##" ) + std::to_string( myUniqueID );
+
 		// spectrum preview + xrite checker
+			// will just be an image you need to show using the ImGui TextureID
+		// ImGui::Image( myTextureID, ImVec2( 386, 256 ) );
+
+			// going to change this to use an atlassed version
+
 		// source PDF picker
+		ImGui::Combo( ( std::string( "Light Type" ) + lString ).c_str(), &PDFPick, sourcePDFLabels, numSourcePDFs ); // may eventually do some kind of scaled gaussians for user-configurable RGB triplets...
+		dirtyFlag |= ImGui::IsItemEdited();
+
+		ImGui::SameLine(); // pick a random source PDF
+		if ( ImGui::Button( ( "Randomize" + lString ).c_str() ) ) {
+			static std::mt19937 seedRNG( [] {
+				std::random_device rd;
+				std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
+				return std::mt19937( seq );
+			} () );
+			PDFPick = std::uniform_int_distribution< int >( 0, numSourcePDFs - 1 )( seedRNG );
+			dirtyFlag = true; // we changed the light, need to update
+		}
+
 		// gel filter list
+		for ( int i = 0; i < filterStack.size(); i++ ) {
+			ImGui::PushID( i );
+			ImGui::Separator();
+
+			// show gel picker
+			ImGui::Combo( ( "Gel" + lString ).c_str(), &filterStack[ i ], gelFilterLabels, numGelFilters );
+			dirtyFlag |= ImGui::IsItemEdited();
+
+			ImGui::SameLine();
+			if ( ImGui::Button( ( "Randomize" + lString ).c_str() ) ) {
+				static std::mt19937 seedRNG( [] {
+					std::random_device rd;
+					std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
+					return std::mt19937( seq );
+				} () );
+				filterStack[ i ] = std::uniform_int_distribution< int >( 0, numGelFilters - 1 )( seedRNG );
+				dirtyFlag = true;
+			}
+
+			ImGui::SameLine();
+			if ( ImGui::Button( ( "Remove" + lString ).c_str() ) ) {
+				filterStack.erase( filterStack.begin() + i );
+				dirtyFlag = true;
+			} else { // need to prevent accessing these things if we remove
+				// show selected gel preview color
+				vec3 col = gelPreviewColors[ filterStack[ i ] ];
+
+				if ( ImGui::ColorButton( ( "##ColorSquare" + lString ).c_str(), ImColor( col.r, col.g, col.b ), ImGuiColorEditFlags_NoAlpha, ImVec2(16, 16 ) ) ) {}
+				ImGui::SameLine();
+
+				// show selected gel description
+				ImGui::TextWrapped( "%s", gelFilterDescriptions[ filterStack[ i ] ] );
+			}
+			ImGui::PopID();
+		}
+
+		// button to add a new gel to the stack
+		if ( ImGui::Button( ( "Add Gel" + lString ).c_str() ) ) {
+			filterStack.emplace_back();
+			dirtyFlag = true;
+		}
 
 		// emitter parameters... tbd
 
 		// option to remove -> set deleteFlag
+		if ( ImGui::Button( "Remove" ) ) {
+			deleteFlag = true;
+		}
 	}
 
 	void Update () {
