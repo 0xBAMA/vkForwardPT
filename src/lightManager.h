@@ -269,7 +269,7 @@ public:
 		int xOffset = 0;
 		for ( auto& freqBand : PDFScratch ) {
 			// we know the PDF value at this location...
-			for ( int y = 0; y < previewImageSize.height; y++ ) {
+			for ( size_t y = 0; y < previewImageSize.height; y++ ) {
 				float fractionalPosition = 1.0f - float( y ) / float( previewImageSize.height );
 				if ( fractionalPosition < freqBand ) {
 					// we want to use a representative color for the frequency...
@@ -280,7 +280,7 @@ public:
 					float xWave = sin( xOffset * 0.5f );
 					float yWave = sin( y * 0.5f );
 					const float p = 40.0f;
-					uint8_t v = std::max( 32.0f * pow( ( 16 + 15 * xWave ) / 32.0f, p ), 32.0f * pow( ( 16 + 15 * yWave ) / 32.0f, p ) );
+					float v = std::max( 32.0f * pow( ( 16 + 15 * xWave ) / 32.0f, p ), 32.0f * pow( ( 16 + 15 * yWave ) / 32.0f, p ) );
 					setPixel( xOffset, y, vec3( float( v ) ) );
 				}
 			}
@@ -296,7 +296,7 @@ public:
 			// we need to iterate over wavelengths and get an average color value under this illuminant
 			for ( int y = 0; y < 450; y++ ) {
 				// color[ chip ] += ( wavelengthColorLinear( 380 + y ) * light.PDFScratch[ y ] ) / 450.0f;
-				color[ chip ] += 3.5f * glm::clamp( wavelengthColorLinear( 380 + y ) * xRiteReflectances[ chip ][ y ] * PDFScratch[ y ], vec3( 0.0f ), vec3( 1.0f ) ) / 450.0f;
+				color[ chip ] += 3.5f * glm::clamp( wavelengthColorLinear( 380.0f + y ) * xRiteReflectances[ chip ][ y ] * PDFScratch[ y ], vec3( 0.0f ), vec3( 1.0f ) ) / 450.0f;
 			}
 		}
 
@@ -318,20 +318,18 @@ public:
 			}
 		}
 
-		stbi_write_png(
+		// writing a preview
+		/* stbi_write_png(
 			std::string( "test.png" ).c_str(),
 			previewImageSize.width,
 			previewImageSize.height,
 			4, // RGBA
 			textureScratch,
 			previewImageSize.width * 4 // stride (bytes per row)
-		);
+		);*/
 
-		// compute the iCDF once you have a final PDF, the light manager will need it
-
-		// compute the state of the preview into the scratch memory
-			// compute the spectral curve preview
-			// compute the xrite color checker
+		// we have done the update
+		dirtyFlag = false;
 	}
 
 	// spectral distribution

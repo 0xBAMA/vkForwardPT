@@ -137,6 +137,18 @@ public:
 	// light manager
 	LightManager lightManager;
 
+	// Textures for the light scheme
+	AllocatedImage PreviewAtlas;	// keeps all the spectrum + xrite chip previews, imgui::Image can specify min and max UVs to show
+	AllocatedImage SpectrumISImage;	// keeps the iCDFs of the light emission spectra - this is indexed the same as the emitters, max 256
+	AllocatedImage PickISImage;		// keeps the uint8 indices of the lights. Normalized random sampling, nearest filter, to pick - presence is weighted by brightness
+		// 0 is mouse, 1-255 are custom user lights as configured in the menu -> this is a nice limit, for what we're doing here
+
+	// gathered up parameters from the list of lights
+	AllocatedBuffer LightParametersBuffer; // uses the same indexing as the pick importance sampling + spectrum importance sampling list
+
+	// main loop gather function, updates textures + buffer
+	void lightManagerMaintenance();
+
 	// engine triggers
 	bool resizeRequest { false };
 	bool isInitialized { false };
@@ -164,7 +176,7 @@ public:
 	// some helper functions for allocating textures
 	AllocatedImage createImage ( VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false ); // storage image type
 	AllocatedImage createImage ( void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false ); // loaded from disk
-	void updateImage( AllocatedImage& image, void* data );
+	void updateImage( AllocatedImage& image, void* data, int bytesPerTexel );
 	void screenshot(); // save the contents of the framebuffer
 	void destroyImage ( const AllocatedImage& img );
 
@@ -233,7 +245,6 @@ private:
 	void initImgui ();
 	void initResources ();
 	void initLights();
-	void lightManagerMaintainence();
 
 	// main loop helpers
 	void drawImgui ( VkCommandBuffer cmd, VkImageView targetImageView );
