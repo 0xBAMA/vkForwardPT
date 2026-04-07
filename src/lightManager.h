@@ -367,7 +367,8 @@ private:
 //======================================================================================================================
 class LightManager {
 public:
-	const int maxLights { 256 };
+	bool needsUpdate { true };
+	static constexpr int maxLights { 256 };
 	LightManager () {}
 
 	void Initialize () {
@@ -382,18 +383,18 @@ public:
 
 		// load the data for the sRGB reflectances
 		PrecomputesRGBReflectances();
+
+		// need to call this to prepare
+		MouseLight = std::make_unique<Light>();
+
+		// and add one placeholder user light
+		// lights.emplace_back();
 	}
 
 	// you always have a mouse light
 	glm::vec2 MouseLocation { 0.0f };
-	// Light MouseLight;
+	std::unique_ptr<Light> MouseLight = nullptr;
 	std::deque< Light > lights;
-
-	// we have two different importance sampling structures...
-		// first is a list of the light spectral iCDFs, in a texture
-		// second is for preferentially picking the lights by brightness
-
-	// we also have the list of parameters for the lights
 
 	void ImGuiDrawLightList () {
 		// configuration for the mouse light
@@ -412,24 +413,122 @@ public:
 			light.ImGuiDrawLightInfo();
 		}
 
-		// after the list is drawn...
-			// iterate through and Update() any with the dirtyFlag
-			// iterate through and renove any that have the deleteFlag
-			// if any needed to call Update(), that means we need to update the GPU resources
+		// optionally add a light to the list:
+		if ( ImGui::Button( "Add Light" ) ) {
+			lights.emplace_back(); // constructor calls Update()
+			needsUpdate = true;
+		}
+
+	// after the list is drawn...
+		// iterate through and Update() any with the dirtyFlag
 		for ( auto & light : lights ) {
 			if ( light.dirtyFlag ) {
 				light.Update();
+				needsUpdate = true;
 			}
 		}
+		// same for the mouse light
+		if ( MouseLight->dirtyFlag ) {
+			MouseLight->Update();
+			needsUpdate = true;
+		}
+
+		// delete any that shouldn't exist anymore
+		lights.erase( std::remove_if( lights.begin(), lights.end(),
+			[ & ]( const auto& light ) {
+				if ( light.deleteFlag ) {
+					needsUpdate = true;
+					return true;
+				}
+				return false;
+			}), lights.end()
+		);
 	}
 
+// we have two different importance sampling structures...
+	// first is a list of the light spectral iCDFs, in a texture
+	std::vector< float > iCDFTexture; // 1024 floats defines one iCDF
+
+	// second is for preferentially picking the lights by brightness
+	std::vector< uint8_t > pickTexture;
+
+	// and each light has prepared a spectrum preview -> need to combine into atlas
+	std::vector< uint8_t > concatenatedPreviews;
+
+	int numLights{ 0 };
+
+	// this will need to happen any time we have an edit
 	void Update () {
+		numLights = lights.size() + 1; // user lights + mouse light
+
 		// construct the light spectral sampling texture from light iCDFs
+			// data comes from each light, the data should be available by the time this runs
+		iCDFTexture.resize( numLights * 1024 );
+		for ( size_t i = 0; i < 1024; i++ ) {
+			iCDFTexture[ i ] = MouseLight->iCDF[ i ];
+		}
+
+		// the user lights do the same
+		for ( size_t j = 1; j < numLights; j++ ) {
+			for ( size_t i = 0; i < 1024; i++ ) {
+				iCDFTexture[ j * 1024 + i ] = lights[ j - 1 ].iCDF[ i ];
+			}
+		}
 
 		// construct the light pick texture from the light brightnesses
+			// need to refer to individual light brightnesses relative to the sum of all brightnesses in the list
+		float sumBrightness{ 0.0f };
+		std::vector< float > thresholds;
+		for ( auto & light : lights ) {
+			sumBrightness += light.brightness;
+		}
+		float cumSum{ 0.0f };
+		for ( auto & light : lights ) {
+			thresholds.emplace_back( cumSum );
+			cumSum += light.brightness / sumBrightness;
+		}
+		thresholds.push_back( 1.0f );
+
+		// size of the texture doesn't actually matter on the GPU side, since it will use normalized sampling
+		glm::vec2 isSize = glm::vec2( 256, 256 );
+
+		// for RNG
+		static std::mt19937 seedRNG( [] {
+			// RNG ( mostly for generating GPU-side RNG seed)
+			std::random_device rd;
+			std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
+			return std::mt19937( seq );
+		} () );
+
+		// get some samples from this process -> this is the texture memory
+		pickTexture.resize( isSize.x * isSize.y );
+		auto x = std::uniform_real_distribution< float >( 0.0f, 1.0f );
+		for ( size_t i = 0; i < isSize.x * isSize.y; i++ ) {
+			float val = x( seedRNG );
+			for ( size_t j = 0; j < thresholds.size(); j++ ) {
+				if ( val >= thresholds[ j ] || thresholds[ j ] == 1.0f ) {
+					pickTexture[ i ] = static_cast< uint8_t >( j - 1 );
+				}
+			}
+		}
+
+		// next we need to make sure that the atlas is constructed
+		int numValuesPerPreview = 554 * 64 * 4;
+		concatenatedPreviews.resize( numValuesPerPreview * numLights );
+		for ( int i = 0; i < numValuesPerPreview; i++ ) {
+			concatenatedPreviews[ i ] = MouseLight->textureScratch[ i ];
+		}
+		for ( int light = 0; light < numLights - 1; light++ ) {
+			for ( int i = 0; i < numValuesPerPreview; i++ ) {
+				concatenatedPreviews[ ( light + 1 ) * numValuesPerPreview + i ] = lights[ light ].textureScratch[ i ];
+			}
+		}
 
 		// construct the buffer for the light parameters
+			// tbd what the parameterization for the emitterslooks like
 
+		// update complete
+		needsUpdate = false;
 	}
 
 private:
