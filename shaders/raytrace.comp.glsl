@@ -215,7 +215,7 @@ float de ( vec2 p ) {
 	hitRoughness = 0.0f;
 
 	{
-		const float d = abs( sdParabola( p - vec2( GlobalData.floatBufferResolution.xy ) * vec2( 0.5f, 0.7f ), 500.0f, 200.0f ) ) - 15.0f;
+		const float d = abs( sdParabola( p - vec2( GlobalData.floatBufferResolution.xy ) * vec2( 0.5f, 0.7f ), 800.0f, 350.0f ) ) - 5.0f;
 		sceneDist = min( sceneDist, d );
 		if ( sceneDist == d && d < epsilon ) {
 			hitSurfaceType = MIRROR;
@@ -225,15 +225,15 @@ float de ( vec2 p ) {
 	if ( true ) {
 		p = Rotate2D( 0.3f ) * pOriginal;
 		vec2 gridIndex;
-		gridIndex.x = pModInterval1( p.x, 16.0f, -60.0f, 60.0f );
-		gridIndex.y = pModInterval1( p.y, 16.0f, -20.0f, 60.0f );
+		gridIndex.x = pModInterval1( p.x, 64.0f, -60.0f, 20.0f );
+		gridIndex.y = pModInterval1( p.y, 64.0f, -20.0f, 15.0f );
 		{ // an example object (refractive)
 			uint seedCache = seed;
 			seed = 31415 * uint( gridIndex.x ) + uint( gridIndex.y ) * 42069 + 999999;
 			const vec3 noise = 0.5f * hash33( vec3( gridIndex.xy, 0.0f ) ) + vec3( 2.0f, 1.0f, 0.5f );
 			// const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.x ) : ( ( distance( p, vec2( 0.0f ) ) - ( 4.0f * noise.y ) ) ) );
 			// const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.z ) : ( ( rectangle( Rotate2D( 10.0f * noise.x ) * p, vec2( 2.40f * noise.y ) ) ) ) );
-			 const float d = ( invert ? -1.0f : 1.0f ) * ( distance( p, vec2( 0.0f ) ) - 3.0f * noise.x );
+			 const float d = ( invert ? -1.0f : 1.0f ) * ( distance( p, vec2( 0.0f ) ) - 28.0f );
 //			 const float d = ( invert ? -1.0f : 1.0f ) * ( rectangle( Rotate2D( 100.0f * noise.z ) * p, vec2( 4.0f, 3.0f ) ) );
 			seed = seedCache;
 			sceneDist = min( sceneDist, d );
@@ -330,7 +330,7 @@ void main () {
 		// importance sampled from the light
 
 	// placeholder mouse light, uniform point with uniform distribution
-	rayOrigin = GlobalData.mouseLoc + 50.0f * Rotate2D( PushConstants.rotate ) * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
+	rayOrigin = GlobalData.mouseLoc + 350.0f * Rotate2D( PushConstants.rotate ) * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 	rayDirection = normalize( Rotate2D( PushConstants.rotate ) * vec2( 0.0f, 1.0f ) );
 //	wavelength = remap( pow( NormalizedRandomFloat(), 1.3f ), 0.0f, 1.0f, 380.0f, 830.0f );
 	wavelength = getWavelengthForLight( 0 );
