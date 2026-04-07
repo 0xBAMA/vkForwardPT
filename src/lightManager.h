@@ -242,6 +242,7 @@ public:
 		}
 
 		iCDF.clear();
+		iCDF.reserve( 1024 );
 		for ( int x = 0; x < 1024; x++ ) {
 			// each pixel along this strip needs a value of the inverse CDF
 			// this is the intersection with the line defined by the set of segments in the array CDFpoints
@@ -250,7 +251,7 @@ public:
 				if ( p == ( CDFpoints.size() - 1 ) ) {
 					iCDF.emplace_back( CDFpoints[ p ].x );
 				} else if ( CDFpoints[ p ].y >= normalizedPosition ) {
-					iCDF.emplace_back( remap( normalizedPosition, CDFpoints[ p - 1 ].y, CDFpoints[ p ].y, CDFpoints[ p - 1 ].x, CDFpoints[ p ].x ) );
+					iCDF.emplace_back( remap( normalizedPosition, CDFpoints[ std::max( p - 1, 0 ) ].y, CDFpoints[ p ].y + 0.0001f, CDFpoints[ std::max( p - 1, 0 ) ].x, CDFpoints[ p ].x + 0.0001f ) );
 					break;
 				}
 		}
