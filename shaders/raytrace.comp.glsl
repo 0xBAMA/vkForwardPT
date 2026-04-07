@@ -28,6 +28,11 @@ layout( set = 0, binding = 1, std430 ) buffer rayBuffer {
 	raySegment rays[];
 };
 
+layout( set = 0, binding = 2 ) uniform sampler2D iCDFBuffer;
+float getWavelengthForLight( int selectedLight ) {
+	return texture( iCDFBuffer, vec2( NormalizedRandomFloat(), ( selectedLight + 0.5f ) / textureSize( iCDFBuffer, 0 ).y ) ).r;
+}
+
 #define NOHIT						0
 #define DIFFUSE						1
 #define METALLIC					2
@@ -327,7 +332,8 @@ void main () {
 	// placeholder mouse light, uniform point with uniform distribution
 	rayOrigin = GlobalData.mouseLoc + 50.0f * Rotate2D( PushConstants.rotate ) * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 	rayDirection = normalize( Rotate2D( PushConstants.rotate ) * vec2( 0.0f, 1.0f ) );
-	wavelength = remap( pow( NormalizedRandomFloat(), 1.3f ), 0.0f, 1.0f, 380.0f, 830.0f );
+//	wavelength = remap( pow( NormalizedRandomFloat(), 1.3f ), 0.0f, 1.0f, 380.0f, 830.0f );
+	wavelength = getWavelengthForLight( 0 );
 
 	// initial values... probably redundant
 	float transmission = 1.0f;
