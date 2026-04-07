@@ -97,6 +97,7 @@ void PrometheusInstance::Init () {
 	initComputePasses();
 	initImgui();
 	initDefaultData();
+	initLights();
 
 	// everything went fine
 	isInitialized = true;
@@ -299,13 +300,16 @@ void PrometheusInstance::MainLoop () {
 			if ( ImGui::Begin( "Edit" ) ) {
 				ImGui::SliderFloat( "Render Scale", &renderScale, 0.3f, 1.0f );
 
+				/*
 				static ImTextureID myTextureID = ( ImTextureID ) ImGui_ImplVulkan_AddTexture(
 					defaultSamplerLinear,
 					lineColorAttachment.imageView,
 					VK_IMAGE_LAYOUT_GENERAL
 				);
 				ImGui::Image( myTextureID, ImVec2( 386, 256 ) );
+				*/
 
+				/*
 				if ( ImGui::Button( "Add Preset" ) ) {
 					// add the new one
 					presets.push_back( lastPreset );
@@ -318,6 +322,10 @@ void PrometheusInstance::MainLoop () {
 					std::ofstream fout( "../src/presets.yaml" );
 					fout << outputNode;
 				}
+				*/
+
+				lightManager.ImGuiDrawLightList();
+
 			}
 			ImGui::End();
 
@@ -596,9 +604,6 @@ void PrometheusInstance::initResources () {
 }
 
 void PrometheusInstance::initComputePasses () {
-
-
-
 	{ // Raytrace update
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
@@ -1328,6 +1333,17 @@ void PrometheusInstance::initImgui () {
 		ImGui_ImplSDL3_Shutdown();
 		ImGui::DestroyContext();
 	});
+}
+
+void PrometheusInstance::initLights () {
+	// setting up some of the global resources used by the lights
+	lightManager.Initialize();
+
+	// adding a placeholder light
+	// AllocatedImage previewImage = createImage( { 450 + 104, 64, 1 }, VK_FORMAT_R8G8B8A8_SNORM, VK_IMAGE_USAGE_SAMPLED_BIT );
+	lightManager.lights.push_back( Light() );
+
+
 }
 
 //==============================================================================================

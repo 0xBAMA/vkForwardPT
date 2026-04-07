@@ -12,6 +12,7 @@
 
 #include "lightManager.h"
 
+
 struct DeletionQueue {
 	std::deque< std::function< void() > > deletors;
 
@@ -133,6 +134,9 @@ public:
 	AllocatedImage lineColorAttachment;
 	ComputeEffect lineRaster;
 
+	// light manager
+	LightManager lightManager;
+
 	// engine triggers
 	bool resizeRequest { false };
 	bool isInitialized { false };
@@ -228,6 +232,7 @@ private:
 	void initComputePasses ();
 	void initImgui ();
 	void initResources ();
+	void initLights();
 
 	// main loop helpers
 	void drawImgui ( VkCommandBuffer cmd, VkImageView targetImageView );

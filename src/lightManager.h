@@ -360,40 +360,352 @@ public:
 private:
 	int myUniqueID; // for ImGUI
 };
-
+//======================================================================================================================
 class LightManager {
 public:
-	LightManager () {
-		// create the texture for the
+	const int maxLights { 256 };
+	LightManager () {}
 
+	void Initialize () {
+		// create the texture for the light spectrum sampling -> scale the Y for some max
+		// create the texture for the light picking -> 256 max lights means R8 texture can be used for the picking texture
+
+		// load the light PDFs
+		LoadPDFData();
+
+		// load the data about the filters -> labels, swatch colors, and spectral filter %Y vectors
+		LoadGelFilterData();
+
+		// load the data for the sRGB reflectances
+		PrecomputesRGBReflectances();
 	}
 
 	// you always have a mouse light
-	glm::vec2 MouseLocation;
-	Light MouseLight;
+	glm::vec2 MouseLocation { 0.0f };
+	// Light MouseLight;
 	std::deque< Light > lights;
 
 	// we have two different importance sampling structures...
 		// first is a list of the light spectral iCDFs, in a texture
-		// second is for preferentially picking the lights
+		// second is for preferentially picking the lights by brightness
 
 	// we also have the list of parameters for the lights
 
 	void ImGuiDrawLightList () {
 		// configuration for the mouse light
 
+
 		// and then for a growable list of lights after that
+		for ( auto & light : lights ) {
+			light.ImGuiDrawLightInfo();
+		}
 
 		// after the list is drawn...
 			// iterate through and Update() any with the dirtyFlag
-			// iterate through and
+			// iterate through and renove any that have the deleteFlag
 			// if any needed to call Update(), that means we need to update the GPU resources
+		for ( auto & light : lights ) {
+			if ( light.dirtyFlag ) {
+				light.Update();
+			}
+		}
 	}
 
 	void Update () {
 		// construct the light spectral sampling texture from light iCDFs
+
 		// construct the light pick texture from the light brightnesses
+
 		// construct the buffer for the light parameters
+
 	}
 
+private:
+	void PrecomputesRGBReflectances () {
+		// populating the xRite color checker card
+		const vec3 sRGBConstants[] = {
+			vec3( 115,  82,  68 ), // dark skin
+			vec3( 194, 150, 120 ), // light skin
+			vec3(  98, 122, 157 ), // blue sky
+			vec3(  87, 108,  67 ), // foliage
+			vec3( 133, 128, 177 ), // blue flower
+			vec3( 103, 189, 170 ), // bluish green
+			vec3( 214, 126,  44 ), // orange
+			vec3(  80,  91, 166 ), // purplish blue
+			vec3( 193,  90,  99 ), // moderate red
+			vec3(  94,  60, 108 ), // purple
+			vec3( 157, 188,  64 ), // yellow green
+			vec3( 244, 163,  46 ), // orange yellow
+			vec3(  56,  61, 150 ), // blue
+			vec3(  70, 148,  73 ), // green
+			vec3( 175,  54,  60 ), // red
+			vec3( 231, 199,  31 ), // yellow
+			vec3( 187,  86, 149 ), // magenta
+			vec3(   8, 133, 161 ), // cyan
+			vec3( 243, 243, 242 ), // white
+			vec3( 200, 200, 200 ), // neutral 8
+			vec3( 160, 160, 160 ), // neutral 6.5
+			vec3( 122, 122, 121 ), // neutral 5
+			vec3(  85,  85,  85 ), // neutral 3.5
+			vec3(  52,  52,  52 ) // black
+		};
+
+	// there is some resources associated with this sampling process...
+		// we first need to load the LUT from Jakob's paper
+		// https://rgl.epfl.ch/publications/Jakob2019Spectral
+		RGB2Spec *model = rgb2spec_load( "../src/third_party/Jakob2019Spectral/supplement/tables/srgb.coeff" );
+
+		// once we have that, we can use an sRGB constant to derive a reflectance curve
+			// we are going to do that by 1nm bands to match the other data
+		xRiteReflectances = ( const float ** ) malloc( 24 * sizeof( float * ) );
+
+		// for each of the reflectances
+		for ( int i = 0; i < 24; i++ ) {
+			// first step get the reflectance coefficients
+			float rgb[ 3 ] = { sRGBConstants[ i ].r / 255.0f, sRGBConstants[ i ].g / 255.0f, sRGBConstants[ i ].b / 255.0f }, coeff[ 3 ];
+
+			rgb2spec_fetch( model, rgb, coeff );
+			// printf( "fetch(): %f %f %f\n", coeff[ 0 ], coeff[ 1 ], coeff[ 2 ] );
+
+			// allocate and populate the reflectance corresponding to this color chip
+			xRiteReflectances[ i ] = ( const float * ) malloc( 450 * sizeof( float ) );
+			for ( int l = 0; l < 450; l++ ) {
+				( float& ) xRiteReflectances[ i ][ l ] = rgb2spec_eval_precise( coeff, float( l + 380 ) );
+			}
+		}
+	}
+
+	void LoadPDFData () {
+		// setup the texture with rows for the specific light types, for the importance sampled emission spectra
+		const std::string LUTPath = "../src/spectralData/LightPDFs/";
+
+		// need to populate the array of LUT filenames
+		if ( std::filesystem::exists( LUTPath ) && std::filesystem::is_directory( LUTPath ) ) {
+			// Iterate over the directory contents
+			std::vector< std::filesystem::path > paths;
+			for ( const auto& entry : std::filesystem::directory_iterator( LUTPath ) ) {
+				// Check if the entry is a regular file
+				if ( std::filesystem::is_regular_file( entry.status() ) ) {
+					paths.push_back( entry.path() );
+					// cout << "adding " << entry.path().filename().stem() << endl;
+				}
+			}
+
+			// we have a list of filenames, now we need to create the buffers to hold the data + labels
+			sourcePDFs = ( const float ** ) malloc( paths.size() * sizeof( const float * ) );
+			sourcePDFLabels = ( const char ** ) malloc( paths.size() * sizeof( const char * ) );
+
+			for ( size_t i = 0u; i < paths.size(); i++ ) {
+				// populate the labels
+				sourcePDFLabels[ i ] = ( const char * ) malloc( strlen( paths[ i ].filename().stem().string().c_str() ) + 1 );
+				strcpy( ( char * ) sourcePDFLabels[ i ], paths[ i ].filename().stem().string().c_str() );
+
+				// we need to process each of the source distributions into a PDF
+				sourcePDFs[ i ] = ( const float * ) malloc( 450 * sizeof( float ) );
+
+				// helper for the below
+				const auto getLuma = [] ( const glm::vec3& v ) -> float {
+					const float scaleFactors[ 3 ] = { 0.299f, 0.587f, 0.114f };
+					float sum = 0.0f;
+					for ( int c = 0; c < 3; ++c ) sum += v[ c ] * v[ c ] * scaleFactors[ c ];
+					return std::sqrt( sum );
+				};
+
+			// loading the image needs to change to use stb_image
+				int width, height, channels;
+				unsigned char *data = stbi_load( paths[ i ].string().c_str(), &width, &height, &channels, 0 );
+				if ( data == NULL ) {
+					printf("Failed to load image: %s\n", stbi_failure_reason());
+				}
+
+				// load the referenced data to decode the emission spectra PDF
+				for ( int x = 0; x < width; x++ ) {
+					float sum = 0.0f;
+					for ( int y = 0; y < height; y++ ) {
+						vec3 col = vec3( 0.0f, 0.0f, 0.0f );
+						col.r = data[ ( x + width * y ) * channels ] / 255.0f;
+						col.g = data[ ( x + width * y ) * channels + 1 ] / 255.0f;
+						col.b = data[ ( x + width * y ) * channels + 2 ] / 255.0f;
+						sum += 1.0f - getLuma( col );
+					}
+					( float& ) sourcePDFs[ i ][ x ] = sum;
+				}
+
+				// and increment count
+				numSourcePDFs++;
+
+				/*
+				// and the debug dump
+				cout << "adding source distribution: " << endl << sourcePDFLabels[ i ] << endl;
+				for ( size_t x = 0; x < pdfLUT.Width(); x++ ) {
+					cout << " " << sourcePDFs[ i ][ x ];
+				}
+				cout << endl << endl;
+				*/
+			}
+
+		} else {
+			std::cerr << "Directory does not exist or is not a directory." << std::endl;
+		}
+	}
+
+	void LoadGelFilterData () {
+		// loading the initial data from the JSON records
+		json gelatinRecords;
+		std::ifstream i( "../src/spectralData/LeeGelList.json" );
+		i >> gelatinRecords; i.close();
+
+		struct gelRecord {
+			std::string label;
+			std::string description;
+			vec3 previewColor;
+			std::vector< float > filterData;
+		};
+
+		std::vector< gelRecord > gelRecords;
+
+		// iterating through and finding all the gel filters that have nonzero ("valid") spectral data
+		for ( auto& e : gelatinRecords ) {
+			// getting the data we need... problem is we don't know ahead of time, how many there are
+
+			// Need to do some processing to separate label and description
+			std::string text = e[ "text" ];
+			size_t firstPos = text.find_first_not_of( " \n" );
+			size_t numEnd = text.find( ' ', firstPos );
+			std::string number = text.substr( firstPos, numEnd - firstPos );
+			size_t secondPos = text.find( number, numEnd );
+
+			// also some processing in anticipation of needing the color, too
+			std::string c = e[ "color" ];
+			std::transform( c.begin(), c.end(), c.begin(), [] ( unsigned char cf ) { return std::tolower( cf ); } );
+			vec3 color = HexToVec3( c );
+
+			// going through the filter is where we will be able to determine if this entry is valid or not
+			bool valid = true;
+			std::vector< float > filter;
+			std::vector< float > filterScratch;
+			filter.clear();
+			if ( e.contains( "datatext" ) ) {
+				for ( int lambda = 405;; lambda += 5 ) {
+					if ( e[ "datatext" ].contains( std::to_string( lambda ) ) ) {
+						filter.push_back( std::stof( e[ "datatext" ][ std::to_string( lambda ) ].get< std::string >() ) / 100.0f );
+					} else {
+						// loop exit
+						if ( filter.size() != 0 )
+							filter.push_back( filter[ filter.size() - 1 ] );
+						break;
+					}
+				}
+			}
+
+			// we want to dismiss under two conditions:
+				// zero length filter (filter data was not included)
+				// filter is all zeroes (filter data was replaced with placeholder)
+			if ( filter.size() != 0 ) {
+				// let's also determine that we have valid coefficients:
+				bool allZeroes = true;
+				for ( int f = 0; f < filter.size(); f++ ) {
+					if ( filter[ f ] != 0.0f ) {
+						allZeroes = false;
+					}
+				}
+				// all zeroes means invalid
+				if ( allZeroes ) {
+					valid = false;
+				} else {
+					// great - we have valid filter data...
+						// let's pad out the edges and interpolate from 400-700 by 5's to 380-830 by 1's for the engine
+
+					// low side pad with value in index 0 (optionally you could make this 1's or 0's, as desired)
+					for ( int w = 380; w < 400; w++ ) {
+						filterScratch.push_back( filter[ 0 ] );
+					}
+
+					// interpolate the middle section, 400-700nm
+					float vprev = filter[ 0 ];
+					float v = filter[ 1 ];
+					for ( int wOffset = 1; wOffset < filter.size(); wOffset++ ) {
+						// each entry spawns 5 elements
+						for ( int j = 0; j < 5; j++ ) {
+							filterScratch.push_back( glm::mix( vprev, v, ( j + 0.5f ) / 5.0f ) );
+						}
+						// cycle in the new values
+						vprev = v;
+						if ( wOffset < filter.size() ) {
+							v = filter[ wOffset ];
+						}
+					}
+
+					// high side pad with value in final index (also optionally force 1's or 0's, if you want)
+					while ( filterScratch.size() < 450 ) {
+						filterScratch.push_back( filter[ filter.size() - 1 ] );
+					}
+				}
+			} else {
+				// empty filter means invalid
+				valid = false;
+			}
+
+			if ( valid ) {
+				gelRecord g;
+
+				// we can split now labels and description strings
+				g.label = text.substr( firstPos, secondPos - firstPos );
+				g.description = text.substr( secondPos );
+
+				// also want to extract color from the hex codes
+				g.previewColor = color;
+
+				// and of course the filter data
+				g.filterData = filterScratch;
+
+				// we are going to collect these together to make it easier to sort
+				numGelFilters++;
+				gelRecords.push_back( g );
+			}
+		}
+
+		// we have now constructed a list of filter datapoints... sort by labels, so we have basically ascending color codes
+		std::sort( gelRecords.begin(), gelRecords.end(), [] ( gelRecord g1, gelRecord g2 ) { return g1.label < g2.label; } );
+
+		// now we need to do the allocations for the menus - this is separated out for labels and descriptions, preview colors and filter coefficients
+		gelFilters = ( const float ** ) malloc( numGelFilters * sizeof( const float * ) );
+		gelFilterLabels = ( const char ** ) malloc( numGelFilters * sizeof( const char * ) );
+		gelFilterDescriptions = ( const char ** ) malloc( numGelFilters * sizeof( const char * ) );
+		gelPreviewColors = ( const vec3* ) malloc( numGelFilters * sizeof( const vec3 ) );
+
+		for ( size_t i = 0; i < numGelFilters; i++ ) {
+			// Allocate memory for each string and copy it
+			gelFilterLabels[ i ] = ( const char * ) malloc( strlen( gelRecords[ i ].label.c_str() ) + 1 );
+			strcpy( ( char * ) gelFilterLabels[ i ], gelRecords[ i ].label.c_str() );  // Copy the string
+
+			gelFilterDescriptions[ i ] = ( const char * ) malloc( strlen( gelRecords[ i ].description.c_str() ) + 1 );
+			strcpy( ( char * ) gelFilterDescriptions[ i ], gelRecords[ i ].description.c_str() );
+
+			// just do the sRGB convert and avoid doing it every frame
+			vec4 sRGB = vec4( gelRecords[ i ].previewColor[ 0 ], gelRecords[ i ].previewColor[ 1 ], gelRecords[ i ].previewColor[ 2 ], 255 );
+			bvec4 cutoff = lessThan( sRGB, vec4( 0.04045f ) );
+			vec4 higher = pow( ( sRGB + vec4( 0.055f ) ) / vec4( 1.055f ), vec4( 2.4f ) );
+			vec4 lower = sRGB / vec4( 12.92f );
+			gelRecords[ i ].previewColor =  mix( higher, lower, cutoff );
+			( vec3& ) gelPreviewColors[ i ] = gelRecords[ i ].previewColor;
+
+			// filter coefficients slightly more
+			gelFilters[ i ] = ( const float * ) malloc( 450 * sizeof( const float ) );
+			for ( size_t j = 0; j < 450; j++ ) {
+				( float& ) gelFilters[ i ][ j ] = gelRecords[ i ].filterData[ j ];
+			}
+
+			/*
+			// debug dump would be useful here
+			cout << "Created Record: " << endl << gelFilterLabels[ i ] << endl;
+			cout << gelFilterDescriptions[ i ] << endl;
+			cout << to_string( gelPreviewColors[ i ] ) << endl;
+			for ( size_t j = 0; j < 450; j++ ) {
+				cout << gelFilters[ i ][ j ];
+			}
+			cout << endl << endl;
+			*/
+		}
+	}
 };
