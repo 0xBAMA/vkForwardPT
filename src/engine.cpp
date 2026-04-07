@@ -1140,8 +1140,8 @@ AllocatedImage PrometheusInstance::createImage ( void* data, VkExtent3D size, Vk
 	return new_image;
 }
 
-void PrometheusInstance::updateImage( AllocatedImage& image, void* data, VkExtent3D size ) {
-	size_t dataSize = size.width * size.height * size.depth * 4;
+void PrometheusInstance::updateImage( AllocatedImage& image, void* data ) {
+	size_t dataSize = image.imageExtent.width * image.imageExtent.height * image.imageExtent.depth * 4;
 
 	AllocatedBuffer uploadbuffer = createBuffer( dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU );
 
@@ -1157,7 +1157,7 @@ void PrometheusInstance::updateImage( AllocatedImage& image, void* data, VkExten
 		copyRegion.imageSubresource.mipLevel = 0;
 		copyRegion.imageSubresource.baseArrayLayer = 0;
 		copyRegion.imageSubresource.layerCount = 1;
-		copyRegion.imageExtent = size;
+		copyRegion.imageExtent = image.imageExtent;
 
 		vkCmdCopyBufferToImage( cmd, uploadbuffer.buffer, image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion );
 	} );
