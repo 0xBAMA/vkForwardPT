@@ -65,11 +65,23 @@ inline glm::vec3 HexToVec3 ( const std::string& hex ) {
 // for handing out unique identifiers
 static int uniqueID { 0 };
 
-// what does ImGUI need for the dropdown menus?
-	// need the information for the light LUTs
-	// need the information for the gel LUTs
-	// need the text and the preview swatch for the gel
+// memory associated with the xRite color chip reflectances
+static const float** xRiteReflectances = nullptr;
 
+// memory associated with the source PDFs
+static int numSourcePDFs = 0;
+static const float** sourcePDFs = nullptr;
+static const char** sourcePDFLabels = nullptr;
+
+// information about the gel filters
+static int numGelFilters = 0;
+static const float** gelFilters = nullptr;
+static const char** gelFilterLabels = nullptr;
+static const char** gelFilterDescriptions = nullptr;
+static const glm::vec3* gelPreviewColors = nullptr;
+
+//======================================================================================================================
+// light class -> configuration for a single light
 class Light {
 public:
 
