@@ -1,13 +1,63 @@
-
-
 #include "third_party/stb/stb_image.h"
+#include "third_party/stb/stb_image_write.h"
 
 #include <deque>
 #include <vector>
+#include <random>
 #include <fstream>
-#include <third_party/nlohmann/json.hpp>
+#include "third_party/nlohmann/json.hpp"
 using json = nlohmann::json;
 
+#include <vk_types.h>
+
+// remap the value from [inLow..inHigh] to [outLow..outHigh]
+inline float remap ( float value, float inLow, float inHigh, float outLow, float outHigh ) {
+	return outLow + ( value - inLow ) * ( outHigh - outLow ) / ( inHigh - inLow );
+}
+
+using glm::vec3;
+using glm::vec4;
+using glm::bvec4;
+
+#include "spectralData/spectralToolkit.h"
+
+inline glm::vec3 HexToVec3 ( const std::string& hex ) {
+	// uint8_t r, g, b;
+	// std::stringstream( hex ) >> std::hex >> r >> g >> b;
+	// return glm::vec3( r / 255.0f, g / 255.0f, b / 255.0f );
+
+	// Check if the input hex string is valid (should be 6 characters without the #)
+
+	// Extract the RGB components from the hex string
+	std::string redHex = hex.substr(0, 2);
+	std::string greenHex = hex.substr(2, 2);
+	std::string blueHex = hex.substr(4, 2);
+
+	// Convert hex to integers
+	int r, g, b;
+	std::stringstream ss;
+
+	ss << std::hex << redHex;
+	ss >> r;
+	ss.clear();
+
+	ss << std::hex << greenHex;
+	ss >> g;
+	ss.clear();
+
+	ss << std::hex << blueHex;
+	ss >> b;
+
+	// Normalize the values to 0-1 range by dividing by 255
+	vec3 color;
+	color.r = r / 255.0f;
+	color.g = g / 255.0f;
+	color.b = b / 255.0f;
+
+	return color;
+}
+
+#include "third_party/imgui/imgui.h"
 #include "third_party/imgui/imgui_impl_vulkan.h"
 
 #include "third_party/Jakob2019Spectral/supplement/rgb2spec.h"
