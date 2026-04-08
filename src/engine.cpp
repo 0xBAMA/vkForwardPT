@@ -313,6 +313,9 @@ void PrometheusInstance::MainLoop () {
 
 			if ( showMenu ) {
 				if ( ImGui::Begin( "Edit" ) ) {
+
+
+					ImGui::SliderFloat( "Brightness Scale", &globalData.brightnessScalar, 0.3f, 5.0f, "%.5f", ImGuiSliderFlags_Logarithmic ); // this should also apply to the raster step + accumulate step
 					ImGui::SliderFloat( "Render Scale", &renderScale, 0.3f, 1.0f ); // this should also apply to the raster step + accumulate step
 
 					/*
