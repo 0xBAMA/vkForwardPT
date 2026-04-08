@@ -15,6 +15,7 @@ inline float remap ( float value, float inLow, float inHigh, float outLow, float
 	return outLow + ( value - inLow ) * ( outHigh - outLow ) / ( inHigh - inLow );
 }
 
+using glm::vec2;
 using glm::vec3;
 using glm::vec4;
 using glm::bvec4;
@@ -163,7 +164,7 @@ public:
 			}
 
 			ImGui::SameLine();
-			if ( ImGui::Button( ( "Remove" + lString ).c_str() ) ) {
+			if ( ImGui::Button( ( "Remove Gel" + lString ).c_str() ) ) {
 				filterStack.erase( filterStack.begin() + i );
 				dirtyFlag = true;
 			} else { // need to prevent accessing these things if we remove
@@ -439,6 +440,9 @@ public:
 	std::unique_ptr<Light> MouseLight = nullptr;
 	std::deque< Light > lights;
 
+	// staging memory for the light emitter parameter buffer
+	LightEmitterParameters lightEmitterParameters[ maxLights ];
+
 	void ImGuiDrawLightList () {
 		// configuration for the mouse light
 		ImGui::Separator();
@@ -520,12 +524,12 @@ public:
 
 		// construct the light pick texture from the light brightnesses
 			// need to refer to individual light brightnesses relative to the sum of all brightnesses in the list
-		float sumBrightness{ 0.0f };
+		float sumBrightness{ MouseLight->brightness };
 		std::vector< float > thresholds;
 		for ( auto & light : lights ) {
 			sumBrightness += light.brightness;
 		}
-		float cumSum{ 0.0f };
+		float cumSum{ MouseLight->brightness / sumBrightness };
 		for ( auto & light : lights ) {
 			thresholds.emplace_back( cumSum );
 			cumSum += light.brightness / sumBrightness;
@@ -549,8 +553,10 @@ public:
 		for ( size_t i = 0; i < isSize.x * isSize.y; i++ ) {
 			float val = x( seedRNG );
 			for ( size_t j = 0; j < thresholds.size(); j++ ) {
-				if ( val >= thresholds[ j ] || thresholds[ j ] == 1.0f ) {
-					pickTexture[ i ] = static_cast< uint8_t >( j - 1 );
+				if ( val < MouseLight->brightness / sumBrightness ) {
+					pickTexture[ i ] = 0;;
+				} else if ( val >= thresholds[ j ] || thresholds[ j ] == 1.0f ) {
+					pickTexture[ i ] = static_cast< uint8_t >( j );
 				}
 			}
 		}
