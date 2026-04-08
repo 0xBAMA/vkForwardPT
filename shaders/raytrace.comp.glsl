@@ -360,10 +360,11 @@ void main () {
 
 	// cache rotation matrix
 	const mat2 rot = Rotate2D( params.rotation );
+	const vec2 subpixelJitter = vec2( NormalizedRandomFloat(), NormalizedRandomFloat() );
 
 	if ( lightPick == 0 ) {
 		// this is the mouse light
-		rayOrigin = GlobalData.mouseLoc + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
+		rayOrigin = subpixelJitter + GlobalData.mouseLoc + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 		rayDirection = normalize( Rotate2D( params.rotation + params.angleScalar * ( NormalizedRandomFloat() - 0.5f ) + params.cauchyMix * rnd_disc_cauchy().x ) * vec2( 0.0f, 1.0f ) );
 	} else {
 		// values in the buffer sets origin, direction
@@ -372,7 +373,7 @@ void main () {
 			pickedRepeat = float( floor( NormalizedRandomFloat() * params.repeats ) ) - float( params.repeats ) / 2.0f;
 		}
 		vec2 offset = rot * pickedRepeat * params.emitterSpacing * vec2( 1.0f, 0.0f );
-		rayOrigin = params.position + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
+		rayOrigin = subpixelJitter + params.position + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 		rayDirection = normalize( Rotate2D( params.rotation + params.angleScalar * ( NormalizedRandomFloat() - 0.5f ) + params.cauchyMix * rnd_disc_cauchy().x ) * vec2( 0.0f, 1.0f ) );
 	}
 
