@@ -256,6 +256,10 @@ void PrometheusInstance::MainLoop () {
 				quit = true;
 			}
 
+			if ( e.type == SDL_EVENT_KEY_DOWN && e.key.scancode == SDL_SCANCODE_M ) {
+				showMenu = !showMenu;
+			}
+
 			const bool* kb = SDL_GetKeyboardState( NULL );
 			const bool shift = SDL_GetModState() & SDL_KMOD_LSHIFT;
 			const float amount = shift ? 0.1f : 0.01f;
@@ -306,37 +310,38 @@ void PrometheusInstance::MainLoop () {
 			// some imgui UI to test
 			// ImGui::ShowDemoWindow();
 
-			if ( ImGui::Begin( "Edit" ) ) {
-				ImGui::SliderFloat( "Render Scale", &renderScale, 0.3f, 1.0f );
+			if ( showMenu ) {
+				if ( ImGui::Begin( "Edit" ) ) {
+					ImGui::SliderFloat( "Render Scale", &renderScale, 0.3f, 1.0f ); // this should also apply to the raster step + accumulate step
 
-				/*
-				static ImTextureID myTextureID = ( ImTextureID ) ImGui_ImplVulkan_AddTexture(
-					defaultSamplerLinear,
-					lineColorAttachment.imageView,
-					VK_IMAGE_LAYOUT_GENERAL
-				);
-				ImGui::Image( myTextureID, ImVec2( 386, 256 ) );
-				*/
+					/*
+					static ImTextureID myTextureID = ( ImTextureID ) ImGui_ImplVulkan_AddTexture(
+						defaultSamplerLinear,
+						lineColorAttachment.imageView,
+						VK_IMAGE_LAYOUT_GENERAL
+					);
+					ImGui::Image( myTextureID, ImVec2( 386, 256 ) );
+					*/
 
-				/*
-				if ( ImGui::Button( "Add Preset" ) ) {
-					// add the new one
-					presets.push_back( lastPreset );
+					/*
+					if ( ImGui::Button( "Add Preset" ) ) {
+						// add the new one
+						presets.push_back( lastPreset );
 
-					// overwrite the file
-					YAML::Node outputNode;
-					for ( auto& p: presets ) {
-						outputNode.push_back( p );
+						// overwrite the file
+						YAML::Node outputNode;
+						for ( auto& p: presets ) {
+							outputNode.push_back( p );
+						}
+						std::ofstream fout( "../src/presets.yaml" );
+						fout << outputNode;
 					}
-					std::ofstream fout( "../src/presets.yaml" );
-					fout << outputNode;
+					*/
+
+					lightManager.ImGuiDrawLightList();
 				}
-				*/
-
-				lightManager.ImGuiDrawLightList();
-
+				ImGui::End();
 			}
-			ImGui::End();
 
 			// make imgui calculate internal draw structures
 			ImGui::Render();

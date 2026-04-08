@@ -110,6 +110,8 @@ inline uint32_t genWangSeed () {
 class PrometheusInstance {
 public:
 
+	bool showMenu = true;
+
 	uint32_t lastPreset;
 	std::vector< uint32_t > presets;
 
