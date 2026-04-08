@@ -17,6 +17,8 @@
 #include <fstream>
 
 #define VMA_IMPLEMENTATION
+#include <fastgltf/types.hpp>
+
 #include "vk_mem_alloc.h"
 
 #include <third_party/imgui/imgui.h>
@@ -165,6 +167,9 @@ void PrometheusInstance::Draw () {
 	vkutil::transition_image( cmd, drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, lineColorAttachment.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 
+	vkutil::transition_image( cmd, PickISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
+	vkutil::transition_image( cmd, SpectrumISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
+
 	// compute shader to do one update of the raytrace process
 	Raytrace.invoke( cmd );
 
@@ -262,12 +267,14 @@ void PrometheusInstance::MainLoop () {
 
 			if ( kb[ SDL_SCANCODE_D ] ) {
 				globalData.reset = 1;
-				Raytrace.pushConstants.rotate -= amount;
+				// Raytrace.pushConstants.rotate -= amount;
+				lightManager.MouseLight->parameters.rotation -= amount;
 			}
 
 			if ( kb[ SDL_SCANCODE_A ] ) {
 				globalData.reset = 1;
-				Raytrace.pushConstants.rotate += amount;
+				// Raytrace.pushConstants.rotate += amount;
+				lightManager.MouseLight->parameters.rotation += amount;
 			}
 
 			if ( kb[ SDL_SCANCODE_T ] && shift ) {
@@ -594,11 +601,17 @@ void PrometheusInstance::initResources () {
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) rayBuffer.buffer, "Ray Segment Buffer" );
 	}
 
+	{
+		LightParametersBuffer = createBuffer( 256 * sizeof( LightEmitterParameters ), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) LightParametersBuffer.buffer, "Light Parameter UBO" );
+	}
+
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
 		// destroying buffers
 		destroyBuffer( GlobalUBO );
 		destroyBuffer( rayBuffer );
+		destroyBuffer( LightParametersBuffer );
 
 		// destroying images
 		destroyImage( XYZImage );
@@ -616,8 +629,8 @@ void PrometheusInstance::initComputePasses () {
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
 			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the ray buffer
 			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // the iCDF texture for light spectra
-			// builder.add_binding( 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // the discrete IS texture for lights
-			// builder.add_binding( 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // the parameters for the light emitters
+			builder.add_binding( 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // the discrete IS texture for lights
+			builder.add_binding( 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // the parameters for the light emitters
 			Raytrace.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
 			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) Raytrace.descriptorSetLayout, "Raytrace Descriptor Set Layout" );
 		}
@@ -679,7 +692,8 @@ void PrometheusInstance::initComputePasses () {
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 				writer.write_buffer( 1, rayBuffer.buffer, globalData.numBounces * globalData.numRays * sizeof( raySegment ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
 				writer.write_image( 2, SpectrumISImage.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
-				// writer.write_image( 3, pick.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE );
+				writer.write_image( 3, PickISImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				writer.write_buffer( 4, LightParametersBuffer.buffer, 256 * sizeof( LightEmitterParameters ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 				writer.update_set( device, Raytrace.descriptorSet );
 			}
 
@@ -1104,6 +1118,11 @@ void PrometheusInstance::lightManagerMaintenance () {
 	}
 
 	// and then we need to update the parameters buffer for the emitters
+	LightEmitterParameters* emitterParams = ( LightEmitterParameters * ) LightParametersBuffer.allocation->GetMappedData();
+	emitterParams[ 0 ] = lightManager.MouseLight->parameters;
+	for ( int i = 0; i < lightManager.lights.size(); i++ ) {
+		emitterParams[ i + 1 ] = lightManager.lights[ i ].parameters;
+	}
 }
 
 AllocatedBuffer PrometheusInstance::createBuffer ( size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage ) {
