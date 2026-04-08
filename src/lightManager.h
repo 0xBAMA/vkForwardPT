@@ -127,6 +127,7 @@ public:
 			// going to change this to use an atlassed version
 
 		ImGui::SliderFloat( ( "Brightness" + lString ).c_str(), &brightness, 0.0001f, 100.0f, "%.5f", ImGuiSliderFlags_Logarithmic );
+		if ( ImGui::IsItemEdited() ) dirtyFlag = true;
 
 		// source PDF picker
 		ImGui::Combo( ( std::string( "Light Type" ) + lString ).c_str(), &PDFPick, sourcePDFLabels, numSourcePDFs ); // may eventually do some kind of scaled gaussians for user-configurable RGB triplets...
@@ -524,17 +525,11 @@ public:
 
 		// construct the light pick texture from the light brightnesses
 			// need to refer to individual light brightnesses relative to the sum of all brightnesses in the list
-		float sumBrightness{ MouseLight->brightness };
-		std::vector< float > thresholds;
+		std::vector< float > brightnesses;
+		brightnesses.emplace_back( MouseLight->brightness );
 		for ( auto & light : lights ) {
-			sumBrightness += light.brightness;
+			brightnesses.emplace_back( light.brightness );
 		}
-		float cumSum{ MouseLight->brightness / sumBrightness };
-		for ( auto & light : lights ) {
-			thresholds.emplace_back( cumSum );
-			cumSum += light.brightness / sumBrightness;
-		}
-		thresholds.push_back( 1.0f );
 
 		// size of the texture doesn't actually matter on the GPU side, since it will use normalized sampling
 		glm::vec2 isSize = glm::vec2( 256, 256 );
@@ -547,18 +542,11 @@ public:
 			return std::mt19937( seq );
 		} () );
 
-		// get some samples from this process -> this is the texture memory
+		// get some samples from this process (std::random has a good tool for this) -> this is the texture memory
 		pickTexture.resize( isSize.x * isSize.y );
-		auto x = std::uniform_real_distribution< float >( 0.0f, 1.0f );
+		std::discrete_distribution<> d({ brightnesses.begin(), brightnesses.end() });
 		for ( size_t i = 0; i < isSize.x * isSize.y; i++ ) {
-			float val = x( seedRNG );
-			for ( size_t j = 0; j < thresholds.size(); j++ ) {
-				if ( val < MouseLight->brightness / sumBrightness ) {
-					pickTexture[ i ] = 0;;
-				} else if ( val >= thresholds[ j ] || thresholds[ j ] == 1.0f ) {
-					pickTexture[ i ] = static_cast< uint8_t >( j );
-				}
-			}
+			pickTexture[ i ] = d( seedRNG );
 		}
 
 		// next we need to make sure that the atlas is constructed
