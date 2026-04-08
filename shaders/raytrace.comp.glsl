@@ -29,9 +29,33 @@ layout( set = 0, binding = 1, std430 ) buffer rayBuffer {
 };
 
 layout( set = 0, binding = 2 ) uniform sampler2D iCDFBuffer;
-float getWavelengthForLight( int selectedLight ) {
+float getWavelengthForLight( uint selectedLight ) {
 	return texture( iCDFBuffer, vec2( NormalizedRandomFloat(), ( selectedLight + 0.5f ) / textureSize( iCDFBuffer, 0 ).y ) ).r;
 }
+
+layout( set = 0, binding = 3 ) uniform usampler2D pickBuffer;
+uint getPickedLight() {
+	return texture( pickBuffer, vec2( NormalizedRandomFloat(), NormalizedRandomFloat() ) ).r;
+}
+
+struct LightEmitterParameters {
+// base emitter
+	vec2 position;
+	float rotation;
+
+// angular distribution
+	float angleScalar;
+	float cauchyMix;
+
+// array modifier
+	int repeats;
+	float emitterSpacing;
+	float width;
+};
+
+layout( set = 0, binding = 4 ) uniform emitterParameters {
+	LightEmitterParameters emitterParams[ 256 ];
+} EmitterParameters;
 
 #define NOHIT						0
 #define DIFFUSE						1
@@ -323,17 +347,32 @@ void main () {
 	// the raytrace process...
 	vec2 rayOrigin, rayDirection;
 
+
 	// picking a light...
-		// sets origin, direction
+	uint lightPick = getPickedLight();
+	LightEmitterParameters params = EmitterParameters.emitterParams[ lightPick ];
+
+	// cache rotation matrix
+	const mat2 rot = Rotate2D( params.rotation );
+
+	if ( lightPick == 0 ) {
+		// this is the mouse light
+		rayOrigin = GlobalData.mouseLoc + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
+		rayDirection = normalize( Rotate2D( params.rotation + params.angleScalar * ( NormalizedRandomFloat() - 0.5f ) + params.cauchyMix * rnd_disc_cauchy().x ) * vec2( 0.0f, 1.0f ) );
+	} else {
+		// values in the buffer sets origin, direction
+		float pickedRepeat = 0;
+		if ( params.repeats != 1 ) {
+			pickedRepeat = float( floor( NormalizedRandomFloat() * params.repeats ) ) - float( params.repeats ) / 2.0f;
+		}
+		vec2 offset = rot * pickedRepeat * params.emitterSpacing * vec2( 1.0f, 0.0f );
+		rayOrigin = params.position + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
+		rayDirection = normalize( Rotate2D( params.rotation + params.angleScalar * ( NormalizedRandomFloat() - 0.5f ) + params.cauchyMix * rnd_disc_cauchy().x ) * vec2( 0.0f, 1.0f ) );
+	}
 
 	// picking a wavelength...
 		// importance sampled from the light
-
-	// placeholder mouse light, uniform point with uniform distribution
-	rayOrigin = GlobalData.mouseLoc + 350.0f * Rotate2D( PushConstants.rotate ) * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
-	rayDirection = normalize( Rotate2D( PushConstants.rotate ) * vec2( 0.0f, 1.0f ) );
-//	wavelength = remap( pow( NormalizedRandomFloat(), 1.3f ), 0.0f, 1.0f, 380.0f, 830.0f );
-	wavelength = getWavelengthForLight( 0 );
+	wavelength = getWavelengthForLight( lightPick );
 
 	// initial values... probably redundant
 	float transmission = 1.0f;

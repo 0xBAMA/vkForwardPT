@@ -81,6 +81,21 @@ static const char** gelFilterDescriptions = nullptr;
 static const glm::vec3* gelPreviewColors = nullptr;
 
 //======================================================================================================================
+struct LightEmitterParameters {
+	// base emitter
+	vec2 position = vec2( 0.0f, 0.0f );
+	float rotation = 0.0f;
+
+	// angular distribution
+	float angleScalar = 0.0f;
+	float cauchyMix = 0.0001f;
+
+	// array modifier
+	int32_t repeats = 1;
+	float emitterSpacing = 0.0f;
+	float width = 10.0f;
+};
+//======================================================================================================================
 // light class -> configuration for a single light
 class Light {
 public:
@@ -97,6 +112,8 @@ public:
 	bool dirtyFlag { false }; // need to call Update() on this light
 	bool deleteFlag { false }; // need to delete this light
 
+	LightEmitterParameters parameters;
+
 	// called inside of the light manager ImGui Draw function
 	void ImGuiDrawLightInfo ( bool mouseLight = false ) {
 	// use myUniqueID in the labels, disambiguates between otherwise identical labels for ImGui
@@ -107,6 +124,8 @@ public:
 		// ImGui::Image( myTextureID, ImVec2( 386, 256 ) );
 
 			// going to change this to use an atlassed version
+
+		ImGui::SliderFloat( ( "Brightness" + lString ).c_str(), &brightness, 0.0001f, 100.0f, "%.5f", ImGuiSliderFlags_Logarithmic );
 
 		// source PDF picker
 		ImGui::Combo( ( std::string( "Light Type" ) + lString ).c_str(), &PDFPick, sourcePDFLabels, numSourcePDFs ); // may eventually do some kind of scaled gaussians for user-configurable RGB triplets...
@@ -166,14 +185,39 @@ public:
 			dirtyFlag = true;
 		}
 
-		// emitter parameters... tbd
-
 		// option to remove -> set deleteFlag
+		ImGui::PushID( uniqueID );
 		if ( !mouseLight ) {
-			if ( ImGui::Button( "Remove" ) ) {
+			// emitter parameters
+			ImGui::Separator();
+			ImGui::Text("Emitter Parameters:" );
+			ImGui::SliderFloat2( ( "Location" + lString ).c_str(), ( float* ) &parameters.position, 0.0f, 2000.0f, "%.1f" );
+			ImGui::SliderFloat( ( "Rotation" + lString ).c_str(), &parameters.rotation, 0.0f, 6.3f, "%.3f" );
+			ImGui::SliderFloat( ( "Width" + lString ).c_str(), &parameters.width, 0.0f, 500.0f, "%.1f", ImGuiSliderFlags_Logarithmic );
+
+			ImGui::Text( "Angular Distribution:" );
+			ImGui::SliderFloat( ( "Angle" + lString ).c_str(), &parameters.angleScalar, 0.0f, 6.3f, "%.3f", ImGuiSliderFlags_Logarithmic );
+			ImGui::SliderFloat( ( "Cauchy Mix" + lString ).c_str(), &parameters.cauchyMix, 0.0f, 0.01f, "%.6f", ImGuiSliderFlags_Logarithmic );
+
+			ImGui::Text( "Array Mod:" );
+			ImGui::SliderInt( ( "Repeats" + lString ).c_str(), &parameters.repeats, 1, 10 );
+			if ( parameters.repeats != 1 )
+			ImGui::SliderFloat( ( "Spacing" + lString ).c_str(), &parameters.emitterSpacing, 0.0f, 500.0f, "%.3f", ImGuiSliderFlags_Logarithmic );
+
+			if ( ImGui::Button( ( "Remove Light" + lString ).c_str() ) ) {
 				deleteFlag = true;
 			}
+		} else {
+			ImGui::Text("Emitter Parameters:" );
+			ImGui::SliderFloat2( ( "Location" + lString ).c_str(), ( float* ) &parameters.position, 0.0f, 2000.0f, "%.1f" );
+			ImGui::SliderFloat( ( "Rotation" + lString ).c_str(), &parameters.rotation, 0.0f, 6.3f, "%.3f" );
+			ImGui::SliderFloat( ( "Width" + lString ).c_str(), &parameters.width, 0.0f, 500.0f, "%.1f", ImGuiSliderFlags_Logarithmic );
+
+			ImGui::Text( "Angular Distribution:" );
+			ImGui::SliderFloat( ( "Angle" + lString ).c_str(), &parameters.angleScalar, 0.0f, 6.3f, "%.3f" );
+			ImGui::SliderFloat( ( "Cauchy Mix" + lString ).c_str(), &parameters.cauchyMix, 0.0f, 0.01f, "%.6f", ImGuiSliderFlags_Logarithmic );
 		}
+		ImGui::PopID();
 	}
 
 	void Update () {
@@ -524,7 +568,12 @@ public:
 		}
 
 		// construct the buffer for the light parameters
-			// tbd what the parameterization for the emitterslooks like
+		int idx = 0;
+		lightEmitterParameters[ idx ] = MouseLight->parameters;
+		while ( ( idx + 1 ) < lights.size() ) {
+			idx++;
+			lightEmitterParameters[ idx ] = lights[ idx ].parameters;
+		}
 
 		// update complete
 		needsUpdate = false;
