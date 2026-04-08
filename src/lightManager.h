@@ -106,6 +106,14 @@ public:
 		uniqueID += 42069;
 		myUniqueID = uniqueID;
 
+		std::mt19937 seedRNG( [] {
+			std::random_device rd;
+			std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
+			return std::mt19937( seq );
+		} () );
+		// random starting value
+		PDFPick = std::uniform_int_distribution< int >( 0, numSourcePDFs - 1 )( seedRNG );
+
 		Update();
 	}
 
@@ -117,7 +125,13 @@ public:
 
 	// called inside of the light manager ImGui Draw function
 	void ImGuiDrawLightInfo ( bool mouseLight = false ) {
-	// use myUniqueID in the labels, disambiguates between otherwise identical labels for ImGui
+		static std::mt19937 seedRNG( [] {
+			std::random_device rd;
+			std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
+			return std::mt19937( seq );
+		} () );
+
+		// use myUniqueID in the labels, disambiguates between otherwise identical labels for ImGui
 		const std::string lString = std::string( "##" ) + std::to_string( myUniqueID );
 
 		// spectrum preview + xrite checker
@@ -135,11 +149,6 @@ public:
 
 		ImGui::SameLine(); // pick a random source PDF
 		if ( ImGui::Button( ( "Randomize" + lString ).c_str() ) ) {
-			static std::mt19937 seedRNG( [] {
-				std::random_device rd;
-				std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
-				return std::mt19937( seq );
-			} () );
 			PDFPick = std::uniform_int_distribution< int >( 0, numSourcePDFs - 1 )( seedRNG );
 			dirtyFlag = true; // we changed the light, need to update
 		}
@@ -155,11 +164,6 @@ public:
 
 			ImGui::SameLine();
 			if ( ImGui::Button( ( "Randomize" + lString ).c_str() ) ) {
-				static std::mt19937 seedRNG( [] {
-					std::random_device rd;
-					std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
-					return std::mt19937( seq );
-				} () );
 				filterStack[ i ] = std::uniform_int_distribution< int >( 0, numGelFilters - 1 )( seedRNG );
 				dirtyFlag = true;
 			}
@@ -183,7 +187,7 @@ public:
 
 		// button to add a new gel to the stack
 		if ( ImGui::Button( ( "Add Gel" + lString ).c_str() ) ) {
-			filterStack.emplace_back();
+			filterStack.emplace_back(  std::uniform_int_distribution< int >( 0, numGelFilters - 1 )( seedRNG ) );
 			dirtyFlag = true;
 		}
 
