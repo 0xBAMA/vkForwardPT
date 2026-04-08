@@ -81,6 +81,8 @@ static const char** gelFilterLabels = nullptr;
 static const char** gelFilterDescriptions = nullptr;
 static const glm::vec3* gelPreviewColors = nullptr;
 
+// used to draw the preview images on the menu
+static ImTextureID textureID;
 //======================================================================================================================
 struct LightEmitterParameters {
 	// base emitter
@@ -123,6 +125,10 @@ public:
 
 	LightEmitterParameters parameters;
 
+	// need to set this in the maintenance function
+	ImVec2 minUV { 0.0f, 0.0f };
+	ImVec2 maxUV { 1.0f, 1.0f };
+
 	// called inside of the light manager ImGui Draw function
 	void ImGuiDrawLightInfo ( bool mouseLight = false ) {
 		static std::mt19937 seedRNG( [] {
@@ -136,9 +142,7 @@ public:
 
 		// spectrum preview + xrite checker
 			// will just be an image you need to show using the ImGui TextureID
-		// ImGui::Image( myTextureID, ImVec2( 386, 256 ) );
-
-			// going to change this to use an atlassed version
+		ImGui::Image( textureID, ImVec2( 554, 64 ), minUV, maxUV );
 
 		ImGui::SliderFloat( ( "Brightness" + lString ).c_str(), &brightness, 0.0001f, 100.0f, "%.5f", ImGuiSliderFlags_Logarithmic );
 		if ( ImGui::IsItemEdited() ) dirtyFlag = true;
@@ -562,6 +566,14 @@ public:
 			for ( int i = 0; i < numValuesPerPreview; i++ ) {
 				concatenatedPreviews[ ( light + 1 ) * numValuesPerPreview + i ] = lights[ light ].textureScratch[ i ];
 			}
+		}
+
+		// updating atlas positions
+		MouseLight->minUV = ImVec2( 0.0f, 0.0f );
+		MouseLight->maxUV = ImVec2( 1.0f, 1.0f / numLights );
+		for ( int light = 0; light < numLights - 1; light++ ) {
+			lights[ light ].minUV = ImVec2( 0.0f, ( light + 1 ) * 1.0f / numLights );
+			lights[ light ].maxUV = ImVec2( 1.0f, ( light + 2 ) * 1.0f / numLights );
 		}
 
 		// construct the buffer for the light parameters

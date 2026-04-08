@@ -169,6 +169,7 @@ void PrometheusInstance::Draw () {
 	vkutil::transition_image( cmd, drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, lineColorAttachment.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 
+	vkutil::transition_image( cmd, PreviewAtlas.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, PickISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, SpectrumISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 
@@ -1101,9 +1102,15 @@ void PrometheusInstance::lightManagerMaintenance () {
 			destroyImage( PickISImage );
 		}
 		// create the new textures at current sizes
-		PreviewAtlas = createImage( { 554, 64u * numLights, 1 }, VK_FORMAT_R8G8B8A8_UINT,  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT );
+		PreviewAtlas = createImage( { 554, 64u * numLights, 1 }, VK_FORMAT_R8G8B8A8_UNORM,  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT );
+		SetDebugName( VK_OBJECT_TYPE_IMAGE, ( uint64_t ) PreviewAtlas.image, "Preview Atlas" );
+
 		SpectrumISImage = createImage( { 1024, numLights, 1 }, VK_FORMAT_R32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT );
+		SetDebugName( VK_OBJECT_TYPE_IMAGE, ( uint64_t ) SpectrumISImage.image, "Spectral IS Texture" );
+
 		PickISImage = createImage( { 256, 256, 1 }, VK_FORMAT_R8_UINT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT );
+		SetDebugName( VK_OBJECT_TYPE_IMAGE, ( uint64_t ) PickISImage.image, "Pick IS Texture" );
+
 		firstTime = false;
 
 		// we have memory allocated, now need to do the updates
@@ -1119,6 +1126,13 @@ void PrometheusInstance::lightManagerMaintenance () {
 		updateImage( PreviewAtlas, lightManager.concatenatedPreviews.data(), 4 );	// data comes in as R8B8G8A8 (4 bytes)
 		updateImage( SpectrumISImage, lightManager.iCDFTexture.data(), 4 );			// data comes in as R32 (4 bytes)
 		updateImage( PickISImage, lightManager.pickTexture.data(), 1 );				// data comes in as R8 (1 byte)
+
+		// setup for ImGui to draw texture on the menus
+		textureID = ( ImTextureID ) ImGui_ImplVulkan_AddTexture(
+			defaultSamplerNearest,
+			PreviewAtlas.imageView,
+			VK_IMAGE_LAYOUT_GENERAL
+		);
 
 		// wipe buffers
 		globalData.reset = 1;
