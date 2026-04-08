@@ -73,7 +73,7 @@ void PrometheusInstance::SetDebugName ( VkObjectType type, uint64_t handle, cons
 void PrometheusInstance::Init () {
 	// initializing SDL
 	SDL_Init( SDL_INIT_VIDEO );
-	SDL_WindowFlags windowFlags = ( SDL_WindowFlags ) ( SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE );
+	SDL_WindowFlags windowFlags = ( SDL_WindowFlags ) ( SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_FULLSCREEN );
 
 	SDL_Rect viewRect;
 	int numDisplays;
@@ -81,8 +81,10 @@ void PrometheusInstance::Init () {
 	SDL_GetDisplayBounds( displays[ 0 ], &viewRect );
 
 	// accumulator image is going to be 1:1 with the swapchain image
-	ImageBufferResolution.width = windowExtent.width = 3 * viewRect.w / 4;
-	ImageBufferResolution.height = windowExtent.height = 3 * viewRect.h / 4;
+	// ImageBufferResolution.width = windowExtent.width = 3 * viewRect.w / 4;
+	// ImageBufferResolution.height = windowExtent.height = 3 * viewRect.h / 4;
+	ImageBufferResolution.width = windowExtent.width = viewRect.w;
+	ImageBufferResolution.height = windowExtent.height = viewRect.h;
 
 	window = SDL_CreateWindow(
 		"Prometheus",
