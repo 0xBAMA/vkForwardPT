@@ -65,7 +65,6 @@ struct GlobalData {
 // smallest scope CPU->GPU passing of information
 struct PushConstants {
 	uint32_t wangSeed;
-	float rotate = 0.0f;
 };
 
 struct raySegment {
