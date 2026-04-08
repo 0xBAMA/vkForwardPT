@@ -211,12 +211,11 @@ public:
 			}
 		} else {
 			ImGui::Text("Emitter Parameters:" );
-			ImGui::SliderFloat2( ( "Location" + lString ).c_str(), ( float* ) &parameters.position, 0.0f, 2000.0f, "%.1f" );
 			ImGui::SliderFloat( ( "Rotation" + lString ).c_str(), &parameters.rotation, 0.0f, 6.3f, "%.3f" );
 			ImGui::SliderFloat( ( "Width" + lString ).c_str(), &parameters.width, 0.0f, 500.0f, "%.1f", ImGuiSliderFlags_Logarithmic );
 
 			ImGui::Text( "Angular Distribution:" );
-			ImGui::SliderFloat( ( "Angle" + lString ).c_str(), &parameters.angleScalar, 0.0f, 6.3f, "%.3f" );
+			ImGui::SliderFloat( ( "Angle" + lString ).c_str(), &parameters.angleScalar, 0.0f, 6.3f, "%.3f", ImGuiSliderFlags_Logarithmic );
 			ImGui::SliderFloat( ( "Cauchy Mix" + lString ).c_str(), &parameters.cauchyMix, 0.0f, 0.01f, "%.6f", ImGuiSliderFlags_Logarithmic );
 		}
 		ImGui::PopID();
