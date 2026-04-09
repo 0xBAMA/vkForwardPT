@@ -261,9 +261,13 @@ void PrometheusInstance::MainLoop () {
 				showMenu = !showMenu;
 			}
 
-			const bool* kb = SDL_GetKeyboardState( NULL );
+			if ( e.type == SDL_EVENT_KEY_DOWN && e.key.scancode == SDL_SCANCODE_N ) {
+				lightManager.MouseLightToUserLight();
+				globalData.reset = 1;
+			}
 			const bool shift = SDL_GetModState() & SDL_KMOD_LSHIFT;
 			const float amount = shift ? 0.1f : 0.01f;
+			const bool* kb = SDL_GetKeyboardState( NULL );
 			// if ( kb[ SDL_SCANCODE_RIGHT ] || kb[ SDL_SCANCODE_D ] ) {
 				// globalData.rotation = glm::rotate( globalData.rotation, amount, glm::vec3( 0.0f, 1.0f, 0.0f ) );
 				// globalData.reset = 1;

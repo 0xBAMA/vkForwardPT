@@ -505,6 +505,29 @@ public:
 		);
 	}
 
+	void MouseLightToUserLight () {
+
+		// add a new light, at the mouse brightness
+		AddLight( MouseLight->brightness );
+
+		// other parameters come from the mouse parameters
+		lights.back().parameters = MouseLight->parameters;
+
+		// position is the mouse position
+		static float mouseX, mouseY;
+		SDL_GetMouseState( &mouseX, &mouseY );
+		lights.back().parameters.position.x = mouseX;
+		lights.back().parameters.position.y = mouseY;
+
+		// light distribution comes from the mouse distribution
+		lights.back().PDFPick = MouseLight->PDFPick;
+		for ( auto & filter : MouseLight->filterStack ) {
+			lights.back().filterStack.emplace_back( filter );
+		}
+
+		lights.back().Update();
+	}
+
 // we have two different importance sampling structures...
 	// first is a list of the light spectral iCDFs, in a texture
 	std::vector< float > iCDFTexture; // 1024 floats defines one iCDF
