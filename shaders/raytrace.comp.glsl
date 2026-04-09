@@ -362,20 +362,21 @@ void main () {
 	const mat2 rot = Rotate2D( params.rotation );
 	const vec2 subpixelJitter = vec2( NormalizedRandomFloat(), NormalizedRandomFloat() );
 
+	// values in the buffer set origin, direction
+	float pickedRepeat = 0;
+	if ( params.repeats != 1 ) {
+		pickedRepeat = float( floor( NormalizedRandomFloat() * params.repeats ) ) - float( params.repeats ) / 2.0f;
+	}
+	vec2 offset = rot * pickedRepeat * params.emitterSpacing * vec2( 1.0f, 0.0f );
+
 	if ( lightPick == 0 ) {
 		// this is the mouse light
-		rayOrigin = subpixelJitter + GlobalData.mouseLoc + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
-		rayDirection = normalize( Rotate2D( params.rotation + params.angleScalar * ( NormalizedRandomFloat() - 0.5f ) + params.cauchyMix * rnd_disc_cauchy().x ) * vec2( 0.0f, 1.0f ) );
+		rayOrigin = subpixelJitter + GlobalData.mouseLoc + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 	} else {
-		// values in the buffer sets origin, direction
-		float pickedRepeat = 0;
-		if ( params.repeats != 1 ) {
-			pickedRepeat = float( floor( NormalizedRandomFloat() * params.repeats ) ) - float( params.repeats ) / 2.0f;
-		}
-		vec2 offset = rot * pickedRepeat * params.emitterSpacing * vec2( 1.0f, 0.0f );
 		rayOrigin = subpixelJitter + params.position + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
-		rayDirection = normalize( Rotate2D( params.rotation + params.angleScalar * ( NormalizedRandomFloat() - 0.5f ) + params.cauchyMix * rnd_disc_cauchy().x ) * vec2( 0.0f, 1.0f ) );
 	}
+	// direction is the same either way
+	rayDirection = normalize( Rotate2D( params.rotation + params.angleScalar * ( NormalizedRandomFloat() - 0.5f ) + params.cauchyMix * rnd_disc_cauchy().x ) * vec2( 0.0f, 1.0f ) );
 
 	// picking a wavelength...
 		// importance sampled from the light

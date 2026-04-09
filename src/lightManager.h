@@ -207,12 +207,12 @@ public:
 
 			ImGui::Text( "Angular Distribution:" );
 			ImGui::SliderFloat( ( "Angle" + lString ).c_str(), &parameters.angleScalar, 0.0f, 6.3f, "%.3f", ImGuiSliderFlags_Logarithmic );
-			ImGui::SliderFloat( ( "Cauchy Mix" + lString ).c_str(), &parameters.cauchyMix, 0.0f, 0.01f, "%.6f", ImGuiSliderFlags_Logarithmic );
+			ImGui::SliderFloat( ( "Cauchy Mix" + lString ).c_str(), &parameters.cauchyMix, 0.0f, 1.0f, "%.6f", ImGuiSliderFlags_Logarithmic );
 
 			ImGui::Text( "Array Mod:" );
 			ImGui::SliderInt( ( "Repeats" + lString ).c_str(), &parameters.repeats, 1, 10 );
 			if ( parameters.repeats != 1 )
-			ImGui::SliderFloat( ( "Spacing" + lString ).c_str(), &parameters.emitterSpacing, 0.0f, 500.0f, "%.3f", ImGuiSliderFlags_Logarithmic );
+				ImGui::SliderFloat( ( "Spacing" + lString ).c_str(), &parameters.emitterSpacing, 0.0f, 500.0f, "%.3f", ImGuiSliderFlags_Logarithmic );
 
 			if ( ImGui::Button( ( "Remove Light" + lString ).c_str() ) ) {
 				deleteFlag = true;
@@ -224,7 +224,12 @@ public:
 
 			ImGui::Text( "Angular Distribution:" );
 			ImGui::SliderFloat( ( "Angle" + lString ).c_str(), &parameters.angleScalar, 0.0f, 6.3f, "%.3f", ImGuiSliderFlags_Logarithmic );
-			ImGui::SliderFloat( ( "Cauchy Mix" + lString ).c_str(), &parameters.cauchyMix, 0.0f, 0.01f, "%.6f", ImGuiSliderFlags_Logarithmic );
+			ImGui::SliderFloat( ( "Cauchy Mix" + lString ).c_str(), &parameters.cauchyMix, 0.0f, 1.0f, "%.6f", ImGuiSliderFlags_Logarithmic );
+
+			ImGui::Text( "Array Mod:" );
+			ImGui::SliderInt( ( "Repeats" + lString ).c_str(), &parameters.repeats, 1, 10 );
+			if ( parameters.repeats != 1 )
+				ImGui::SliderFloat( ( "Spacing" + lString ).c_str(), &parameters.emitterSpacing, 0.0f, 500.0f, "%.3f", ImGuiSliderFlags_Logarithmic );
 		}
 		ImGui::PopID();
 	}
