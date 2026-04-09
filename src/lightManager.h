@@ -475,8 +475,7 @@ public:
 
 		// optionally add a light to the list:
 		if ( ImGui::Button( "Add Light" ) ) {
-			lights.emplace_back(); // constructor calls Update()
-			needsUpdate = true;
+			AddLight();
 		}
 
 	// after the list is drawn...
@@ -503,6 +502,20 @@ public:
 				return false;
 			}), lights.end()
 		);
+	}
+
+	void AddLight ( float brightness = 1.0f ) {
+		// calculate the brightness increment needed to keep constant...
+		float prevSumPower{ MouseLight->brightness };
+		for ( auto & light : lights ) {
+			prevSumPower += light.brightness;
+		}
+
+		lights.emplace_back( brightness ); // constructor calls Update()
+		needsUpdate = true;
+
+		// should keep subjective brightness constant (light initialized with brightess = 1)
+		*brightnessScalar = *brightnessScalar * ( ( prevSumPower + brightness ) / prevSumPower );
 	}
 
 	void MouseLightToUserLight () {
