@@ -265,8 +265,17 @@ void PrometheusInstance::MainLoop () {
 				lightManager.MouseLightToUserLight();
 				globalData.reset = 1;
 			}
+
 			const bool shift = SDL_GetModState() & SDL_KMOD_LSHIFT;
 			const float amount = shift ? 0.1f : 0.01f;
+
+			if ( e.type == SDL_EVENT_KEY_DOWN && e.key.scancode == SDL_SCANCODE_EQUALS ) {
+				globalData.brightnessScalar *= 1.0f + amount;
+			}
+
+			if ( e.type == SDL_EVENT_KEY_DOWN && e.key.scancode == SDL_SCANCODE_MINUS ) {
+				globalData.brightnessScalar /= 1.0f + amount;
+			}
 			const bool* kb = SDL_GetKeyboardState( NULL );
 			// if ( kb[ SDL_SCANCODE_RIGHT ] || kb[ SDL_SCANCODE_D ] ) {
 				// globalData.rotation = glm::rotate( globalData.rotation, amount, glm::vec3( 0.0f, 1.0f, 0.0f ) );
@@ -1445,6 +1454,7 @@ void PrometheusInstance::initImgui () {
 void PrometheusInstance::initLights () {
 	// setting up some of the global resources used by the lights
 	lightManager.Initialize();
+	lightManager.brightnessScalar = &globalData.brightnessScalar;
 
 	// AllocatedImage previewImage = createImage( { 450 + 104, 64, 1 }, VK_FORMAT_R8G8B8A8_SNORM, VK_IMAGE_USAGE_SAMPLED_BIT );
 

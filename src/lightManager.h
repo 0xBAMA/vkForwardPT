@@ -5,6 +5,9 @@
 #include <vector>
 #include <random>
 #include <fstream>
+
+#include <SDL3/SDL_mouse.h>
+
 #include "third_party/nlohmann/json.hpp"
 using json = nlohmann::json;
 
@@ -103,7 +106,7 @@ struct LightEmitterParameters {
 class Light {
 public:
 
-	Light () {
+	Light ( float brightness_in = 1.0f ) : brightness { brightness_in } {
 		// ImGUI needs distinct strings... can use an int, just assign at construction time
 		uniqueID += 42069;
 		myUniqueID = uniqueID;
@@ -398,7 +401,7 @@ public:
 	std::vector< float > iCDF;
 
 	// unitless, relative brightness
-	float brightness{ 1.0f };
+	float brightness;
 
 	// ImGui textureID thing
 	ImTextureID myTextureID;
@@ -418,7 +421,6 @@ public:
 		textureScratch[ index + 3 ] = 255; // constant alpha
 	}
 
-private:
 	int myUniqueID; // for ImGUI
 };
 //======================================================================================================================
@@ -427,6 +429,8 @@ public:
 	bool needsUpdate { true };
 	static constexpr int maxLights { 256 };
 	LightManager () {}
+
+	float* brightnessScalar = nullptr;
 
 	void Initialize () {
 		// create the texture for the light spectrum sampling -> scale the Y for some max
@@ -448,6 +452,11 @@ public:
 		// lights.emplace_back();
 	}
 
+	// get rid of all lights
+	void clearList () {
+		lights.clear();
+	}
+
 	// you always have a mouse light
 	glm::vec2 MouseLocation { 0.0f };
 	std::unique_ptr<Light> MouseLight = nullptr;
@@ -461,7 +470,9 @@ public:
 		ImGui::Separator();
 		ImGui::Text( "Mouse Light" );
 		ImGui::Separator();
-		MouseLight->ImGuiDrawLightInfo( true );
+		if ( ImGui::CollapsingHeader( "Show/Hide" ) ) {
+			MouseLight->ImGuiDrawLightInfo( true );
+		}
 
 		// something to make it stand out from the user light list:
 		ImGui::Separator();
@@ -470,7 +481,9 @@ public:
 
 		// and then for a growable list of lights after that
 		for ( auto & light : lights ) {
-			light.ImGuiDrawLightInfo();
+			if ( ImGui::CollapsingHeader( ( "Show/Hide##" + std::to_string( light.myUniqueID ) ).c_str() ) ) {
+				light.ImGuiDrawLightInfo();
+			}
 		}
 
 		// optionally add a light to the list:
