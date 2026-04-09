@@ -72,6 +72,7 @@ void PrometheusInstance::SetDebugName ( VkObjectType type, uint64_t handle, cons
 //============================================================================================================================
 void PrometheusInstance::Init () {
 	// initializing SDL
+	// SDL_SetHint( SDL_HINT_VIDEO_HDR_ENABLED, "1" );
 	SDL_Init( SDL_INIT_VIDEO );
 	SDL_WindowFlags windowFlags = ( SDL_WindowFlags ) ( SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_FULLSCREEN );
 
@@ -276,24 +277,28 @@ void PrometheusInstance::MainLoop () {
 			if ( e.type == SDL_EVENT_KEY_DOWN && e.key.scancode == SDL_SCANCODE_MINUS ) {
 				globalData.brightnessScalar /= 1.0f + amount;
 			}
+
+			if ( e.type == SDL_EVENT_KEY_DOWN && e.key.scancode == SDL_SCANCODE_K ) {
+				lightManager.clearList();
+				globalData.reset = 1;
+			}
+
 			const bool* kb = SDL_GetKeyboardState( NULL );
 			// if ( kb[ SDL_SCANCODE_RIGHT ] || kb[ SDL_SCANCODE_D ] ) {
 				// globalData.rotation = glm::rotate( globalData.rotation, amount, glm::vec3( 0.0f, 1.0f, 0.0f ) );
 				// globalData.reset = 1;
 			// }
 			if ( kb[ SDL_SCANCODE_R ] ) {
-				globalData.reset = 1;
+				globalData.reset = true;
 			}
 
 			if ( kb[ SDL_SCANCODE_D ] ) {
-				globalData.reset = 1;
-				// Raytrace.pushConstants.rotate -= amount;
+				globalData.reset = true;
 				lightManager.MouseLight->parameters.rotation -= amount;
 			}
 
 			if ( kb[ SDL_SCANCODE_A ] ) {
-				globalData.reset = 1;
-				// Raytrace.pushConstants.rotate += amount;
+				globalData.reset = true;
 				lightManager.MouseLight->parameters.rotation += amount;
 			}
 
@@ -465,8 +470,6 @@ void PrometheusInstance::initVulkan () {
 	// Get the VkDevice handle used in the rest of a vulkan application
 	device = vkbDevice.device;
 	physicalDevice = physicalDeviceSelect.physical_device;
-
-
 
 	{
 		// reporting some platform info
