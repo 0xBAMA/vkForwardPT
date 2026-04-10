@@ -283,6 +283,32 @@ void PrometheusInstance::MainLoop () {
 				globalData.reset = 1;
 			}
 
+			if ( e.type == SDL_EVENT_KEY_DOWN && e.key.scancode == SDL_SCANCODE_P ) {
+				// lightManager.serializeList( std::string( "test" ) );
+
+				std::string filename = "test";
+				YAML::Node outputNode;
+				outputNode[ "globalBrightness" ] = globalData.brightnessScalar;
+				for ( auto& l : lightManager.lights ) {
+					YAML::Node node;
+					node[ "positionX" ] = l.parameters.position.x;
+					node[ "positionY" ] = l.parameters.position.y;
+					node[ "rotation" ] = l.parameters.rotation;
+					node[ "angleScalar" ] = l.parameters.angleScalar;
+					node[ "cauchyMix" ] = l.parameters.cauchyMix;
+					node[ "repeats" ] = l.parameters.repeats;
+					node[ "emitterSpacing" ] = l.parameters.emitterSpacing;
+					node[ "width" ] = l.parameters.width;
+
+					node[ "lightSource" ] = l.PDFPick;
+					node[ "gels" ] = l.filterStack;
+
+					outputNode[ "lights" ].push_back( node );
+				}
+				std::ofstream fout( "../src/" + filename + ".yaml" );
+				fout << outputNode;
+			}
+
 			const bool* kb = SDL_GetKeyboardState( NULL );
 			// if ( kb[ SDL_SCANCODE_RIGHT ] || kb[ SDL_SCANCODE_D ] ) {
 				// globalData.rotation = glm::rotate( globalData.rotation, amount, glm::vec3( 0.0f, 1.0f, 0.0f ) );
