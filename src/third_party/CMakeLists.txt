@@ -49,13 +49,6 @@ set_property(TARGET vkbootstrap PROPERTY CXX_STANDARD 20)
 target_include_directories(vma INTERFACE vma)
 target_include_directories(glm INTERFACE glm)
 
-#add_library(sdl2 INTERFACE)
-
-#target_include_directories(sdl2 INTERFACE $ENV{VULKAN_SDK}/Include/SDL2 )
-#target_link_directories(sdl2 INTERFACE $ENV{VULKAN_SDK}/Lib )
-
-#target_link_libraries(sdl2 INTERFACE SDL2 SDL2main)
-
 add_library( STB_ImageUtilsWrapper STATIC stb/impl.cc )
 
 add_library(imgui STATIC)

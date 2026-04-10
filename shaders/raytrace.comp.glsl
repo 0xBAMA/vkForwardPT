@@ -239,7 +239,7 @@ float de ( vec2 p ) {
 	hitRoughness = 0.0f;
 
 	{
-		const float d = abs( sdParabola( p - vec2( GlobalData.floatBufferResolution.xy ) * vec2( 0.5f, 0.7f ), 800.0f, 350.0f ) ) - 5.0f;
+		const float d = abs( sdParabola( p - vec2( GlobalData.floatBufferResolution.xy ) * vec2( 0.5f, 0.78f ), 1200.0f, 350.0f ) ) - 5.0f;
 		sceneDist = min( sceneDist, d );
 		if ( sceneDist == d && d < epsilon ) {
 			hitSurfaceType = MIRROR;
@@ -247,23 +247,38 @@ float de ( vec2 p ) {
 		}
 	}
 	if ( true ) {
-//		p = Rotate2D( 0.3f ) * pOriginal;
+		p = Rotate2D( 0.1f ) * pOriginal;
 		vec2 p2 = p;
+		vec2 pBall = p - vec2( GlobalData.floatBufferResolution.xy / 2.0f );
+
+		pModPolar( pBall, 10 );
+		pBall = Rotate2D( 0.0f ) * pBall;
+		pBall -= vec2( 200.0f, 0.0f );
+
 		vec2 gridIndex;
-		gridIndex.x = pModInterval1( p.x, 20.0f, 20.0f, 200.0f );
-		gridIndex.y = pModInterval1( p.y, 20.0f, 10.0f, 45.0f );
+
+		pModInterval1( p.y, 600.0f, -1.0f, 3.0f );
+
+		gridIndex.x = pModInterval1( p.x, 64.0f, 1.0f, 20.0f );
+		gridIndex.y = pModInterval1( p.y, 64.0f, 1.0f, 4.0f );
 		vec2 gridIndex2;
-		gridIndex2.x = pModInterval1( p2.x, 6.0f, 20.0f, 200.0f );
-		gridIndex2.y = pModInterval1( p2.y, 6.0f, 10.0f, 45.0f );
+
+		// adding a second order repeat
+		pModInterval1( p2.y, 800.0f, -1.0f, 3.0f );
+
+		gridIndex2.x = pModInterval1( p2.x, 6.0f, 20.0f, 600.0f );
+		gridIndex2.y = pModInterval1( p2.y, 6.0f, 10.0f, 85.0f );
 		{ // an example object (refractive)
 			uint seedCache = seed;
 			seed = 31415 * uint( gridIndex.x ) + uint( gridIndex.y ) * 42069 + 999999;
 			const vec3 noise = 0.5f * hash33( vec3( gridIndex.xy, 0.0f ) ) + vec3( 2.0f, 1.0f, 0.5f );
 			const vec3 noise2 = 0.5f * hash33( vec3( gridIndex2.xy, 0.0f ) ) + vec3( 2.0f, 1.0f, 0.5f );
 			// const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.x ) : ( ( distance( p, vec2( 0.0f ) ) - ( 4.0f * noise.y ) ) ) );
-			const float d = ( invert ? -1.0f : 1.0f ) * ( min( distance( pOriginal, vec2( 400.0f, 800.0f ) ) - 100.0f,
-				min( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 10.0f * noise.z ) : ( rectangle( Rotate2D( 10.0f * noise.x ) * p, vec2( 2.40f * noise.y ) ) ),
-				( noise2.z > 0.25f ) ? ( distance( p2, vec2( 0.0f ) ) - 2.0f * noise2.z ) : ( rectangle( Rotate2D( 10.0f * noise2.x ) * p2, vec2( 1.40f * noise2.y ) ) ) ) ) );
+			const float d = ( invert ? -1.0f : 1.0f ) * ( min( distance( pBall, vec2( 300.0f, 0.0f ) ) - 130.0f,
+				// min( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 10.0f * noise.z ) : ( rectangle( Rotate2D( 10.0f * noise.x ) * p, vec2( 2.40f * noise.y ) ) ),
+				// ( noise2.z > 0.25f ) ? ( distance( p2, vec2( 0.0f ) ) - 1.0f * noise2.z ) : ( rectangle( Rotate2D( 100.0f * noise2.x ) * p2, vec2( 1.0f * noise2.y ) ) ) ) ) );
+				min( ( distance( p, vec2( 0.0f ) ) - 28.0f ),
+				( distance( p2, vec2( 0.0f ) ) - 2.0f ) ) ) );
 			// const float d = ( invert ? -1.0f : 1.0f ) * ( distance( p, vec2( 0.0f ) ) - 28.0f );
 //			 const float d = ( invert ? -1.0f : 1.0f ) * ( rectangle( Rotate2D( 100.0f * noise.z ) * p, vec2( 4.0f, 3.0f ) ) );
 			seed = seedCache;
@@ -284,8 +299,8 @@ float de ( vec2 p ) {
 		rectangle( pOriginal - vec2( GlobalData.floatBufferResolution.x, 0.0f ), vec2( 20.0f, 3000.0f ) ) );
 		sceneDist = min( sceneDist, d );
 		if ( sceneDist == d && d < epsilon ) {
-			hitSurfaceType = MIRROR;
-			hitAlbedo = 0.5f;
+			hitSurfaceType = DIFFUSE;
+			hitAlbedo = 0.9f;
 		}
 	}
 
