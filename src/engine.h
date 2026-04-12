@@ -62,6 +62,7 @@ struct GlobalData {
 	int framesSinceReset{ 0 };
 
 	float brightnessScalar{ 1.0f };
+	float resolutionScalar{ 1.0f };
 };
 
 // smallest scope CPU->GPU passing of information

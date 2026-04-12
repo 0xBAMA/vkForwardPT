@@ -18,7 +18,7 @@ void main () {
 	// get the sum
 	const ivec2 loc = ivec2( gl_GlobalInvocationID.xy );
 	vec4 sum =
-		texture( rasterImage, ( vec2( loc ) + vec2( NormalizedRandomFloat(), NormalizedRandomFloat() ) ) / textureSize( rasterImage, 0 ) ) +
+		texture( rasterImage, ( vec2( loc ) + vec2( NormalizedRandomFloat(), NormalizedRandomFloat() ) ) / ( textureSize( rasterImage, 0 ) / GlobalData.resolutionScalar ) ) +
 		imageLoad( accumulator, loc );
 
 	if ( GlobalData.reset != 0 )

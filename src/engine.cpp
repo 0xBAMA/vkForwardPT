@@ -151,6 +151,7 @@ void PrometheusInstance::Draw () {
 	globalData.presentBufferResolution = glm::uvec2( drawExtent.width, drawExtent.height );
 	globalData.frameNumber = frameNumber;
 	globalData.framesSinceReset++;
+	globalData.resolutionScalar = renderScale;
 
 	// write directly from the memory on the PrometheusInstance
 	GlobalData* uniformData = ( GlobalData * ) GlobalUBO.allocation->GetMappedData();
@@ -358,9 +359,10 @@ void PrometheusInstance::MainLoop () {
 			if ( showMenu ) {
 				if ( ImGui::Begin( "Edit" ) ) {
 
-
 					ImGui::SliderFloat( "Brightness Scale", &globalData.brightnessScalar, 0.3f, 5.0f, "%.5f", ImGuiSliderFlags_Logarithmic ); // this should also apply to the raster step + accumulate step
-					ImGui::SliderFloat( "Render Scale", &renderScale, 0.3f, 1.0f ); // this should also apply to the raster step + accumulate step
+					ImGui::SliderFloat( "Resolution Scale", &renderScale, 0.05f, 1.0f ); // this should also apply to the raster step + accumulate step
+					ImGui::Separator();
+					ImGui::Separator();
 
 					/*
 					static ImTextureID myTextureID = ( ImTextureID ) ImGui_ImplVulkan_AddTexture(
@@ -879,8 +881,8 @@ void PrometheusInstance::initComputePasses () {
 			VkViewport viewport = {};
 			viewport.x = 0;
 			viewport.y = 0;
-			viewport.width = float( ImageBufferResolution.width );
-			viewport.height = float( ImageBufferResolution.height );
+			viewport.width = float( ImageBufferResolution.width * renderScale );
+			viewport.height = float( ImageBufferResolution.height * renderScale );
 			viewport.minDepth = 0.0f;
 			viewport.maxDepth = 1.0f;
 			vkCmdSetViewport( cmd, 0, 1, &viewport );

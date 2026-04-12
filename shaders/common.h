@@ -22,8 +22,9 @@ layout( set = 0, binding = 0 ) uniform globalData {
 	int framesSinceReset;
 
 	float brightnessScalar;
+	float resolutionScalar;
 
-	// nsight layout: vec2u; vec2u; vec2; int; int; int; int; int;
+	// nsight layout: vec2u; vec2u; vec2; int; int; int; int; int; float; float;
 } GlobalData;
 //=========================================================
 
