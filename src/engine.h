@@ -115,6 +115,8 @@ public:
 
 	bool showMenu = true;
 
+	char currentExportFilename[ 256 ]{ "filename" };
+
 	uint32_t lastPreset;
 	std::vector< uint32_t > presets;
 

@@ -16,6 +16,8 @@
 #include <chrono>
 #include <fstream>
 
+using namespace std::chrono_literals;
+
 #define VMA_IMPLEMENTATION
 #include <fastgltf/types.hpp>
 
@@ -284,32 +286,6 @@ void PrometheusInstance::MainLoop () {
 				globalData.reset = 1;
 			}
 
-			if ( e.type == SDL_EVENT_KEY_DOWN && e.key.scancode == SDL_SCANCODE_P ) {
-				// lightManager.serializeList( std::string( "test" ) );
-
-				std::string filename = "test";
-				YAML::Node outputNode;
-				outputNode[ "globalBrightness" ] = globalData.brightnessScalar;
-				for ( auto& l : lightManager.lights ) {
-					YAML::Node node;
-					node[ "positionX" ] = l.parameters.position.x;
-					node[ "positionY" ] = l.parameters.position.y;
-					node[ "rotation" ] = l.parameters.rotation;
-					node[ "angleScalar" ] = l.parameters.angleScalar;
-					node[ "cauchyMix" ] = l.parameters.cauchyMix;
-					node[ "repeats" ] = l.parameters.repeats;
-					node[ "emitterSpacing" ] = l.parameters.emitterSpacing;
-					node[ "width" ] = l.parameters.width;
-
-					node[ "lightSource" ] = l.PDFPick;
-					node[ "gels" ] = l.filterStack;
-
-					outputNode[ "lights" ].push_back( node );
-				}
-				std::ofstream fout( "../src/" + filename + ".yaml" );
-				fout << outputNode;
-			}
-
 			const bool* kb = SDL_GetKeyboardState( NULL );
 			// if ( kb[ SDL_SCANCODE_RIGHT ] || kb[ SDL_SCANCODE_D ] ) {
 				// globalData.rotation = glm::rotate( globalData.rotation, amount, glm::vec3( 0.0f, 1.0f, 0.0f ) );
@@ -363,6 +339,113 @@ void PrometheusInstance::MainLoop () {
 					ImGui::SliderFloat( "Resolution Scale", &renderScale, 0.05f, 1.0f ); // this should also apply to the raster step + accumulate step
 					ImGui::Separator();
 					ImGui::Separator();
+
+					{
+						static std::chrono::time_point< std::chrono::system_clock > tLastFileListUpdate = std::chrono::system_clock::now();
+
+						static std::vector< std::string > savesList;
+						if ( savesList.size() == 0 ) { // get the list
+							struct pathLeafString {
+								std::string operator()( const std::filesystem::directory_entry &entry ) const {
+									return entry.path().string();
+								}
+							};
+							std::filesystem::path p( "../lightingConfigs/" );
+							std::filesystem::directory_iterator start( p );
+							std::filesystem::directory_iterator end;
+							std::transform( start, end, std::back_inserter( savesList ), pathLeafString() );
+							std::sort( savesList.begin(), savesList.end() ); // sort these alphabetic
+							tLastFileListUpdate = std::chrono::system_clock::now();
+						}
+
+						#define LISTBOX_SIZE_MAX 256
+						const char *listboxItems[ LISTBOX_SIZE_MAX ];
+						uint32_t i;
+						for ( i = 0; i < LISTBOX_SIZE_MAX && i < savesList.size(); ++i ) {
+							listboxItems[ i ] = savesList[ i ].c_str();
+						}
+
+						ImGui::Text( "Files In /lightingConfigs/" );
+						static int listboxSelected = 0;
+						ImGui::ListBox( " ", &listboxSelected, listboxItems, i, 24 );
+
+						if ( ImGui::Button( " Load " ) ) {
+							// LoadLightConfig( savesList[ listboxSelected ] );
+							YAML::Node root = YAML::LoadFile( "../lightingConfigs/" + savesList[ listboxSelected ] );
+
+							if ( root[ "globalBrightness" ] ) {
+								globalData.brightnessScalar = root[ "globalBrightness" ].as< float >();
+							}
+
+							// clear the light list
+							lightManager.clearList();
+
+							// load the config specified
+							YAML::Node lightsNode = root[ "lights" ];
+							if ( lightsNode && lightsNode.IsSequence() ) {
+								// list of lights in the file
+								for ( const auto& node : lightsNode ) {
+									Light l;
+
+									l.parameters.position.x = node[ "positionX" ].as<float>();
+									l.parameters.position.y = node[ "positionY" ].as<float>();
+									l.parameters.rotation = node[ "rotation" ].as<float>();
+									l.parameters.angleScalar = node[ "angleScalar" ].as<float>();
+									l.parameters.cauchyMix = node[ "cauchyMix" ].as<float>();
+									l.parameters.repeats = node[ "repeats" ].as<int>();
+									l.parameters.emitterSpacing = node[ "emitterSpacing" ].as<float>();
+									l.parameters.width = node[ "width" ].as<float>();
+
+									// light source
+									l.PDFPick = node[ "lightSource" ].as<int>();
+
+									// gels / filter stack
+									if ( node[ "gels" ] ) {
+										l.filterStack = node[ "gels" ].as<std::vector<int>>();
+									}
+
+									l.dirtyFlag = true;
+									lightManager.lights.push_back( l );
+								}
+							}
+							globalData.reset = 1;
+						}
+
+						// triggering the thing every 10 seconds
+						if ( ( tLastFileListUpdate - std::chrono::system_clock::now() ) > 10s ) {
+							savesList.clear();
+						}
+
+						ImGui::SameLine();
+						ImGui::InputText( "##SaveFile", currentExportFilename, IM_ARRAYSIZE( currentExportFilename ) );
+						ImGui::SameLine();
+						if ( ImGui::Button( " Save " ) ) {
+
+							// output the light list
+							YAML::Node outputNode;
+							outputNode[ "globalBrightness" ] = globalData.brightnessScalar;
+							for ( auto& l : lightManager.lights ) {
+								YAML::Node node;
+								node[ "positionX" ] = l.parameters.position.x;
+								node[ "positionY" ] = l.parameters.position.y;
+								node[ "rotation" ] = l.parameters.rotation;
+								node[ "angleScalar" ] = l.parameters.angleScalar;
+								node[ "cauchyMix" ] = l.parameters.cauchyMix;
+								node[ "repeats" ] = l.parameters.repeats;
+								node[ "emitterSpacing" ] = l.parameters.emitterSpacing;
+								node[ "width" ] = l.parameters.width;
+
+								node[ "lightSource" ] = l.PDFPick;
+								node[ "gels" ] = l.filterStack;
+
+								outputNode[ "lights" ].push_back( node );
+							}
+							std::ofstream fout( "../lightingConfigs/" + std::string( currentExportFilename ) + ".yaml" );
+							fout << outputNode;
+
+							savesList.clear(); // triggers rebuild of list
+						}
+					}
 
 					/*
 					static ImTextureID myTextureID = ( ImTextureID ) ImGui_ImplVulkan_AddTexture(
