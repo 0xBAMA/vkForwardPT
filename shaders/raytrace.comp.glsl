@@ -251,7 +251,7 @@ float de ( vec2 p ) {
 		vec2 p2 = p;
 		vec2 pBall = p - vec2( GlobalData.floatBufferResolution.xy / 2.0f );
 
-		pModPolar( pBall, 10 );
+		pModPolar( pBall, 12 );
 		pBall = Rotate2D( 0.0f ) * pBall;
 		pBall -= vec2( 200.0f, 0.0f );
 
@@ -274,7 +274,7 @@ float de ( vec2 p ) {
 			const vec3 noise = 0.5f * hash33( vec3( gridIndex.xy, 0.0f ) ) + vec3( 2.0f, 1.0f, 0.5f );
 			const vec3 noise2 = 0.5f * hash33( vec3( gridIndex2.xy, 0.0f ) ) + vec3( 2.0f, 1.0f, 0.5f );
 			// const float d = ( invert ? -1.0f : 1.0f ) * ( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 2.0f * noise.x ) : ( ( distance( p, vec2( 0.0f ) ) - ( 4.0f * noise.y ) ) ) );
-			const float d = ( invert ? -1.0f : 1.0f ) * ( min( distance( pBall, vec2( 300.0f, 0.0f ) ) - 130.0f,
+			const float d = ( invert ? -1.0f : 1.0f ) * ( min( distance( pBall, vec2( 300.0f, 0.0f ) ) - 100.0f,
 				// min( ( noise.z > 0.25f ) ? ( distance( p, vec2( 0.0f ) ) - 10.0f * noise.z ) : ( rectangle( Rotate2D( 10.0f * noise.x ) * p, vec2( 2.40f * noise.y ) ) ),
 				// ( noise2.z > 0.25f ) ? ( distance( p2, vec2( 0.0f ) ) - 1.0f * noise2.z ) : ( rectangle( Rotate2D( 100.0f * noise2.x ) * p2, vec2( 1.0f * noise2.y ) ) ) ) ) );
 				min( ( distance( p, vec2( 0.0f ) ) - 28.0f ),
@@ -386,9 +386,9 @@ void main () {
 
 	if ( lightPick == 0 ) {
 		// this is the mouse light
-		rayOrigin = subpixelJitter + GlobalData.mouseLoc + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
+		rayOrigin = subpixelJitter + GlobalData.mouseLoc + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f ) + rnd_disc_cauchy();
 	} else {
-		rayOrigin = subpixelJitter + params.position + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
+		rayOrigin = subpixelJitter + params.position + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f ) + rnd_disc_cauchy();
 	}
 	// direction is the same either way
 	rayDirection = normalize( Rotate2D( params.rotation + params.angleScalar * ( NormalizedRandomFloat() - 0.5f ) + params.cauchyMix * rnd_disc_cauchy().x ) * vec2( 0.0f, 1.0f ) );
