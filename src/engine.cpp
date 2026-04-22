@@ -309,8 +309,6 @@ void PrometheusInstance::MainLoop () {
 				screenshot();
 			}
 
-			//send SDL event to imgui for handling
-			ImGui_ImplSDL3_ProcessEvent( &e );
 		}
 
 		static glm::vec2 lastMousePos = glm::vec2( 0.0f );
@@ -1375,7 +1373,6 @@ void PrometheusInstance::updateImage( AllocatedImage& image, void* data, int byt
 	AllocatedBuffer uploadbuffer = createBuffer( dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU );
 
 	memcpy( uploadbuffer.info.pMappedData, data, dataSize );
-
 
 	immediateSubmit( [&]( VkCommandBuffer cmd ) {
 		VkBufferImageCopy copyRegion = {};
