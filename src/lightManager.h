@@ -472,7 +472,8 @@ public:
 		ImGui::Separator();
 		ImGui::Text( "Mouse Light" );
 		ImGui::Separator();
-		if ( ImGui::CollapsingHeader( "Show/Hide" ) ) {
+		static bool mouseLightVisible = true;
+		if ( ImGui::CollapsingHeader( "Show/Hide", &mouseLightVisible, ImGuiTreeNodeFlags_DefaultOpen ) ) {
 			MouseLight->ImGuiDrawLightInfo( true );
 		}
 
