@@ -733,7 +733,7 @@ void PrometheusInstance::initResources () {
 
 	// buffer for the rays
 	{
-		rayBuffer = createBuffer( globalData.numBounces * globalData.numRays * sizeof( raySegment ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY );
+		rayBuffer = createBuffer( globalData.numBounces * globalData.numRays * sizeof( raySegment ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY );
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) rayBuffer.buffer, "Ray Segment Buffer" );
 	}
 
@@ -983,6 +983,10 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdDraw( cmd, 2 * ( globalData.numRays * globalData.numBounces ), 1, 0, 0 );
 			vkCmdEndRendering( cmd );
 
+			const float fillValue = 0.0f;
+			const uint32_t& fillValueU32 = reinterpret_cast< const uint32_t& >( fillValue );
+			vkCmdFillBuffer( cmd, rayBuffer.buffer, 0, globalData.numBounces * globalData.numRays * sizeof( raySegment ), fillValueU32 );
+
 			VkImageMemoryBarrier2 barrierC {
 				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
 
@@ -1002,8 +1006,23 @@ void PrometheusInstance::initComputePasses () {
 				}
 			};
 
+			VkBufferMemoryBarrier2 barrierB {
+				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+				.srcStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
+				.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+
+				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				.dstAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+
+				.buffer = rayBuffer.buffer,
+				.offset = 0,
+				.size = VK_WHOLE_SIZE
+			};
+
 			VkDependencyInfo barrierDependency {
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+				.bufferMemoryBarrierCount = 1,
+				.pBufferMemoryBarriers = &barrierB,
 				.imageMemoryBarrierCount = 1,
 				.pImageMemoryBarriers = &barrierC
 			};

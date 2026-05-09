@@ -472,7 +472,7 @@ void main () {
 			}
 		} else {
 			// if the ray has finished tracing, we need to zero out the rest of the segment memory, so the raster process doesn't draw anything
-			rays[ baseIdx + i ] = getDefaultSegment();
+//			rays[ baseIdx + i ] = getDefaultSegment(); -> replaced with VkCmdFillBuffer
 		}
 	}
 }
