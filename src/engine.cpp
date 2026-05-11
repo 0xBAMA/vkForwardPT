@@ -1235,8 +1235,7 @@ void PrometheusInstance::initComputePasses () {
 			}
 
 			// additive raster for the agent locations
-			VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-			VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( drawImage.imageView, &clearColor, VK_IMAGE_LAYOUT_GENERAL );
+			VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
 			VkRenderingInfo renderInfo = vkinit::rendering_info( ImageBufferResolution, &colorAttachment, nullptr );
 
 			vkCmdBeginRendering( cmd, &renderInfo );
