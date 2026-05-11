@@ -330,6 +330,16 @@ void PrometheusInstance::MainLoop () {
 			ImGui_ImplSDL3_NewFrame();
 			ImGui::NewFrame();
 
+			if ( ImGui::GetIO().WantCaptureMouse ) {
+				if ( !SDL_CursorVisible() ) {
+					SDL_ShowCursor();
+				}
+			} else {
+				if ( SDL_CursorVisible() ) {
+					SDL_HideCursor();
+				}
+			}
+
 			// some imgui UI to test
 			// ImGui::ShowDemoWindow();
 
