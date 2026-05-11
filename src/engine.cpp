@@ -189,6 +189,9 @@ void PrometheusInstance::Draw () {
 	// compute shader to accumulate the raster result + put the resolved final image into the drawImage...
 	BufferPresent.invoke( cmd );
 
+	// do the debug line draw over top of the final LDR color
+	DebugLineDraw.invoke( cmd );
+
 	// transition the images for the copy
 	vkutil::transition_image( cmd, drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
 	vkutil::transition_image( cmd, swapchainImages[ swapchainImageIndex ], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
@@ -742,12 +745,18 @@ void PrometheusInstance::initResources () {
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) LightParametersBuffer.buffer, "Light Parameter UBO" );
 	}
 
+	{ // buffer for debug line drawing
+		debugLineDrawBuffer = createBuffer( ( 1 << 16 ) * sizeof( debugLinePoint ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) debugLineDrawBuffer.buffer, "Debug Line SSBO" );
+	}
+
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
 		// destroying buffers
 		destroyBuffer( GlobalUBO );
 		destroyBuffer( rayBuffer );
 		destroyBuffer( LightParametersBuffer );
+		destroyBuffer( debugLineDrawBuffer );
 
 		// destroying images
 		destroyImage( XYZImage );
@@ -1143,12 +1152,167 @@ void PrometheusInstance::initComputePasses () {
 		};
 	}
 
+	{ //debug line drawing layer, need to be able to draw boxes for debugging and for user geometry manipulation widgets
+		{ // descriptor layout
+			DescriptorLayoutBuilder builder;
+			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
+			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // buffer with line information
+			DebugLineDraw.descriptorSetLayout = builder.build( device,  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT );
+			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) DebugLineDraw.descriptorSetLayout, "Debug Line Raster Descriptor Set Layout" );
+		}
+
+		{ // pipeline layout + pipeline build
+			VkPushConstantRange pushConstant{};
+			pushConstant.offset = 0;
+			pushConstant.size = sizeof( PushConstants );
+			pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+
+			VkPipelineLayoutCreateInfo rasterLayout{};
+			rasterLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			rasterLayout.pNext = nullptr;
+			rasterLayout.pSetLayouts = &DebugLineDraw.descriptorSetLayout;
+			rasterLayout.setLayoutCount = 1;
+			rasterLayout.pPushConstantRanges = &pushConstant;
+			rasterLayout.pushConstantRangeCount = 1;
+
+			VK_CHECK( vkCreatePipelineLayout( device, &rasterLayout, nullptr, &DebugLineDraw.pipelineLayout ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE_LAYOUT, ( uint64_t ) DebugLineDraw.pipelineLayout, "Debug Line Raster Pipeline Layout" );
+
+			VkShaderModule lineFragShader;
+			if ( !vkutil::load_shader_module( "../shaders/debugLineDraw.frag.glsl.spv", device, &lineFragShader ) ) {
+				fmt::print( "Error when building the Debug Line Draw Fragment shader module\n" );
+			}
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) lineFragShader, "Debug Line Fragment Shader Module" );
+
+			VkShaderModule lineVertexShader;
+			if ( !vkutil::load_shader_module( "../shaders/debugLineDraw.vert.glsl.spv", device, &lineVertexShader ) ) {
+				fmt::print( "Error when building the Debug Line Draw Vertex shader module\n" );
+			}
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) lineVertexShader, "Debug Line Vertex Shader Module" );
+
+			PipelineBuilder pipelineBuilder;
+			pipelineBuilder._pipelineLayout = DebugLineDraw.pipelineLayout;
+			pipelineBuilder.set_shaders( lineVertexShader, lineFragShader );
+			pipelineBuilder.set_input_topology( VK_PRIMITIVE_TOPOLOGY_LINE_LIST );
+			pipelineBuilder.set_polygon_mode( VK_POLYGON_MODE_FILL );
+			pipelineBuilder.set_cull_mode( VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE );
+			pipelineBuilder.set_multisampling_none();
+			pipelineBuilder.enable_blending_additive();
+			pipelineBuilder.disable_depthtest();
+			pipelineBuilder.set_color_attachment_format( drawImage.imageFormat );
+			DebugLineDraw.pipeline = pipelineBuilder.build_pipeline( device );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) DebugLineDraw.pipeline, "Debug Line Raster Pipeline" );
+
+			// cleanup
+			vkDestroyShaderModule( device, lineFragShader, nullptr );
+			vkDestroyShaderModule( device, lineVertexShader, nullptr );
+
+			mainDeletionQueue.push_function( [ & ] ()  {
+				vkDestroyDescriptorSetLayout( device, DebugLineDraw.descriptorSetLayout, nullptr );
+				vkDestroyPipeline( device, DebugLineDraw.pipeline, nullptr );
+				vkDestroyPipelineLayout( device, DebugLineDraw.pipelineLayout, nullptr );
+			});
+		}
+
+		DebugLineDraw.invoke = [ & ] ( VkCommandBuffer cmd ) {
+
+			// need to update the lines in the buffer
+			debugLinePoint* linePointData = ( debugLinePoint * ) debugLineDrawBuffer.allocation->GetMappedData();
+
+			// for now just random data
+			for ( int i = 0; i < ( 1 << 16 ); i++ ) {
+				static thread_local std::mt19937 seedRNG( [] {
+					std::random_device rd;
+					std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
+					return std::mt19937( seq );
+				} () );
+
+				float x = std::uniform_real_distribution< float >( 0, ImageBufferResolution.width )( seedRNG );
+				float y = std::uniform_real_distribution< float >( 0, ImageBufferResolution.height )( seedRNG );
+
+				linePointData[ i ].position = vec4( x, y, 0.0f, 1.0f );
+				linePointData[ i ].color = vec4( x / ImageBufferResolution.width, y / ImageBufferResolution.height, 0.0f, 1.0f );
+			}
+
+			// additive raster for the agent locations
+			VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+			VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( drawImage.imageView, &clearColor, VK_IMAGE_LAYOUT_GENERAL );
+			VkRenderingInfo renderInfo = vkinit::rendering_info( ImageBufferResolution, &colorAttachment, nullptr );
+
+			vkCmdBeginRendering( cmd, &renderInfo );
+			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, DebugLineDraw.pipeline );
+
+			// dynamic descriptor allocation
+			DebugLineDraw.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, DebugLineDraw.descriptorSetLayout );
+			{
+				DescriptorWriter writer;
+				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
+				writer.write_buffer( 1, debugLineDrawBuffer.buffer, ( 1 << 16 ) * sizeof( debugLinePoint ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.update_set( device, DebugLineDraw.descriptorSet );
+			}
+
+			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, DebugLineDraw.pipelineLayout, 0, 1, &DebugLineDraw.descriptorSet, 0, nullptr );
+
+			//set dynamic viewport and scissor
+			VkViewport viewport = {};
+			viewport.x = 0;
+			viewport.y = 0;
+			viewport.width = float( ImageBufferResolution.width * renderScale );
+			viewport.height = float( ImageBufferResolution.height * renderScale );
+			viewport.minDepth = 0.0f;
+			viewport.maxDepth = 1.0f;
+			vkCmdSetViewport( cmd, 0, 1, &viewport );
+
+			VkRect2D scissor = {};
+			scissor.offset.x = 0;
+			scissor.offset.y = 0;
+			scissor.extent.width = ImageBufferResolution.width;
+			scissor.extent.height = ImageBufferResolution.height;
+			vkCmdSetScissor( cmd, 0, 1, &scissor );
+
+			// draw all the agents as points
+			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,  DebugLineDraw.pipelineLayout, 0, 1, &DebugLineDraw.descriptorSet, 0, nullptr );
+			vkCmdPushConstants( cmd, DebugLineDraw.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &DebugLineDraw.pushConstants );
+
+			// launch a draw command to do the fullscreen triangle
+			vkCmdDraw( cmd, ( 1 << 16 ), 1, 0, 0 );
+			vkCmdEndRendering( cmd );
+
+			VkImageMemoryBarrier2 barrierC {
+				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+
+				.srcStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
+				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+
+				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+
+				// now the blur has finished, we are using the filtered reads until the next agent raster
+				.oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
+
+				.image = drawImage.image,
+				.subresourceRange = {
+					VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
+				}
+			};
+
+			VkDependencyInfo barrierDependency {
+				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrierC
+			};
+
+			vkCmdPipelineBarrier2( cmd, &barrierDependency );
+		};
+	}
+
 	{ // Present
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
 			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // draw image
-			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // XYZ Buffer -> linear filter
+			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // accumulation Buffer -> linear filter
 			BufferPresent.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
 			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) BufferPresent.descriptorSetLayout, "Buffer Present Descriptor Set Layout" );
 		}

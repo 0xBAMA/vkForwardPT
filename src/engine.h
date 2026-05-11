@@ -77,6 +77,11 @@ struct raySegment {
 	glm::vec2 b;	// second point
 };
 
+struct debugLinePoint {
+	vec4 position; // xy has position
+	vec4 color;
+};
+
 constexpr unsigned int FRAME_OVERLAP = 2;
 constexpr bool useValidationLayers = true;
 
@@ -128,12 +133,18 @@ public:
 	VkExtent2D ImageBufferResolution;
 	AllocatedImage XYZImage;
 
-	// rays
+	// ray state
 	AllocatedBuffer rayBuffer;
 
-	// wrapping the compute passes which are involved
+	// debug line state
+	AllocatedBuffer debugLineDrawBuffer;
+
+	// main compute shaders
 	ComputeEffect Raytrace;
 	ComputeEffect Accumulate;
+	ComputeEffect DebugLineDraw;
+
+	// putting the image on the screen
 	ComputeEffect BufferPresent;
 
 	// abusing the ComputeEffect struct for a raster pipeline
