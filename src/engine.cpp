@@ -1219,19 +1219,25 @@ void PrometheusInstance::initComputePasses () {
 			// need to update the lines in the buffer
 			debugLinePoint* linePointData = ( debugLinePoint * ) debugLineDrawBuffer.allocation->GetMappedData();
 
-			// for now just random data
-			for ( int i = 0; i < ( 1 << 16 ); i++ ) {
-				static thread_local std::mt19937 seedRNG( [] {
-					std::random_device rd;
-					std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
-					return std::mt19937( seq );
-				} () );
+			// this needs to show a couple things:
+				// outlines of the selected objects
+				// show a glyph for each light, at the light position, indicating direction, width, angle...
+				// ...
 
-				float x = std::uniform_real_distribution< float >( 0, ImageBufferResolution.width )( seedRNG );
-				float y = std::uniform_real_distribution< float >( 0, ImageBufferResolution.height )( seedRNG );
+			{ // mouse position crosshair
+				linePointData[ 0 ].position = vec4( globalData.mouseLoc.x + 15, globalData.mouseLoc.y, 0.0f, 1.0f );
+				linePointData[ 1 ].position = vec4( globalData.mouseLoc.x + 10, globalData.mouseLoc.y, 0.0f, 1.0f );
+				linePointData[ 2 ].position = vec4( globalData.mouseLoc.x - 15, globalData.mouseLoc.y, 0.0f, 1.0f );
+				linePointData[ 3 ].position = vec4( globalData.mouseLoc.x - 10, globalData.mouseLoc.y, 0.0f, 1.0f );
 
-				linePointData[ i ].position = vec4( x, y, 0.0f, 1.0f );
-				linePointData[ i ].color = vec4( x / ImageBufferResolution.width, y / ImageBufferResolution.height, 0.0f, 1.0f );
+				linePointData[ 4 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + 15, 0.0f, 1.0f );
+				linePointData[ 5 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + 10, 0.0f, 1.0f );
+				linePointData[ 6 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - 15, 0.0f, 1.0f );
+				linePointData[ 7 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - 10, 0.0f, 1.0f );
+
+				for ( int i = 0; i < 8; ++i ) {
+					linePointData[ i ].color = vec4( 1.0f );
+				}
 			}
 
 			// additive raster for the agent locations
