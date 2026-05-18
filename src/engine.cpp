@@ -1229,21 +1229,23 @@ void PrometheusInstance::initComputePasses () {
 			// need to update the lines in the buffer
 			debugLinePoint* linePointData = ( debugLinePoint * ) debugLineDrawBuffer.allocation->GetMappedData();
 
-			// this needs to show a couple things:
-				// outlines of the selected objects
+			// this needs to show a couple of things:
+				// outlines showing the individual bounding boxes of the selected objects...
 				// show a glyph for each light, at the light position, indicating direction, width, angle...
 				// ...
 
 			{ // mouse position crosshair
-				linePointData[ 0 ].position = vec4( globalData.mouseLoc.x + 15, globalData.mouseLoc.y, 0.0f, 1.0f );
-				linePointData[ 1 ].position = vec4( globalData.mouseLoc.x + 10, globalData.mouseLoc.y, 0.0f, 1.0f );
-				linePointData[ 2 ].position = vec4( globalData.mouseLoc.x - 15, globalData.mouseLoc.y, 0.0f, 1.0f );
-				linePointData[ 3 ].position = vec4( globalData.mouseLoc.x - 10, globalData.mouseLoc.y, 0.0f, 1.0f );
+				const int sO = 7;
+				const int bO = 15;
+				linePointData[ 0 ].position = vec4( globalData.mouseLoc.x + bO, globalData.mouseLoc.y, 0.0f, 1.0f );
+				linePointData[ 1 ].position = vec4( globalData.mouseLoc.x + sO, globalData.mouseLoc.y, 0.0f, 1.0f );
+				linePointData[ 2 ].position = vec4( globalData.mouseLoc.x - bO, globalData.mouseLoc.y, 0.0f, 1.0f );
+				linePointData[ 3 ].position = vec4( globalData.mouseLoc.x - sO, globalData.mouseLoc.y, 0.0f, 1.0f );
 
-				linePointData[ 4 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + 15, 0.0f, 1.0f );
-				linePointData[ 5 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + 10, 0.0f, 1.0f );
-				linePointData[ 6 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - 15, 0.0f, 1.0f );
-				linePointData[ 7 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - 10, 0.0f, 1.0f );
+				linePointData[ 4 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + bO, 0.0f, 1.0f );
+				linePointData[ 5 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + sO, 0.0f, 1.0f );
+				linePointData[ 6 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - bO, 0.0f, 1.0f );
+				linePointData[ 7 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - sO, 0.0f, 1.0f );
 
 				for ( int i = 0; i < 8; ++i ) {
 					linePointData[ i ].color = vec4( 1.0f );
