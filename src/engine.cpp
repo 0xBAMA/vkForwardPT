@@ -1431,9 +1431,12 @@ void PrometheusInstance::initComputePasses () {
 
 void PrometheusInstance::bufferRebuild () {
 	// retained memory for the grid + resize logic
-	const glm::ivec2 gridDims = glm::ivec2( ( std::floor( globalData.floatBufferResolution.x / gridScalar ) + 1 ), std::floor( globalData.floatBufferResolution.y / gridScalar ) + 1 );
+	const glm::ivec2 gridDims = glm::ivec2(
+		( std::floor( globalData.floatBufferResolution.x / globalData.gridScalar ) + 1 ),
+		( std::floor( globalData.floatBufferResolution.y / globalData.gridScalar ) + 1 ) );
+
 	const int numGridCells = gridDims.x * gridDims.y;
-	static std::vector< std::set< int > > gridCellList;
+	static std::vector< std::set< uint32_t > > gridCellList;
 	if ( gridCellList.size() != numGridCells ) {
 		gridCellList.resize( numGridCells );
 	}
@@ -1446,13 +1449,21 @@ void PrometheusInstance::bufferRebuild () {
 	// start by resetting the global dirty flag
 	geometryListDirty = false;
 
+	// 16-float structs
+	std::vector< float > preppedGeoBuffer;
+
+	// grid buffer holds indices, prefix holds index of first entry + count per cell
+	std::vector < uint32_t > prefixValues;
+	std::vector < uint32_t > gridValues;
+
+	const float epsilon = 0.001f;
+	uint32_t idx { 0 };
+	preppedGeoBuffer.reserve( geometryList.size() * 16 );
+
 	// iterating through the list of geometry
 		// reset all the dirty flags
 		// create the GPU buffer of 16-float structs
-	const float epsilon = 0.001f;
-	int idx { 0 };
-	std::vector< float > preppedGeoBuffer;
-	preppedGeoBuffer.reserve( geometryList.size() * 16 );
+
 	for ( auto& primitive : geometryList ) {
 		primitive.touchedSinceLastUpdate = false; // kind of useless right now, useful optimization later
 
@@ -1482,7 +1493,7 @@ void PrometheusInstance::bufferRebuild () {
 			for ( float t = 0.0f; t <= d; t += 0.1f ) {
 				// grid may not be per-pixel...
 				p = glm::mix( a, b, t / d );
-				glm::ivec2 pGrid = glm::ivec2( p / gridScalar );
+				glm::ivec2 pGrid = glm::ivec2( p / globalData.gridScalar );
 
 				// and insert into the grid structure
 				gridCellList[ pGrid.x + gridDims.x * pGrid.y ].insert( idx );
@@ -1503,14 +1514,14 @@ void PrometheusInstance::bufferRebuild () {
 
 			const float thetaIncrement = 0.1f / circ;
 			for ( float t = thetaStart; t <= thetaEnd; t += thetaIncrement ) {
-				glm::vec2 p = glm::ivec2( ( center + radius * vec2( cos( t ), sin( t ) ) ) / gridScalar );
+				glm::vec2 p = glm::ivec2( ( center + radius * vec2( cos( t ), sin( t ) ) ) / globalData.gridScalar );
 				gridCellList[ p.x + gridDims.x * p.y ].insert( idx );
 			}
 
 			break;
 		}
 
-		// case 2: // parabola
+		// case 2: // parabola - todo
 			// break;
 
 		default: // need to specify a shape if it is in the primitives list
@@ -1527,10 +1538,47 @@ void PrometheusInstance::bufferRebuild () {
 		// this grid, compacted so that the variable stride elements come one after another
 		// the prefix buffer, which keeps the starting index for each cell and the number of elements per cell
 
+	uint32_t i = 0;
+	for ( auto& cell : gridCellList ) {
+		// keeping index of first and the count
+		prefixValues.push_back( i );
+		prefixValues.push_back( cell.size() );
+
+		// add the variable stride grid values
+		for ( auto& element : cell ) {
+			gridValues.push_back( element );
+			i++; // increment current index
+		}
+	}
+
 	// so at the end, we have built three buffers:
-		// geometry buffer
-		// grid buffer
-		// prefix buffer
+		// geometry buffer -> 16 float representations
+		// grid buffer     -> the variable stride index values, contains the contents of the cell
+		// prefix buffer   -> the index of first element and element count, per cell
+
+	static bool firstTime = true;
+	if ( !firstTime ) {
+		// delete the buffers if they have been created
+		destroyBuffer( GeometryBuffer );
+		destroyBuffer( GridBuffer );
+		destroyBuffer( PrefixBuffer );
+		firstTime = false;
+	}
+
+	// create the buffers, with the current contents...
+	GeometryBuffer	= createBuffer( preppedGeoBuffer.size() * sizeof( float ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+	SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GeometryBuffer.buffer, "BVH Geometry Buffer" );
+	GridBuffer		= createBuffer( gridValues.size() * sizeof( uint32_t ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+	SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GridBuffer.buffer, "BVH Grid Buffer" );
+	PrefixBuffer	= createBuffer( prefixValues.size() * sizeof( uint32_t ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+	SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) PrefixBuffer.buffer, "BVH Prefix Buffer" );
+
+	// transferring prepped data to the new buffers
+	memcpy( GeometryBuffer.info.pMappedData, preppedGeoBuffer.data(), preppedGeoBuffer.size() * sizeof( float ) );
+	memcpy( GridBuffer.info.pMappedData, gridValues.data(), gridValues.size() * sizeof( uint32_t ) );
+	memcpy( PrefixBuffer.info.pMappedData, prefixValues.data(), prefixValues.size() * sizeof( uint32_t ) );
+}
+
 // adding primitives to the geometry list
 void PrometheusInstance::addSegment ( vec2 a, vec2 b ) {
 	geometryStruct s;

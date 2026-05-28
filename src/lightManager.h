@@ -567,7 +567,7 @@ public:
 	// and each light has prepared a spectrum preview -> need to combine into atlas
 	std::vector< uint8_t > concatenatedPreviews;
 
-	int numLights{ 0 };
+	uint32_t numLights{ 0 };
 
 	// this will need to happen any time we have an edit
 	void Update () {
