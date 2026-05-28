@@ -370,6 +370,10 @@ intersectionResult sceneTrace ( vec2 rayOrigin, vec2 rayDirection ) {
 	return result;
 }
 
+bool gridBoundsCheck ( vec3 p ) {
+	return ( all( greaterThanEqual( p, ivec3( 0 ) ) ) && all( lessThan( p, vec3( ceil( GlobalData.floatBufferResolution.xy / GlobalData.gridScalar ), 1 ) ) ) );
+}
+
 intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 	intersectionResult result = getDefaultIntersection();
 
@@ -401,31 +405,39 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 	}
 	*/
 
-// DDA traversal
+	// DDA traversal
 	// from https://www.shadertoy.com/view/7sdSzH
-	vec2 deltaDist = 1.0f / abs( rayDirection );
-	ivec2 rayStep = ivec2( sign( rayDirection ) );
-	bvec2 mask0 = bvec2( false );
-	ivec2 mapPos0 = ivec2( floor( rayOrigin / GlobalData.gridScalar ) );
-	vec2 sideDist0 = ( sign( rayDirection ) * ( vec2( mapPos0 ) - ( rayOrigin / GlobalData.gridScalar ) ) + ( sign( rayDirection ) * 0.5f ) + 0.5f ) * deltaDist;
 
-	#define MAX_RAY_STEPS 1000
-	for ( int i = 0; i < MAX_RAY_STEPS && ( all( greaterThanEqual( mapPos0, ivec2( 0 ) ) ) && all( lessThan( mapPos0, ( GlobalData.floatBufferResolution / GlobalData.gridScalar ) + 1 ) ) ); i++ ) {
+	vec3 hitLocation = vec3( rayOrigin / GlobalData.gridScalar, 0.0f );
+	vec3 forwards = normalize( vec3( rayDirection, 0.0f ) );
+	vec3 deltaDist = 1.0f / abs( forwards );
+	ivec3 rayStep = ivec3( sign( forwards ) );
+	bvec3 mask0 = bvec3( false );
+	ivec3 mapPos0 = ivec3( floor( hitLocation + 0.0f ) );
+	vec3 sideDist0 = ( sign( forwards ) * ( vec3( mapPos0 ) - hitLocation ) + ( sign( forwards ) * 0.5f ) + 0.5f ) * deltaDist;
+
+	#define MAX_RAY_STEPS 2000
+	for ( int i = 0; i < MAX_RAY_STEPS && gridBoundsCheck( mapPos0 ); i++ ) {
 		// Core of https://www.shadertoy.com/view/4dX3zl Branchless Voxel Raycasting
+		bvec3 mask1 = lessThanEqual( sideDist0.xyz, min( sideDist0.yzx, sideDist0.zxy ) );
+		vec3 sideDist1 = sideDist0 + vec3( mask1 ) * deltaDist;
+		ivec3 mapPos1 = mapPos0 + ivec3( vec3( mask1 ) ) * rayStep;
 
-//		bvec3 mask1 = lessThanEqual( sideDist0.xyz, min( sideDist0.yzx, sideDist0.zxy ) );
-		bvec2 mask1 = lessThanEqual( sideDist0.xy, sideDist0.yx ); // not sure if this is correctly converted
-		vec2 sideDist1 = sideDist0 + vec2( mask1 ) * deltaDist;
-		ivec2 mapPos1 = mapPos0 + ivec2( vec2( mask1 ) ) * rayStep;
-
+		// consider using distance to hit
 		const int linearIndex = 2 * ( mapPos0.x + int( floor( GlobalData.floatBufferResolution.x / GlobalData.gridScalar ) + 1 ) * mapPos0.y );
 		ivec2 prefixValue = ivec2( prefixBufferValues[ linearIndex ], prefixBufferValues[ linearIndex + 1 ] );
 		if ( prefixValue.y != 0 ) { // there is a nonzero count for this grid cell
-			result.dist = i;
+			result.dist = distance( rayOrigin, mapPos0.xy * GlobalData.gridScalar );
+			result.materialType = MIRROR;
+			break;
 		}
 
 		sideDist0 = sideDist1;
 		mapPos0 = mapPos1;
+	}
+
+	if ( gridBoundsCheck( mapPos0 ) ) {
+		result.dist = distance( rayOrigin, mapPos0.xy * GlobalData.gridScalar );
 	}
 
 	// and give back whatever we got
