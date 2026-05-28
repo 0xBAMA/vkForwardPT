@@ -1574,8 +1574,23 @@ void PrometheusInstance::bufferRebuild () {
 	PrefixBuffer	= createBuffer( prefixValues.size() * sizeof( uint32_t ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
 	SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) PrefixBuffer.buffer, "BVH Prefix Buffer" );
 
-	// need to do something to visualize the buffer
-	// stbi_write_png( filename, size.width, size.height, 4, out.data(), size.width * 4 );
+	// need to do something to visualize the buffers
+	/*
+	std::vector< uint8_t > values;
+	bool invert = true;
+	for ( auto& v : prefixValues ) {
+		if ( invert == true ) {
+			invert = false;
+		} else {
+			invert = true;
+			values.push_back( v * 100 );
+			values.push_back( v * 100 );
+			values.push_back( v * 100 );
+			values.push_back( 255 );
+		}
+	}
+	stbi_write_png( "test.png", globalData.gridDims.x, globalData.gridDims.y, 4, values.data(), globalData.gridDims.x * 4 );
+	*/
 
 	// transferring prepped data to the new buffers
 	memcpy( GeometryBuffer.info.pMappedData, preppedGeoBuffer.data(), preppedGeoBuffer.size() * sizeof( float ) );
