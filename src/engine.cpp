@@ -1431,11 +1431,11 @@ void PrometheusInstance::initComputePasses () {
 
 void PrometheusInstance::bufferRebuild () {
 	// retained memory for the grid + resize logic
-	const glm::ivec2 gridDims = glm::ivec2(
+	globalData.gridDims = glm::ivec2(
 		( std::floor( globalData.floatBufferResolution.x / globalData.gridScalar ) + 1 ),
 		( std::floor( globalData.floatBufferResolution.y / globalData.gridScalar ) + 1 ) );
 
-	const int numGridCells = gridDims.x * gridDims.y;
+	const int numGridCells = globalData.gridDims.x * globalData.gridDims.y;
 	static std::vector< std::set< uint32_t > > gridCellList;
 	if ( gridCellList.size() != numGridCells ) {
 		gridCellList.resize( numGridCells );
@@ -1450,7 +1450,9 @@ void PrometheusInstance::bufferRebuild () {
 	geometryListDirty = false;
 
 	// 16-float structs
-	std::vector< float > preppedGeoBuffer;
+	static std::vector< float > preppedGeoBuffer;
+	preppedGeoBuffer.clear();
+	preppedGeoBuffer.reserve( geometryList.size() * 16 );
 
 	// grid buffer holds indices, prefix holds index of first entry + count per cell
 	std::vector < uint32_t > prefixValues;
@@ -1458,7 +1460,6 @@ void PrometheusInstance::bufferRebuild () {
 
 	const float epsilon = 0.001f;
 	uint32_t idx { 0 };
-	preppedGeoBuffer.reserve( geometryList.size() * 16 );
 
 	// iterating through the list of geometry
 		// reset all the dirty flags
@@ -1496,7 +1497,7 @@ void PrometheusInstance::bufferRebuild () {
 				glm::ivec2 pGrid = glm::ivec2( p / globalData.gridScalar );
 
 				// and insert into the grid structure
-				gridCellList[ pGrid.x + gridDims.x * pGrid.y ].insert( idx );
+				gridCellList[ pGrid.x + globalData.gridDims.x * pGrid.y ].insert( idx );
 			}
 			break;
 		}
@@ -1512,10 +1513,10 @@ void PrometheusInstance::bufferRebuild () {
 			const float span = abs( thetaStart - thetaEnd );
 			const float circ = span * ( 2.0f * pi * radius );
 
-			const float thetaIncrement = 0.1f / circ;
+			const float thetaIncrement = 0.03f / circ;
 			for ( float t = thetaStart; t <= thetaEnd; t += thetaIncrement ) {
 				glm::vec2 p = glm::ivec2( ( center + radius * vec2( cos( t ), sin( t ) ) ) / globalData.gridScalar );
-				gridCellList[ p.x + gridDims.x * p.y ].insert( idx );
+				gridCellList[ p.x + globalData.gridDims.x * p.y ].insert( idx );
 			}
 
 			break;

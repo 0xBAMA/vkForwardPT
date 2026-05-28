@@ -25,8 +25,9 @@ layout( set = 0, binding = 0 ) uniform globalData {
 	float resolutionScalar;
 
 	float gridScalar;
+	ivec2 gridDims;
 
-	// nsight layout: vec2u; vec2u; vec2; int; int; int; int; int; float; float; float;
+	// nsight layout: vec2u; vec2u; vec2; int; int; int; int; int; float; float; float; vec2i;
 } GlobalData;
 //=========================================================
 

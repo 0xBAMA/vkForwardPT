@@ -86,6 +86,7 @@ struct GlobalData {
 
 	// for the BVH
 	float gridScalar = 1.0f; // how big to make the grid?
+	glm::ivec2 gridDims;
 };
 
 // smallest scope CPU->GPU passing of information
