@@ -371,7 +371,7 @@ intersectionResult sceneTrace ( vec2 rayOrigin, vec2 rayDirection ) {
 }
 
 bool gridBoundsCheck ( vec3 p ) {
-	return ( all( greaterThanEqual( p, ivec3( 0 ) ) ) && all( lessThan( p, vec3( ceil( GlobalData.floatBufferResolution.xy / GlobalData.gridScalar ), 1 ) ) ) );
+	return ( all( greaterThanEqual( p, ivec3( 0 ) ) ) && all( lessThanEqual( p, vec3( ceil( GlobalData.floatBufferResolution.xy / GlobalData.gridScalar ), 0 ) ) ) );
 }
 
 intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
@@ -405,6 +405,10 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 	}
 	*/
 
+	result.dist = -1.0f;
+	result.materialType = NOHIT;
+	result.albedo = 0.0f;
+
 	// DDA traversal
 	// from https://www.shadertoy.com/view/7sdSzH
 
@@ -427,7 +431,7 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 		const int linearIndex = 2 * ( mapPos0.x + int( floor( GlobalData.floatBufferResolution.x / GlobalData.gridScalar ) + 1 ) * mapPos0.y );
 		ivec2 prefixValue = ivec2( prefixBufferValues[ linearIndex ], prefixBufferValues[ linearIndex + 1 ] );
 		if ( prefixValue.y != 0 ) { // there is a nonzero count for this grid cell
-			result.dist = distance( rayOrigin, mapPos0.xy * GlobalData.gridScalar );
+			result.dist = distance( rayOrigin / GlobalData.gridScalar, mapPos0.xy );
 			result.materialType = MIRROR;
 			break;
 		}
@@ -438,6 +442,7 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 
 	if ( gridBoundsCheck( mapPos0 ) ) {
 		result.dist = distance( rayOrigin, mapPos0.xy * GlobalData.gridScalar );
+		result.materialType = NOHIT;
 	}
 
 	// and give back whatever we got
@@ -454,7 +459,6 @@ void main () {
 
 	// the raytrace process...
 	vec2 rayOrigin, rayDirection;
-
 
 	// picking a light...
 	uint lightPick = getPickedLight();

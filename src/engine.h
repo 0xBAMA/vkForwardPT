@@ -85,7 +85,7 @@ struct GlobalData {
 	float resolutionScalar{ 1.0f };
 
 	// for the BVH
-	float gridScalar = 3.0f; // how big to make the grid?
+	float gridScalar = 1.0f; // how big to make the grid?
 };
 
 // smallest scope CPU->GPU passing of information

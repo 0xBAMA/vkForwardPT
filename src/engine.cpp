@@ -1589,6 +1589,8 @@ void PrometheusInstance::addSegment ( vec2 a, vec2 b ) {
 	s.values[ 1 ] = a.y;
 	s.values[ 2 ] = b.x;
 	s.values[ 3 ] = b.y;
+
+	s.values[ 15 ] = 0; // line segment identifier
 	s.touchedSinceLastUpdate = true;
 	geometryList.push_back( s );
 }
@@ -1600,6 +1602,8 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 	s.values[ 2 ] = radius;
 	s.values[ 3 ] = thetaStart;
 	s.values[ 4 ] = thetaEnd;
+
+	s.values[ 15 ] = 1; // ARC identifier
 	s.touchedSinceLastUpdate = true;
 	geometryList.push_back( s );
 }
