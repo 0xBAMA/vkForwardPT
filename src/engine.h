@@ -53,6 +53,20 @@ struct frameData_t {
 	DescriptorAllocatorGrowable frameDescriptors;
 };
 
+// this is the CPU side representation... GPU just gets 16 floats
+struct geometryStruct {
+	float values[ 16 ] = { 0.0f }; // tbd how this is going to be accessed
+
+	// 16 floats generatlizes across the primitives needed:
+		// line segment
+		// circular arc
+		// parabola
+		// ...
+
+	// this could operate as a per-primitive dirty flag, so that they can be removed from the grid prior to re-splatting (if grid is maintained)
+	bool touchedSinceLastUpdate = true;
+};
+
 // common configuration across all shaders
 struct GlobalData {
 	glm::uvec2 floatBufferResolution;
@@ -199,8 +213,8 @@ public:
 	// some helper functions for allocating textures
 	AllocatedImage createImage ( VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false ); // storage image type
 	AllocatedImage createImage ( void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false ); // loaded from disk
-	void updateImage( AllocatedImage& image, void* data, int bytesPerTexel );
-	void screenshot(); // save the contents of the framebuffer
+	void updateImage ( AllocatedImage& image, void* data, int bytesPerTexel );
+	void screenshot (); // save the contents of the framebuffer
 	void destroyImage ( const AllocatedImage& img );
 
 	void SetDebugName( VkObjectType type, uint64_t handle, const char* name );
