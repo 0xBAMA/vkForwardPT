@@ -12,6 +12,12 @@
 
 #include "lightManager.h"
 
+#ifndef PI_DEFINED
+#define PI_DEFINED
+const float pi = 3.14159265358979323846f;
+const float tau = 2.0f * pi;
+const float sqrtpi = 1.7724538509f;
+#endif
 
 struct DeletionQueue {
 	std::deque< std::function< void() > > deletors;
