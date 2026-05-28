@@ -1599,19 +1599,20 @@ void PrometheusInstance::bufferRebuild () {
 }
 
 // adding primitives to the geometry list
-void PrometheusInstance::addSegment ( vec2 a, vec2 b ) {
+void PrometheusInstance::addSegment ( vec2 a, vec2 b, bool invert = false ) {
 	geometryStruct s;
 	s.values[ 0 ] = a.x;
 	s.values[ 1 ] = a.y;
 	s.values[ 2 ] = b.x;
 	s.values[ 3 ] = b.y;
 
+	s.values[ 14 ] = invert ? 1.0f : 0.0f;
 	s.values[ 15 ] = 0; // line segment identifier
 	s.touchedSinceLastUpdate = true;
 	geometryList.push_back( s );
 }
 
-void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, float thetaEnd ) {
+void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, bool invert = false ) {
 	geometryStruct s;
 	s.values[ 0 ] = center.x;
 	s.values[ 1 ] = center.y;
@@ -1619,6 +1620,7 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 	s.values[ 3 ] = thetaStart;
 	s.values[ 4 ] = thetaEnd;
 
+	s.values[ 14 ] = invert ? 1.0f : 0.0f;
 	s.values[ 15 ] = 1; // ARC identifier
 	s.touchedSinceLastUpdate = true;
 	geometryList.push_back( s );

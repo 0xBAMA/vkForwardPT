@@ -177,8 +177,8 @@ public:
 	AllocatedBuffer GeometryBuffer;		// containing the 16-float representations of the geometry
 
 	// eventually these also need a material
-	void addSegment ( vec2 a, vec2 b );
-	void addArc ( vec2 center, float radius, float thetaStart, float thetaEnd );
+	void addSegment ( vec2 a, vec2 b, bool invert );
+	void addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, bool invert );
 	// void addParabola ( vec2 center, );
 
 	// there is really only one function associated with this, which manages the buffer rebuild
