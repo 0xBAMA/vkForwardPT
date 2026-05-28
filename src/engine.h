@@ -83,6 +83,9 @@ struct GlobalData {
 
 	float brightnessScalar{ 1.0f };
 	float resolutionScalar{ 1.0f };
+
+	// for the BVH
+	float gridScalar = 3.0f; // how big to make the grid?
 };
 
 // smallest scope CPU->GPU passing of information
@@ -167,6 +170,7 @@ public:
 	// there are now three new buffers + a CPU representation for implementing the grid acceleration structure
 	bool geometryListDirty = true;		// triggering the rebuild of GPU structures
 	std::vector< geometryStruct > geometryList; // eventually this is how the user edits the scene
+
 	AllocatedBuffer PrefixBuffer;		// containing the prefix sums + counts for indexing the grid buffer
 	AllocatedBuffer GridBuffer;			// containing a packed list of each cell's contents (requires prefix buffer to operate)
 	AllocatedBuffer GeometryBuffer;		// containing the 16-float representations of the geometry
@@ -178,7 +182,6 @@ public:
 
 	// there is really only one function associated with this, which manages the buffer rebuild
 	// does it make sense to retain the grid buffer?
-	float gridScalar = 3.0f; // how big to make the grid?
 	void bufferRebuild (); // geometry buffer is constructed... geometry is splatted into grid... prefix buffer is constructed from grid
 
 	// as far as editing features, this will require:
