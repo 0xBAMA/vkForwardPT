@@ -1410,6 +1410,110 @@ void PrometheusInstance::initComputePasses () {
 	}
 }
 
+void PrometheusInstance::bufferRebuild () {
+	// retained memory for the grid + resize logic
+	const glm::ivec2 gridDims = glm::ivec2( ( std::floor( globalData.floatBufferResolution.x / gridScalar ) + 1 ), std::floor( globalData.floatBufferResolution.y / gridScalar ) + 1 );
+	const int numGridCells = gridDims.x * gridDims.y;
+	static std::vector< std::set< int > > gridCellList;
+	if ( gridCellList.size() != numGridCells ) {
+		gridCellList.resize( numGridCells );
+	}
+
+	// I think for now we're clearing everything
+	for ( auto& cell : gridCellList ) {
+		cell.clear();
+	}
+
+	// start by resetting the global dirty flag
+	geometryListDirty = false;
+
+	// iterating through the list of geometry
+		// reset all the dirty flags
+		// create the GPU buffer of 16-float structs
+	const float epsilon = 0.001f;
+	int idx { 0 };
+	std::vector< float > preppedGeoBuffer;
+	preppedGeoBuffer.reserve( geometryList.size() * 16 );
+	for ( auto& primitive : geometryList ) {
+		primitive.touchedSinceLastUpdate = false; // kind of useless right now, useful optimization later
+
+		// we need to put together the geometry buffer
+		for ( auto& element : primitive.values ) {
+			preppedGeoBuffer.emplace_back( element );
+		}
+
+		// the geometry gets now splatted into a grid structure
+			// the grid structure is kept in a 1D array...
+			// each cell has a vector of primitives
+
+		// the last float has the identifier...
+		int primitiveType = int( primitive.values[ 15 ] );
+		switch ( primitiveType ) { // each primitive will need to splat differently...
+		// calling insert with idx puts this index into that cell, we want to keep that index only
+			// this represents an element in the geometry list - more or less equivalent to a pointer
+
+		case 0: { // line segment - DDA would be better solution
+			// values are stored ax, ay, bx, by
+			const vec2 a = vec2( primitive.values[ 0 ], primitive.values[ 1 ] );
+			const vec2 b = vec2( primitive.values[ 2 ], primitive.values[ 3 ] );
+			const float d = glm::length( a - b );
+			vec2 p = vec2( 0.0f );
+
+			// iterating over the segment's length
+			for ( float t = 0.0f; t <= d; t += 0.1f ) {
+				// grid may not be per-pixel...
+				p = glm::mix( a, b, t / d );
+				glm::ivec2 pGrid = glm::ivec2( p / gridScalar );
+
+				// and insert into the grid structure
+				gridCellList[ pGrid.x + gridDims.x * pGrid.y ].insert( idx );
+			}
+			break;
+		}
+
+		case 1: {
+			// circular arcs
+				// centerx, centery, radius, thetastart, thetaend is the order
+			const vec2 center = vec2( primitive.values[ 0 ], primitive.values[ 1 ] );
+			const float radius = primitive.values[ 2 ];
+			const float thetaStart = primitive.values[ 3 ];
+			const float thetaEnd = primitive.values[ 4 ];
+
+			const float span = abs( thetaStart - thetaEnd );
+			const float circ = span * ( 2.0f * pi * radius );
+
+			const float thetaIncrement = 0.1f / circ;
+			for ( float t = thetaStart; t <= thetaEnd; t += thetaIncrement ) {
+				glm::vec2 p = glm::ivec2( ( center + radius * vec2( cos( t ), sin( t ) ) ) / gridScalar );
+				gridCellList[ p.x + gridDims.x * p.y ].insert( idx );
+			}
+
+			break;
+		}
+
+		// case 2: // parabola
+			// break;
+
+		default: // need to specify a shape if it is in the primitives list
+			break;
+		}
+
+		// incrementing, now that splatting is finished
+		idx++;
+	}
+
+	// this data goes into the buffer
+
+	// once all the splatting has happened, we need to build the two GPU buffers:
+		// this grid, compacted so that the variable stride elements come one after another
+		// the prefix buffer, which keeps the starting index for each cell and the number of elements per cell
+
+	// so at the end, we have built three buffers:
+		// geometry buffer
+		// grid buffer
+		// prefix buffer
+}
+
 void PrometheusInstance::lightManagerMaintenance () {
 	// three resources need to be kept up:
 		// spectral sampling IS

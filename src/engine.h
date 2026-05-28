@@ -164,6 +164,30 @@ public:
 	ComputeEffect Accumulate;
 	ComputeEffect DebugLineDraw;
 
+	// there are now three new buffers + a CPU representation for implementing the grid acceleration structure
+	bool geometryListDirty = true;		// triggering the rebuild of GPU structures
+	std::vector< geometryStruct > geometryList; // eventually this is how the user edits the scene
+	AllocatedBuffer PrefixBuffer;		// containing the prefix sums + counts for indexing the grid buffer
+	AllocatedBuffer GridBuffer;			// containing a packed list of each cell's contents (requires prefix buffer to operate)
+	AllocatedBuffer GeometryBuffer;		// containing the 16-float representations of the geometry
+
+	// eventually these also need a material
+	void addSegment ( vec2 a, vec2 b );
+	void addArc ( vec2 center, float radius, float thetaStart, float thetaEnd );
+	// void addParabola ( vec2 center, );
+
+	// there is really only one function associated with this, which manages the buffer rebuild
+	// does it make sense to retain the grid buffer?
+	float gridScalar = 3.0f; // how big to make the grid?
+	void bufferRebuild (); // geometry buffer is constructed... geometry is splatted into grid... prefix buffer is constructed from grid
+
+	// as far as editing features, this will require:
+		// mode select between geometry and lights
+		// geometry selection + drag boxes + multiselect with control
+		// escape to deselect all
+		// so this keeps a list of selected geometry, which is just keeping integer indexes into geometryList, above
+	// operations on the selected geometry is still tbd, but will include things like translating on x and y, drawing a gizmo with the debug lines
+
 	// putting the image on the screen
 	ComputeEffect BufferPresent;
 
