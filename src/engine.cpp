@@ -165,6 +165,10 @@ void PrometheusInstance::Draw () {
 		globalData.framesSinceReset = 0;
 	}
 
+	if ( geometryListDirty ) {
+		bufferRebuild();
+	}
+
 	// start the command buffer recording
 	VK_CHECK( vkBeginCommandBuffer( cmd, &cmdBeginInfo ) );
 
@@ -771,6 +775,9 @@ void PrometheusInstance::initResources () {
 		destroyBuffer( rayBuffer );
 		destroyBuffer( LightParametersBuffer );
 		destroyBuffer( debugLineDrawBuffer );
+		destroyBuffer( GeometryBuffer );
+		destroyBuffer( PrefixBuffer );
+		destroyBuffer( GridBuffer );
 
 		// destroying images
 		destroyImage( XYZImage );
@@ -790,6 +797,10 @@ void PrometheusInstance::initComputePasses () {
 			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // the iCDF texture for light spectra
 			builder.add_binding( 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // the discrete IS texture for lights
 			builder.add_binding( 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // the parameters for the light emitters
+			// buffers for the BVH
+			builder.add_binding( 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the geometry buffer
+			builder.add_binding( 6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the prefix buffer
+			builder.add_binding( 7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // the grid buffer
 			Raytrace.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
 			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) Raytrace.descriptorSetLayout, "Raytrace Descriptor Set Layout" );
 		}
@@ -853,6 +864,10 @@ void PrometheusInstance::initComputePasses () {
 				writer.write_image( 2, SpectrumISImage.imageView, defaultSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
 				writer.write_image( 3, PickISImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
 				writer.write_buffer( 4, LightParametersBuffer.buffer, 256 * sizeof( LightEmitterParameters ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
+				// BVH buffers
+				writer.write_buffer( 5, GeometryBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.write_buffer( 6, PrefixBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.write_buffer( 7, GridBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
 				writer.update_set( device, Raytrace.descriptorSet );
 			}
 
@@ -1611,7 +1626,7 @@ AllocatedBuffer PrometheusInstance::createBuffer ( size_t allocSize, VkBufferUsa
 
 	VmaAllocationCreateInfo vmaallocInfo = {};
 	vmaallocInfo.usage = memoryUsage;
-	vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 	AllocatedBuffer newBuffer;
 
 	// allocate the buffer
