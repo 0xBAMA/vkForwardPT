@@ -760,6 +760,10 @@ void PrometheusInstance::initResources () {
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) debugLineDrawBuffer.buffer, "Debug Line SSBO" );
 	}
 
+	// placeholder
+	addArc( vec2( 300.0f ), 35.0f, 0.0f, 2.0f * pi );
+	addSegment( vec2( 100.0f ), vec2( 200.0f ) );
+
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
 		// destroying buffers
@@ -1512,6 +1516,26 @@ void PrometheusInstance::bufferRebuild () {
 		// geometry buffer
 		// grid buffer
 		// prefix buffer
+// adding primitives to the geometry list
+void PrometheusInstance::addSegment ( vec2 a, vec2 b ) {
+	geometryStruct s;
+	s.values[ 0 ] = a.x;
+	s.values[ 1 ] = a.y;
+	s.values[ 2 ] = b.x;
+	s.values[ 3 ] = b.y;
+	s.touchedSinceLastUpdate = true;
+	geometryList.push_back( s );
+}
+
+void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, float thetaEnd ) {
+	geometryStruct s;
+	s.values[ 0 ] = center.x;
+	s.values[ 1 ] = center.y;
+	s.values[ 2 ] = radius;
+	s.values[ 3 ] = thetaStart;
+	s.values[ 4 ] = thetaEnd;
+	s.touchedSinceLastUpdate = true;
+	geometryList.push_back( s );
 }
 
 void PrometheusInstance::lightManagerMaintenance () {
