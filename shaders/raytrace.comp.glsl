@@ -57,6 +57,19 @@ layout( set = 0, binding = 4 ) uniform emitterParameters {
 	LightEmitterParameters emitterParams[ 256 ];
 } EmitterParameters;
 
+// BVH buffers
+layout ( set = 0, binding = 5 ) buffer geometryBuffer {
+	float geometryParameters[]; // 16-float stride
+};
+
+layout ( set = 0, binding = 6 ) buffer prefixBuffer {
+	uint prefixBufferValues[]; // 2-uint stride - elements in order, index, count, index, count...
+};
+
+layout ( set = 0, binding = 7 ) buffer gridBuffer {
+	uint gridBufferValues[]; // variable stride, requires prefix buffer or it is soup
+};
+
 #define NOHIT						0
 #define DIFFUSE						1
 #define METALLIC					2
