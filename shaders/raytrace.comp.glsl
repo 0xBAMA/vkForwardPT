@@ -370,6 +370,68 @@ intersectionResult sceneTrace ( vec2 rayOrigin, vec2 rayDirection ) {
 	return result;
 }
 
+intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
+	intersectionResult result = getDefaultIntersection();
+
+	/*
+	// if, after managing potential inversion, we still get a negative result back... we are inside solid scene geometry
+	if ( de( rayOrigin ) < 0.0f ) {
+		result.dist = -1.0f;
+		result.materialType = NOHIT;
+		result.albedo = hitAlbedo;
+	} else {
+		// we're in a valid location and clear to do a raymarch
+		result.dist = 0.0f;
+		for ( int i = 0; i < maxSteps; i++ ) {
+			float d = de( rayOrigin + result.dist * rayDirection );
+			if ( d < epsilon ) {
+				// we have a hit - gather intersection information
+				result.materialType = hitSurfaceType;
+				result.albedo = hitAlbedo;
+				result.frontFacing = !invert; // for now, this will be sufficient to make decisions re: IoR
+				result.IoR = getIORForMaterial( hitSurfaceType );
+				result.normal = SDFNormal( rayOrigin + result.dist * rayDirection );
+				result.roughness = hitRoughness;
+			} else if ( result.dist > maxDistance ) {
+				result.materialType = NOHIT;
+				break;
+			}
+			result.dist += d;
+		}
+	}
+	*/
+
+// DDA traversal
+	// from https://www.shadertoy.com/view/7sdSzH
+	vec2 deltaDist = 1.0f / abs( rayDirection );
+	ivec2 rayStep = ivec2( sign( rayDirection ) );
+	bvec2 mask0 = bvec2( false );
+	ivec2 mapPos0 = ivec2( floor( rayOrigin / GlobalData.gridScalar ) );
+	vec2 sideDist0 = ( sign( rayDirection ) * ( vec2( mapPos0 ) - ( rayOrigin / GlobalData.gridScalar ) ) + ( sign( rayDirection ) * 0.5f ) + 0.5f ) * deltaDist;
+
+	#define MAX_RAY_STEPS 1000
+	for ( int i = 0; i < MAX_RAY_STEPS && ( all( greaterThanEqual( mapPos0, ivec2( 0 ) ) ) && all( lessThan( mapPos0, ( GlobalData.floatBufferResolution / GlobalData.gridScalar ) + 1 ) ) ); i++ ) {
+		// Core of https://www.shadertoy.com/view/4dX3zl Branchless Voxel Raycasting
+
+//		bvec3 mask1 = lessThanEqual( sideDist0.xyz, min( sideDist0.yzx, sideDist0.zxy ) );
+		bvec2 mask1 = lessThanEqual( sideDist0.xy, sideDist0.yx ); // not sure if this is correctly converted
+		vec2 sideDist1 = sideDist0 + vec2( mask1 ) * deltaDist;
+		ivec2 mapPos1 = mapPos0 + ivec2( vec2( mask1 ) ) * rayStep;
+
+		const int linearIndex = 2 * ( mapPos0.x + int( floor( GlobalData.floatBufferResolution.x / GlobalData.gridScalar ) + 1 ) * mapPos0.y );
+		ivec2 prefixValue = ivec2( prefixBufferValues[ linearIndex ], prefixBufferValues[ linearIndex + 1 ] );
+		if ( prefixValue.y != 0 ) { // there is a nonzero count for this grid cell
+			result.dist = i;
+		}
+
+		sideDist0 = sideDist1;
+		mapPos0 = mapPos1;
+	}
+
+	// and give back whatever we got
+	return result;
+}
+
 void main () {
 	// pixel index
 	uint loc = uint( gl_GlobalInvocationID.x );
@@ -420,7 +482,7 @@ void main () {
 		if ( !deadRay ) {
 
 			// do the scene intersection
-			intersectionResult result = sceneTrace( rayOrigin, rayDirection );
+			intersectionResult result = sceneTraceBVH( rayOrigin, rayDirection );
 
 			// add the line to the system
 			raySegment r = getDefaultSegment();
