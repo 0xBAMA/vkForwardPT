@@ -1893,8 +1893,9 @@ void PrometheusInstance::initDefaultData () {
 
 	sampl.magFilter = VK_FILTER_LINEAR;
 	sampl.minFilter = VK_FILTER_LINEAR;
-	// sampl.magFilter = VK_FILTER_CUBIC_EXT;
-	// sampl.minFilter = VK_FILTER_CUBIC_EXT;
+	sampl.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampl.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampl.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	vkCreateSampler( device, &sampl, nullptr, &defaultSamplerLinear );
 
 	mainDeletionQueue.push_function([&](){
