@@ -802,14 +802,15 @@ void PrometheusInstance::initResources () {
 	*/
 
 	for ( int x = 0; x < 20; x++ ) {
-		for ( int y = 0; y < 20; y++ ) {
-			vec2 p = vec2( 100 + 6 * x, 100 + 50 *y );
+		for ( int y = 0; y < 100; y++ ) {
+			vec2 p = vec2( 100 + 6 * x, 100 + 6 *y );
 			float r = 2.0f;
 			addArc( p, r, 0.0f, 2.0f * pi, 0 );
 
 			p = vec2( 500 + 64 * x, 100 + 64 * y );
 			r = 28.0f;
-			addArc( p, r, 0.0f, 2.0f * pi, 0 );
+			if ( p.y < 2000 )
+				addArc( p, r, 0.0f, 2.0f * pi, 0 );
 		}
 	}
 
