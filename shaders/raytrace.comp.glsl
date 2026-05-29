@@ -405,7 +405,7 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 	}
 	*/
 
-	result.dist = -1.0f;
+	result.dist = maxDistance;
 	result.materialType = NOHIT;
 	result.albedo = 0.0f;
 
@@ -431,19 +431,33 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 		const int linearIndex = 2 * ( mapPos0.x + GlobalData.gridDims.x * mapPos0.y );
 		ivec2 prefixValue = ivec2( prefixBufferValues[ linearIndex ], prefixBufferValues[ linearIndex + 1 ] );
 		if ( prefixValue.y != 0 ) { // there is a nonzero count for this grid cell
-			result.dist = distance( rayOrigin / GlobalData.gridScalar, mapPos0.xy );
-			result.materialType = MIRROR;
-			break;
+
+			// iterate over the contents... rare that this will be more than 1, but possible
+			float dClosest = maxDistance;
+			for ( int i = 0; i < prefixValue.y; i++ ) {
+				// we are looking at primitives starting at location 16 * prefixValue.x
+				int primitiveBaseIdx = 16 * ( prefixValue.x + i );
+				switch ( int( geometryParameters[ primitiveBaseIdx + 15 ] ) ) {
+				case 0: // line segment
+					break;
+
+				case 1: // circular arc
+					break;
+
+				default:
+					break;
+				}
+			}
+
+			// if we got a good hit in this grid cell, we're going to break
+			if ( result.materialType != NOHIT ) {
+				break;
+			}
 		}
 
 		sideDist0 = sideDist1;
 		mapPos0 = mapPos1;
 	}
-
-//	if ( gridBoundsCheck( mapPos0 ) ) {
-		result.dist = distance( rayOrigin, mapPos0.xy * GlobalData.gridScalar );
-		result.materialType = NOHIT;
-//	}
 
 	// and give back whatever we got
 	return result;
