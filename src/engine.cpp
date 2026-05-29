@@ -765,8 +765,24 @@ void PrometheusInstance::initResources () {
 	}
 
 	// placeholder
-	addArc( vec2( 300.0f ), 35.0f, 0.0f, 2.0f * pi, 0 );
-	addSegment( vec2( 100.0f ), vec2( 200.0f ), 0 );
+	// addArc( vec2( 300.0f ), 35.0f, 0.0f, 2.0f * pi, 0 );
+	// addSegment( vec2( 100.0f ), vec2( 400.0f, 356.0f ), 0 );
+
+	std::mt19937 seedRNG( [] {
+		std::random_device rd;
+		std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
+		return std::mt19937( seq );
+	} () );
+	const float size = 100.0f;
+	for ( int i = 0; i < 10000; i++ ) {
+		const vec2 p = vec2(
+			std::uniform_real_distribution< float >( 0, ImageBufferResolution.width )( seedRNG ),
+			std::uniform_real_distribution< float >( 0, ImageBufferResolution.height )( seedRNG )
+		);
+		addSegment( vec2( p ), vec2(
+			p.x + std::uniform_real_distribution< float >( -size, size )( seedRNG ),
+			p.y + std::uniform_real_distribution< float >( -size, size )( seedRNG ) ), 0 );
+	}
 
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
@@ -1477,6 +1493,8 @@ void PrometheusInstance::bufferRebuild () {
 			// the grid structure is kept in a 1D array...
 			// each cell has a vector of primitives
 
+		auto boundsCheck = [&]( vec2 p ) { return p.x < globalData.floatBufferResolution.x && p.y < globalData.floatBufferResolution.y && p.x >= 0.0f && p.y >= 0.0f; };
+
 		// the last float has the identifier...
 		int primitiveType = int( primitive.values[ 15 ] );
 		switch ( primitiveType ) { // each primitive will need to splat differently...
@@ -1491,13 +1509,17 @@ void PrometheusInstance::bufferRebuild () {
 			vec2 p = vec2( 0.0f );
 
 			// iterating over the segment's length
+			for ( auto xo : { -1.0f, 0.0f, 1.0f } )
+			for ( auto yo : { -1.0f, 0.0f, 1.0f } )
 			for ( float t = 0.0f; t <= d; t += 0.1f ) {
 				// grid may not be per-pixel...
-				p = glm::mix( a, b, t / d );
+				p = glm::mix( a, b, t / d ) + vec2( xo, yo );
 				glm::ivec2 pGrid = glm::ivec2( p / globalData.gridScalar );
 
 				// and insert into the grid structure
-				gridCellList[ pGrid.x + globalData.gridDims.x * pGrid.y ].insert( idx );
+				if ( boundsCheck( pGrid ) ) {
+					gridCellList[ pGrid.x + globalData.gridDims.x * pGrid.y ].insert( idx );
+				}
 			}
 			break;
 		}
@@ -1513,14 +1535,15 @@ void PrometheusInstance::bufferRebuild () {
 			const float span = abs( thetaStart - thetaEnd );
 			const float circ = span * ( 2.0f * pi * radius );
 
-			const float thetaIncrement = 0.05f / circ;
+			const float thetaIncrement = 0.1f / circ;
 			for ( float t = thetaStart - epsilon; t <= thetaEnd + epsilon; t += thetaIncrement ) {
 				for ( auto adj : { -0.1f, 0.0f, 0.1f } ) { // kind of an expensive way to do this
 					glm::vec2 p = glm::ivec2( ( center + ( radius + adj ) * vec2( cos( t ), sin( t ) ) ) / globalData.gridScalar );
-					gridCellList[ p.x + globalData.gridDims.x * p.y ].insert( idx );
+					if ( boundsCheck( p ) ) {
+						gridCellList[ p.x + globalData.gridDims.x * p.y ].insert( idx );
+					}
 				}
 			}
-
 			break;
 		}
 
@@ -1577,7 +1600,6 @@ void PrometheusInstance::bufferRebuild () {
 	SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) PrefixBuffer.buffer, "BVH Prefix Buffer" );
 
 	// need to do something to visualize the buffers
-	/*
 	std::vector< uint8_t > values;
 	bool invert = true;
 	for ( auto& v : prefixValues ) {
@@ -1592,7 +1614,6 @@ void PrometheusInstance::bufferRebuild () {
 		}
 	}
 	stbi_write_png( "test.png", globalData.gridDims.x, globalData.gridDims.y, 4, values.data(), globalData.gridDims.x * 4 );
-	*/
 
 	// transferring prepped data to the new buffers
 	memcpy( GeometryBuffer.info.pMappedData, preppedGeoBuffer.data(), preppedGeoBuffer.size() * sizeof( float ) );
