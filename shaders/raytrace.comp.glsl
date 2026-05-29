@@ -540,9 +540,9 @@ void main () {
 
 	if ( lightPick == 0 ) {
 		// this is the mouse light
-		rayOrigin = subpixelJitter + GlobalData.mouseLoc + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f ) + rnd_disc_cauchy();
+		rayOrigin = subpixelJitter + GlobalData.mouseLoc + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 	} else {
-		rayOrigin = subpixelJitter + params.position + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f ) + rnd_disc_cauchy();
+		rayOrigin = subpixelJitter + params.position + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 	}
 	// direction is the same either way
 	rayDirection = normalize( Rotate2D( params.rotation + params.angleScalar * ( NormalizedRandomFloat() - 0.5f ) + params.cauchyMix * rnd_disc_cauchy().x ) * vec2( 0.0f, 1.0f ) );
