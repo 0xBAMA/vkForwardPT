@@ -490,8 +490,86 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 					}
 					break;
 
-				case 1: // circular arc
+				case 1: // circular arc, centered at p, radius r, and covering a range of theta
+					{
+						vec2 p = vec2( geometryParameters[ primitiveBaseIdx + 0 ], geometryParameters[ primitiveBaseIdx + 1 ] );
+						float r = geometryParameters[ primitiveBaseIdx + 2 ];
+						float thetaLo = geometryParameters[ primitiveBaseIdx + 3 ];
+						float thetaHi = geometryParameters[ primitiveBaseIdx + 4 ];
+
+						// determine nearest positive intersection...
+							// closer than dClosest?
+							// hit inside grid cell? -> may need reject criteria to get rid of bad hits, tbd
+
+						vec2 oc = rayOrigin - p;
+						float b = dot( oc, rayDirection );
+						float c = dot( oc, oc ) - r * r;
+						float h = b * b - c;
+
+						if ( h < 0.0f ) return false;
+						h = sqrt( h );
+
+						// Test nearer then farther root
+						for ( int i = 0; i < 2; ++i ) {
+							float t = ( i == 0 ) ? ( -b - h ) : ( -b + h );
+							if ( t < 0.0f ) continue;
+
+							vec2 hit = ro + rd * t;
+							vec2 dNorm = normalize( hit - p );
+
+							float a = atan( dNorm.y, dNorm.x );
+							if ( a < 0.0f ) a += 6.28318530718;
+
+							float lo = thetaLo;
+							float hi = thetaHi;
+							if ( lo < 0.0 ) lo += 6.28318530718;
+							if ( hi < 0.0 ) hi += 6.28318530718;
+
+							bool inArc = ( lo <= hi ) ? ( a >= lo && a <= hi ) : ( a >= lo || a <= hi );
+							if ( !inArc ) continue;
+
+							nHit = d;
+
+							// frontFace == entering circle from outside
+							frontFace = dot( rayDirection, nHit ) < 0.0;
+
+//							tHit = t;
+//							return true;
+						}
+
+						return false;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+						// else, continue
+					}
 					break;
+
+				// more primitives TBD
 
 				default:
 					break;
@@ -507,6 +585,8 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 		sideDist0 = sideDist1;
 		mapPos0 = mapPos1;
 	}
+
+	// can dereference material to get surfaceType, albedo, IoR
 
 	// and give back whatever we got
 	return result;
