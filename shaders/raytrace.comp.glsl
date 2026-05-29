@@ -492,21 +492,22 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 
 				case 1: // circular arc, centered at p, radius r, and covering a range of theta
 					{
+						// the basic circle
 						vec2 p = vec2( geometryParameters[ primitiveBaseIdx + 0 ], geometryParameters[ primitiveBaseIdx + 1 ] );
 						float r = geometryParameters[ primitiveBaseIdx + 2 ];
-						float thetaLo = geometryParameters[ primitiveBaseIdx + 3 ];
-						float thetaHi = geometryParameters[ primitiveBaseIdx + 4 ];
 
-						// determine nearest positive intersection...
-							// closer than dClosest?
-							// hit inside grid cell? -> may need reject criteria to get rid of bad hits, tbd
+						// theta range
+						float lo = geometryParameters[ primitiveBaseIdx + 3 ];
+						float hi = geometryParameters[ primitiveBaseIdx + 4 ];
+
+						bool invertFace = ( geometryParameters[ primitiveBaseIdx + 14 ] != 0.0f );
 
 						vec2 oc = rayOrigin - p;
 						float b = dot( oc, rayDirection );
 						float c = dot( oc, oc ) - r * r;
 						float h = b * b - c;
 
-						if ( h < 0.0f ) return false;
+						if ( h < 0.0f ) continue;
 						h = sqrt( h );
 
 						// Test nearer then farther root
@@ -514,58 +515,32 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 							float t = ( i == 0 ) ? ( -b - h ) : ( -b + h );
 							if ( t < 0.0f ) continue;
 
-							vec2 hit = ro + rd * t;
+							vec2 hit = rayOrigin + rayDirection * t;
 							vec2 dNorm = normalize( hit - p );
 
 							float a = atan( dNorm.y, dNorm.x );
 							if ( a < 0.0f ) a += 6.28318530718;
 
-							float lo = thetaLo;
-							float hi = thetaHi;
-							if ( lo < 0.0 ) lo += 6.28318530718;
-							if ( hi < 0.0 ) hi += 6.28318530718;
-
 							bool inArc = ( lo <= hi ) ? ( a >= lo && a <= hi ) : ( a >= lo || a <= hi );
 							if ( !inArc ) continue;
 
-							nHit = d;
+							if ( t < dClosest ) {
+								result.dist = dClosest = t;
+								result.frontFacing = invertFace ? ( dot( rayDirection, dNorm ) > 0.0f ) : ( dot( rayDirection, dNorm ) < 0.0f );
+								result.normal = ( invertFace ? -1.0f : 1.0f ) * dNorm;
 
-							// frontFace == entering circle from outside
-							frontFace = dot( rayDirection, nHit ) < 0.0;
+								// we still need a good shading normal
+								if ( dot( rayDirection, result.normal ) > 0.0f ) {
+									result.normal = -result.normal;
+								}
 
-//							tHit = t;
-//							return true;
+								// todo material handling
+								result.materialType = SELLMEIER_BOROSILICATE_BK7;
+								result.IoR = getIORForMaterial( result.materialType );
+								result.roughness = 0.0f;
+								result.albedo = 0.99f;
+							}
 						}
-
-						return false;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-						// else, continue
 					}
 					break;
 

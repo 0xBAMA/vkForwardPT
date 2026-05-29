@@ -773,8 +773,10 @@ void PrometheusInstance::initResources () {
 		std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
 		return std::mt19937( seq );
 	} () );
+
+	/*
 	const float size = 100.0f;
-	for ( int i = 0; i < 10000; i++ ) {
+	for ( int i = 0; i < 1000; i++ ) {
 		const vec2 p = vec2(
 			std::uniform_real_distribution< float >( 0, ImageBufferResolution.width )( seedRNG ),
 			std::uniform_real_distribution< float >( 0, ImageBufferResolution.height )( seedRNG )
@@ -783,6 +785,35 @@ void PrometheusInstance::initResources () {
 			p.x + std::uniform_real_distribution< float >( -size, size )( seedRNG ),
 			p.y + std::uniform_real_distribution< float >( -size, size )( seedRNG ) ), 0 );
 	}
+	*/
+
+	/*
+	for ( int i = 0; i < 1000; i++ ) {
+		const vec2 p = vec2(
+			std::uniform_real_distribution< float >( 0, ImageBufferResolution.width )( seedRNG ),
+			std::uniform_real_distribution< float >( 0, ImageBufferResolution.height )( seedRNG )
+		);
+		const float r = std::uniform_real_distribution< float >( 25.0f, 35.0f )( seedRNG );
+		const float t0 = std::uniform_real_distribution< float >( 0.0f, pi / 4.0f )( seedRNG );
+		const float t1 = std::uniform_real_distribution< float >( pi / 2.0f, pi )( seedRNG );
+		// addArc( p, r, 0.0f, 2.0f * pi, 0 );
+		addArc( p, r, t0, t1, 0 );
+	}
+	*/
+
+	for ( int x = 0; x < 20; x++ ) {
+		for ( int y = 0; y < 20; y++ ) {
+			vec2 p = vec2( 100 + 6 * x, 100 + 50 *y );
+			float r = 2.0f;
+			addArc( p, r, 0.0f, 2.0f * pi, 0 );
+
+			p = vec2( 500 + 64 * x, 100 + 64 * y );
+			r = 28.0f;
+			addArc( p, r, 0.0f, 2.0f * pi, 0 );
+		}
+	}
+
+
 
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
@@ -1535,7 +1566,7 @@ void PrometheusInstance::bufferRebuild () {
 			const float span = abs( thetaStart - thetaEnd );
 			const float circ = span * ( 2.0f * pi * radius );
 
-			const float thetaIncrement = 0.1f / circ;
+			const float thetaIncrement = 0.618f / circ;
 			for ( float t = thetaStart - epsilon; t <= thetaEnd + epsilon; t += thetaIncrement ) {
 				for ( auto adj : { -0.1f, 0.0f, 0.1f } ) { // kind of an expensive way to do this
 					glm::vec2 p = glm::ivec2( ( center + ( radius + adj ) * vec2( cos( t ), sin( t ) ) ) / globalData.gridScalar );
