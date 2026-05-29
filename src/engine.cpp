@@ -801,15 +801,15 @@ void PrometheusInstance::initResources () {
 	}
 	*/
 
-	for ( int x = 0; x < 20; x++ ) {
+	for ( int x = 0; x < 40; x++ ) {
 		for ( int y = 0; y < 100; y++ ) {
 			vec2 p = vec2( 100 + 6 * x, 100 + 6 *y );
 			float r = 2.0f;
 			addArc( p, r, 0.0f, 2.0f * pi, 0 );
 
-			p = vec2( 500 + 64 * x, 100 + 64 * y );
+			p = vec2( 800 + 64 * x, 100 + 64 * y );
 			r = 28.0f;
-			if ( p.y < 2000 )
+			if ( p.y < 1200 && p.x < 2400 )
 				addArc( p, r, 0.0f, 2.0f * pi, 0 );
 		}
 	}
@@ -1632,6 +1632,7 @@ void PrometheusInstance::bufferRebuild () {
 	SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) PrefixBuffer.buffer, "BVH Prefix Buffer" );
 
 	// need to do something to visualize the buffers
+	/*
 	std::vector< uint8_t > values;
 	bool invert = true;
 	for ( auto& v : prefixValues ) {
@@ -1646,6 +1647,7 @@ void PrometheusInstance::bufferRebuild () {
 		}
 	}
 	stbi_write_png( "test.png", globalData.gridDims.x, globalData.gridDims.y, 4, values.data(), globalData.gridDims.x * 4 );
+	*/
 
 	// transferring prepped data to the new buffers
 	memcpy( GeometryBuffer.info.pMappedData, preppedGeoBuffer.data(), preppedGeoBuffer.size() * sizeof( float ) );
