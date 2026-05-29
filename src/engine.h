@@ -74,7 +74,7 @@ struct GlobalData {
 
 	glm::vec2 mouseLoc;
 
-	int numRays{ 64 * 50 };
+	int numRays{ 64 * 250 };
 	int numBounces{ 256 };
 
 	int frameNumber{ 0 };
@@ -177,8 +177,8 @@ public:
 	AllocatedBuffer GeometryBuffer;		// containing the 16-float representations of the geometry
 
 	// eventually these also need a material
-	void addSegment ( vec2 a, vec2 b, bool invert );
-	void addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, bool invert );
+	void addSegment ( vec2 a, vec2 b, int material, bool invert = false );
+	void addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, int material, bool invert = false );
 	// void addParabola ( vec2 center, );
 
 	// there is really only one function associated with this, which manages the buffer rebuild
