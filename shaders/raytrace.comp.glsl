@@ -374,6 +374,8 @@ bool gridBoundsCheck ( vec3 p ) {
 	return ( all( greaterThanEqual( p, ivec3( 0 ) ) ) && all( lessThanEqual( p, vec3( GlobalData.gridDims, 0 ) ) ) );
 }
 
+float cross2( vec2 a, vec2 b ) { return a.x * b.y - a.y * b.x; }
+
 intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 	intersectionResult result = getDefaultIntersection();
 
@@ -436,9 +438,56 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 			float dClosest = maxDistance;
 			for ( int i = 0; i < prefixValue.y; i++ ) {
 				// we are looking at primitives starting at location 16 * prefixValue.x
-				int primitiveBaseIdx = 16 * ( prefixValue.x + i );
+				uint primitiveBaseIdx = 16u * ( gridBufferValues[ prefixValue.x + i ] );
+
+				// we want to test against the primitive... ( + do not accept if the hit point is outside the grid cell? )
+					// math is now operating in pixel space entirely (rayOrigin, rayDirection, and intersection)
 				switch ( int( geometryParameters[ primitiveBaseIdx + 15 ] ) ) {
-				case 0: // line segment
+				case 0: // line segment between a and b
+					{
+						vec2 a = vec2( geometryParameters[ primitiveBaseIdx + 0 ], geometryParameters[ primitiveBaseIdx + 1 ] );
+						vec2 b = vec2( geometryParameters[ primitiveBaseIdx + 2 ], geometryParameters[ primitiveBaseIdx + 3 ] );
+						bool invertFace = ( geometryParameters[ primitiveBaseIdx + 14 ] != 0.0f );
+
+						// edge
+						vec2 edge = b - a;
+						float det = cross2( rayDirection, edge );
+
+						// reject, parallel
+						bool parallel = false;
+						if ( abs( det ) < 1e-9 )
+							parallel = true;
+
+						vec2 ao = a - rayOrigin;
+						float t = cross2( ao, edge ) / det;
+						float u = cross2( ao, rayDirection ) / det;
+
+						// reject based on ray + segment bounds
+						bool oobReject = false;
+						if ( t < 0.0f || u < 0.0f || u > 1.0f  )
+							oobReject = true;
+
+						// cantidate intersection distance is now in t
+						 if ( t < dClosest && t > 0.0f && !parallel && !oobReject ) {
+							// update the hit for the traversal
+							result.dist = dClosest = t;
+
+							// todo material properties
+							result.materialType = SELLMEIER_BOROSILICATE_BK7;
+							result.IoR = getIORForMaterial( result.materialType );
+							result.roughness = 0.0f;
+							result.albedo = 0.99f;
+
+							// determining the normal vector for the surface
+							result.normal = normalize( vec2( -edge.y, edge.x ) );
+							if ( dot( rayDirection, result.normal ) > 0.0f ) {
+								result.normal = -result.normal;
+							}
+
+							// CW edge winding defines front side, or opposite if invert flag is set
+							result.frontFacing = invertFace ? ( det < 0.0f ) : ( det > 0.0f );
+						}
+					}
 					break;
 
 				case 1: // circular arc
