@@ -1513,10 +1513,12 @@ void PrometheusInstance::bufferRebuild () {
 			const float span = abs( thetaStart - thetaEnd );
 			const float circ = span * ( 2.0f * pi * radius );
 
-			const float thetaIncrement = 0.03f / circ;
-			for ( float t = thetaStart; t <= thetaEnd; t += thetaIncrement ) {
-				glm::vec2 p = glm::ivec2( ( center + radius * vec2( cos( t ), sin( t ) ) ) / globalData.gridScalar );
-				gridCellList[ p.x + globalData.gridDims.x * p.y ].insert( idx );
+			const float thetaIncrement = 0.05f / circ;
+			for ( float t = thetaStart - epsilon; t <= thetaEnd + epsilon; t += thetaIncrement ) {
+				for ( auto adj : { -0.1f, 0.0f, 0.1f } ) { // kind of an expensive way to do this
+					glm::vec2 p = glm::ivec2( ( center + ( radius + adj ) * vec2( cos( t ), sin( t ) ) ) / globalData.gridScalar );
+					gridCellList[ p.x + globalData.gridDims.x * p.y ].insert( idx );
+				}
 			}
 
 			break;
