@@ -597,11 +597,10 @@ void PrometheusInstance::initVulkan () {
 	device = vkbDevice.device;
 	physicalDevice = physicalDeviceSelect.physical_device;
 
+	// reporting some platform info
+	VkPhysicalDeviceProperties temp;
+	vkGetPhysicalDeviceProperties( vkbDevice.physical_device, &temp );
 	{
-		// reporting some platform info
-		VkPhysicalDeviceProperties temp;
-		vkGetPhysicalDeviceProperties( vkbDevice.physical_device, &temp );
-
 		std::string GPUType;
 		switch ( temp.deviceType ) {
 			case VK_PHYSICAL_DEVICE_TYPE_OTHER: GPUType = "Other GPU"; break;
@@ -626,12 +625,22 @@ void PrometheusInstance::initVulkan () {
 		fmt::print( "Max Image Dimension(1D): {}\n", temp.limits.maxImageDimension1D );
 		fmt::print( "Max Image Dimension(2D): {}\n", temp.limits.maxImageDimension2D );
 		fmt::print( "Max Image Dimension(3D): {}\n", temp.limits.maxImageDimension3D );
+		fmt::print( "Timestamp Period: {}\n", temp.limits.timestampPeriod );
 		fmt::print( "\n\n" );
 	}
 
 	// use vkbootstrap to get a Graphics queue
 	graphicsQueue = vkbDevice.get_queue( vkb::QueueType::graphics ).value();
 	graphicsQueueFamilyIndex = vkbDevice.get_queue_index( vkb::QueueType::graphics ).value();
+
+	// value for the timestamp period
+	timestampPeriod = temp.limits.timestampPeriod;
+	if ( timestampPeriod != 0 && temp.limits.timestampComputeAndGraphics ) {
+		// timestamps supporteed
+		fmt::print( "Timestamps at {}ns Resolution\n\n", timestampPeriod );
+	} else {
+		fmt::print( "Timestamps Unsupported\n\n" );
+	}
 
 	// initialize the memory allocator
 	VmaAllocatorCreateInfo allocatorInfo = {};
