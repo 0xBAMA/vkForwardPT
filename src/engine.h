@@ -51,6 +51,9 @@ struct frameData_t {
 
 	// descriptor pool management
 	DescriptorAllocatorGrowable frameDescriptors;
+
+	// timestamp query pool
+	VkQueryPool queryPools;
 };
 
 // this is the CPU side representation... GPU just gets 16 floats

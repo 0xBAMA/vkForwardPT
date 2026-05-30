@@ -206,7 +206,7 @@ void PrometheusInstance::Draw () {
 	// set swapchain image layout to Attachment Optimal so we can draw it
 	vkutil::transition_image( cmd, swapchainImages[ swapchainImageIndex ], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
 
-	//draw imgui into the swapchain image
+	// draw imgui into the swapchain image
 	drawImgui( cmd, swapchainImageViews[ swapchainImageIndex ] );
 
 	// transition the image from layout general to ready-for-swapchain-handoff
@@ -677,8 +677,19 @@ void PrometheusInstance::initSyncStructures () {
 	for ( int i = 0; i < FRAME_OVERLAP; i++ ) {
 	// we need to create one fence ( frame end mark )
 		VK_CHECK( vkCreateFence( device, &fenceCreateInfo, nullptr, &frameData[ i ].renderFence ) );
+
 	// and two semaphores: swapchain image ready, and render finished
 		VK_CHECK( vkCreateSemaphore( device, &semaphoreCreateInfo, nullptr, &frameData[ i ].swapchainSemaphore ) );
+
+	// and space for the timestamps (32 pairs as a max for now shouldn't be an issue)
+		VkQueryPoolCreateInfo query_pool_info{};
+		query_pool_info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+		query_pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
+		query_pool_info.queryCount = 64;
+		VK_CHECK( vkCreateQueryPool( device, &query_pool_info, nullptr, &frameData[ i ].queryPools ) );
+		mainDeletionQueue.push_function( [ = ] () {
+			vkDestroyQueryPool( device, frameData[ i ].queryPools, nullptr );
+		});
 	}
 
 	swapchainPresentSemaphores.resize( swapchainImages.size() );
