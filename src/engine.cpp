@@ -672,6 +672,11 @@ void PrometheusInstance::initCommandStructures () {
 }
 
 void PrometheusInstance::initSyncStructures () {
+	// setting up the remainder of the timestamp infrastructure
+	timer.device = &device;
+	timer.timestampPeriod = timestampPeriod;
+	timerManager = &timer;
+
 	VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info( VK_FENCE_CREATE_SIGNALED_BIT );
 	VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
 	for ( int i = 0; i < FRAME_OVERLAP; i++ ) {
@@ -685,7 +690,7 @@ void PrometheusInstance::initSyncStructures () {
 		VkQueryPoolCreateInfo query_pool_info{};
 		query_pool_info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
 		query_pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
-		query_pool_info.queryCount = 64;
+		query_pool_info.queryCount = timer.maxQueries;
 		VK_CHECK( vkCreateQueryPool( device, &query_pool_info, nullptr, &frameData[ i ].queryPools ) );
 		mainDeletionQueue.push_function( [ = ] () {
 			vkDestroyQueryPool( device, frameData[ i ].queryPools, nullptr );

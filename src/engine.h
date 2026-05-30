@@ -11,6 +11,7 @@
 #include <vk_loader.h>
 
 #include "lightManager.h"
+#include "timer.h"
 
 #ifndef PI_DEFINED
 #define PI_DEFINED
@@ -145,8 +146,13 @@ inline uint32_t genWangSeed () {
 class PrometheusInstance {
 public:
 
+	// profiling data
+	timerManager_t timer;
+	int timestampPeriod;
+
 	bool showMenu = true;
 
+	// for saving scene configs
 	char currentExportFilename[ 256 ]{ "filename" };
 
 	uint32_t lastPreset;
