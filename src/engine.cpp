@@ -35,14 +35,6 @@ using namespace std::chrono_literals;
 
 #include <third_party/stb/stb_image_write.h>
 
-inline std::string timeDateString () {
-	auto now = std::chrono::system_clock::now();
-	auto inTime_t = std::chrono::system_clock::to_time_t( now );
-	std::stringstream ssA;
-	ssA << std::put_time( std::localtime( &inTime_t ), "%Y-%m-%d at %H-%M-%S" );
-	return ssA.str();
-}
-
 void PrometheusInstance::SetDebugName ( VkObjectType type, uint64_t handle, const char* name ) {
 	// Must call extension functions through a function pointer:
 	PFN_vkSetDebugUtilsObjectNameEXT pfnSetDebugUtilsObjectNameEXT = ( PFN_vkSetDebugUtilsObjectNameEXT ) vkGetInstanceProcAddr( instance, "vkSetDebugUtilsObjectNameEXT" );
