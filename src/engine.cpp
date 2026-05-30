@@ -26,6 +26,7 @@ using namespace std::chrono_literals;
 #include <third_party/imgui/imgui.h>
 #include <third_party/imgui/imgui_impl_sdl3.h>
 #include <third_party/imgui/imgui_impl_vulkan.h>
+#include <third_party/imgui/LegitProfiler/ImGuiProfilerRenderer.h>
 
 #include <third_party/yaml-cpp/include/yaml-cpp/yaml.h>
 
@@ -172,6 +173,11 @@ void PrometheusInstance::Draw () {
 	// start the command buffer recording
 	VK_CHECK( vkBeginCommandBuffer( cmd, &cmdBeginInfo ) );
 
+	// reset timers...
+	timerManager->cmd = &cmd;
+	timerManager->pool = &getCurrentFrame().queryPools;
+	timerManager->reset();
+
 	// put the core images into a general format
 	vkutil::transition_image( cmd, XYZImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
@@ -181,20 +187,30 @@ void PrometheusInstance::Draw () {
 	vkutil::transition_image( cmd, PickISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, SpectrumISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 
-	// compute shader to do one update of the raytrace process
-	Raytrace.invoke( cmd );
+	{ // compute shader to do one update of the raytrace process
+		scopedTimer start( "Raytrace" );
+		Raytrace.invoke( cmd );
+	}
 
-	// line drawing
-	lineRaster.invoke( cmd );
+	{ // line drawing
+		scopedTimer start( "Line Raster" );
+		lineRaster.invoke( cmd );
+	}
 
-	// accumulate the result into a buffer
-	Accumulate.invoke( cmd );
+	{ // accumulate the result into a buffer
+		scopedTimer start( "Accumulate" );
+		Accumulate.invoke( cmd );
+	}
 
-	// compute shader to accumulate the raster result + put the resolved final image into the drawImage...
-	BufferPresent.invoke( cmd );
+	{ // compute shader to accumulate the raster result + put the resolved final image into the drawImage...
+		scopedTimer start( "Present" );
+		BufferPresent.invoke( cmd );
+	}
 
-	// do the debug line draw over top of the final LDR color
-	DebugLineDraw.invoke( cmd );
+	{ // do the debug line draw over top of the final LDR color
+		scopedTimer start( "Debug Line Draw" );
+		DebugLineDraw.invoke( cmd );
+	}
 
 	// transition the images for the copy
 	vkutil::transition_image( cmd, drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
@@ -214,6 +230,9 @@ void PrometheusInstance::Draw () {
 
 	// Kill recording, and put it in "executable" state
 	VK_CHECK( vkEndCommandBuffer( cmd ) );
+
+	// prepare the timing results for next frame...
+	timerManager->gather();
 
 	// before submitting to the queue, we need to specify the specific dependencies
 	// we want to wait on the presentSemaphore, signaled when the swapchain is ready
@@ -315,7 +334,6 @@ void PrometheusInstance::MainLoop () {
 			if ( kb[ SDL_SCANCODE_T ] && shift ) {
 				screenshot();
 			}
-
 		}
 
 		static glm::vec2 lastMousePos = glm::vec2( 0.0f );
