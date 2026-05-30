@@ -357,6 +357,38 @@ void PrometheusInstance::MainLoop () {
 			// some imgui UI to test
 			// ImGui::ShowDemoWindow();
 
+			// showing the profiler - 1 frame delay, so we have to wait for frame 1 for the first results
+			if ( frameNumber != 0 ) {
+				int color = 0;
+				std::vector< legit::ProfilerTask > tasks_CPU;
+				std::vector< legit::ProfilerTask > tasks_GPU;
+
+				for ( size_t i = 0; i < timerManager->timingResults.size(); i++ ) {
+					color++;
+					color = color % legit::Colors::colorList.size();
+					legit::ProfilerTask pt_CPU;
+					legit::ProfilerTask pt_GPU;
+
+					// calculate start and end times
+					pt_CPU.startTime = timerManager->timingResults[ i ].tStartCPU / 1000.0f;
+					pt_CPU.endTime = timerManager->timingResults[ i ].tStopCPU / 1000.0f;
+					pt_CPU.name = timerManager->timingResults[ i ].label;
+					pt_CPU.color = legit::Colors::colorList[ color ]; // do better
+					tasks_CPU.push_back( pt_CPU );
+
+					pt_GPU.startTime = timerManager->timingResults[ i ].tStartGPU / 1000.0f;
+					pt_GPU.endTime = timerManager->timingResults[ i ].tStopGPU / 1000.0f;
+					pt_GPU.name = timerManager->timingResults[ i ].label;
+					pt_GPU.color = legit::Colors::colorList[ color ]; // do better
+					tasks_GPU.push_back( pt_GPU );
+				}
+
+				static ImGuiUtils::ProfilersWindow profilerWindow; // add new profiling data and render
+				profilerWindow.cpuGraph.LoadFrameData( &tasks_CPU[ 0 ], tasks_CPU.size() );
+				profilerWindow.gpuGraph.LoadFrameData( &tasks_GPU[ 0 ], tasks_GPU.size() );
+				profilerWindow.Render(); // GPU graph is presented on top, CPU on bottom
+			}
+
 			if ( showMenu ) {
 				if ( ImGui::Begin( "Edit" ) ) {
 
@@ -716,6 +748,7 @@ void PrometheusInstance::initSyncStructures () {
 		});
 	}
 
+
 	swapchainPresentSemaphores.resize( swapchainImages.size() );
 	for ( size_t i = 0; i < swapchainImages.size(); i++ ) {
 		VK_CHECK( vkCreateSemaphore( device, &semaphoreCreateInfo, nullptr, &swapchainPresentSemaphores[ i ] ) );
@@ -800,7 +833,7 @@ void PrometheusInstance::initResources () {
 	}
 
 	// placeholder
-	// addArc( vec2( 300.0f ), 35.0f, 0.0f, 2.0f * pi, 0 );
+	// addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 250.0f, 0.0f, 1.0f * pi, 0 );
 	// addSegment( vec2( 100.0f ), vec2( 400.0f, 356.0f ), 0 );
 
 	std::mt19937 seedRNG( [] {
@@ -809,18 +842,20 @@ void PrometheusInstance::initResources () {
 		return std::mt19937( seq );
 	} () );
 
-	/*
-	const float size = 100.0f;
-	for ( int i = 0; i < 1000; i++ ) {
+	const float size = 30.0f;
+	for ( int i = 0; i < 5000; i++ ) {
 		const vec2 p = vec2(
-			std::uniform_real_distribution< float >( 0, ImageBufferResolution.width )( seedRNG ),
-			std::uniform_real_distribution< float >( 0, ImageBufferResolution.height )( seedRNG )
+			std::uniform_real_distribution< float >( 10, ImageBufferResolution.width - 10 )( seedRNG ),
+			std::uniform_real_distribution< float >( 700, ImageBufferResolution.height - 700 )( seedRNG )
 		);
-		addSegment( vec2( p ), vec2(
-			p.x + std::uniform_real_distribution< float >( -size, size )( seedRNG ),
-			p.y + std::uniform_real_distribution< float >( -size, size )( seedRNG ) ), 0 );
+		const float r = std::uniform_real_distribution< float >( 25.0f, 35.0f )( seedRNG );
+		if ( i % 16 != 0 )
+			addSegment( p, p + vec2(
+				std::uniform_real_distribution< float >( -size, size )( seedRNG ),
+				std::uniform_real_distribution< float >( -size, size )( seedRNG ) ), 0 );
+		else
+			addArc( p, r, 0.0f, 2.0f * pi, 0 );
 	}
-	*/
 
 	/*
 	for ( int i = 0; i < 1000; i++ ) {
@@ -836,6 +871,7 @@ void PrometheusInstance::initResources () {
 	}
 	*/
 
+	/*
 	for ( int x = 0; x < 40; x++ ) {
 		for ( int y = 0; y < 100; y++ ) {
 			vec2 p = vec2( 100 + 6 * x, 100 + 6 *y );
@@ -848,6 +884,7 @@ void PrometheusInstance::initResources () {
 				addArc( p, r, 0.0f, 2.0f * pi, 0 );
 		}
 	}
+	*/
 
 
 
