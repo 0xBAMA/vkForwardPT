@@ -76,7 +76,7 @@ struct GlobalData {
 	glm::uvec2 floatBufferResolution;
 	glm::uvec2 presentBufferResolution;
 
-	glm::vec3 mouseLoc;
+	glm::vec2 mouseLoc;
 
 	int numRays{ 64 * 250 };
 	int numBounces{ 256 };
