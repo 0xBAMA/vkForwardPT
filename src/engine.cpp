@@ -140,8 +140,8 @@ void PrometheusInstance::Draw () {
 
 	// update the UBO contents
 	static float mouseX, mouseY;
-	SDL_GetMouseState( &mouseX, &mouseY );
-	globalData.mouseLoc = glm::vec2( mouseX, mouseY );
+	auto ret = SDL_GetMouseState( &mouseX, &mouseY );
+	globalData.mouseLoc = glm::vec3( mouseX, mouseY, ( ( ret & SDL_BUTTON_LEFT ) && !ImGui::GetIO().WantCaptureMouse ) ? 1.0f : 0.0f );
 	globalData.floatBufferResolution = glm::uvec2( ImageBufferResolution.width, ImageBufferResolution.height );
 	globalData.presentBufferResolution = glm::uvec2( drawExtent.width, drawExtent.height );
 	globalData.frameNumber = frameNumber;
@@ -846,12 +846,12 @@ void PrometheusInstance::initResources () {
 	} () );
 
 	const float size = 30.0f;
-	for ( int i = 0; i < 5000; i++ ) {
+	for ( int i = 0; i < 500; i++ ) {
 		const vec2 p = vec2(
 			std::uniform_real_distribution< float >( 10, ImageBufferResolution.width - 10 )( seedRNG ),
 			std::uniform_real_distribution< float >( 700, ImageBufferResolution.height - 700 )( seedRNG )
 		);
-		const float r = std::uniform_real_distribution< float >( 25.0f, 35.0f )( seedRNG );
+		const float r = std::uniform_real_distribution< float >( 5.0f, 35.0f )( seedRNG );
 		if ( i % 16 != 0 )
 			addSegment( p, p + vec2(
 				std::uniform_real_distribution< float >( -size, size )( seedRNG ),
