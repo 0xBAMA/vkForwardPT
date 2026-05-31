@@ -35,6 +35,9 @@ using namespace std::chrono_literals;
 
 #include <third_party/stb/stb_image_write.h>
 
+// heightmap gen
+#include <third_party/diamondSquare/diamondSquare.h>
+
 void PrometheusInstance::SetDebugName ( VkObjectType type, uint64_t handle, const char* name ) {
 	// Must call extension functions through a function pointer:
 	PFN_vkSetDebugUtilsObjectNameEXT pfnSetDebugUtilsObjectNameEXT = ( PFN_vkSetDebugUtilsObjectNameEXT ) vkGetInstanceProcAddr( instance, "vkSetDebugUtilsObjectNameEXT" );
