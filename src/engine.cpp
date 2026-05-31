@@ -628,6 +628,7 @@ void PrometheusInstance::initVulkan () {
 		.set_minimum_version( 1, 3 )
 		.set_required_features_13( features13 )
 		.set_required_features_12( features12 )
+		.add_required_extension( "VK_KHR_maintenance9" )
 		.set_surface( surface )
 		.select()
 		.value();
@@ -741,14 +742,15 @@ void PrometheusInstance::initSyncStructures () {
 	// and space for the timestamps (32 pairs as a max for now shouldn't be an issue)
 		VkQueryPoolCreateInfo query_pool_info{};
 		query_pool_info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+		query_pool_info.flags = VK_QUERY_POOL_CREATE_RESET_BIT_KHR;
 		query_pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
 		query_pool_info.queryCount = timer.maxQueries;
 		VK_CHECK( vkCreateQueryPool( device, &query_pool_info, nullptr, &frameData[ i ].queryPools ) );
+
 		mainDeletionQueue.push_function( [ = ] () {
 			vkDestroyQueryPool( device, frameData[ i ].queryPools, nullptr );
 		});
 	}
-
 
 	swapchainPresentSemaphores.resize( swapchainImages.size() );
 	for ( size_t i = 0; i < swapchainImages.size(); i++ ) {
