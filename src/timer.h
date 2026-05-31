@@ -124,10 +124,9 @@ public:
 			t.tStopCPU = std::chrono::duration_cast<std::chrono::microseconds>(  queries_CPU[ i ].tStop - t0 ).count() / 1000.0f;
 
 			// fmt::print( "{} runs {}ms to {}ms (CPU) and {}ms to {}ms (GPU)\n", t.label, t.tStartCPU, t.tStopCPU, t.tStartGPU, t.tStopGPU );
-
 			timingResults.push_back( t );
 		}
-		fmt::print( "\n\n" );
+		// fmt::print( "\n\n" );
 	}
 };
 

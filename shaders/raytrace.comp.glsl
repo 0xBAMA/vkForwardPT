@@ -473,7 +473,7 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 							result.dist = dClosest = t;
 
 							// todo material properties
-							result.materialType = SELLMEIER_BOROSILICATE_BK7;
+							result.materialType = ( ( primitiveBaseIdx / 16 ) % 6 == 0 ) ? DIFFUSE : SELLMEIER_BOROSILICATE_BK7;
 							result.IoR = getIORForMaterial( result.materialType );
 							result.roughness = 0.0f;
 							result.albedo = 0.99f;
