@@ -628,7 +628,7 @@ void PrometheusInstance::initVulkan () {
 		.set_minimum_version( 1, 3 )
 		.set_required_features_13( features13 )
 		.set_required_features_12( features12 )
-		.add_required_extension( "VK_KHR_maintenance9" )
+		.add_required_extension( "VK_KHR_maintenance9" ) // for VK_QUERY_POOL_CREATE_RESET_BIT_KHR
 		.set_surface( surface )
 		.select()
 		.value();
