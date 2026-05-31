@@ -23,6 +23,11 @@ void main () {
 	int idx = gl_VertexIndex / 2;
 	raySegment r = rays[ idx ];
 
-	gl_Position = vec4( ( gl_VertexIndex % 2 == 0 ) ? r.a : r.b, 0.5f, 1.0f );
+	if ( r.brightness == 0.0f ) {
+		// unused segments shouldn't be drawn
+		gl_Position = vec4( -10000.0f );
+	} else {
+		gl_Position = vec4( ( gl_VertexIndex % 2 == 0 ) ? r.a : r.b, 0.5f, 1.0f );
+	}
 	colorRGB = wl_rgb( r.wavelength ) * r.brightness;
 }
