@@ -911,6 +911,42 @@ void PrometheusInstance::initResources () {
 	});
 }
 
+static inline VkImageMemoryBarrier2 makeImageBarrier ( VkImage img, VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess, VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess ) {
+	return VkImageMemoryBarrier2 {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+		.srcStageMask = srcStage,
+		.srcAccessMask = srcAccess,
+		.dstStageMask = dstStage,
+		.dstAccessMask = dstAccess,
+		.oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+		.newLayout = VK_IMAGE_LAYOUT_GENERAL,
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.image = img,
+		.subresourceRange = {
+			VK_IMAGE_ASPECT_COLOR_BIT, 0,
+			VK_REMAINING_MIP_LEVELS,
+			0,
+			VK_REMAINING_ARRAY_LAYERS
+		}
+	};
+}
+
+static VkBufferMemoryBarrier2 makeBufferBarrier ( VkBuffer buf, VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess, VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess ) {
+	return VkBufferMemoryBarrier2 {
+		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+		.srcStageMask = srcStage,
+		.srcAccessMask = srcAccess,
+		.dstStageMask = dstStage,
+		.dstAccessMask = dstAccess,
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.buffer = buf,
+		.offset = 0,
+		.size = VK_WHOLE_SIZE
+	};
+}
+
 void PrometheusInstance::initComputePasses () {
 	{ // Raytrace update
 		{ // descriptor layout
@@ -1008,20 +1044,7 @@ void PrometheusInstance::initComputePasses () {
 			// dispatch for all the pixels
 			vkCmdDispatch( cmd, globalData.numRays / 64, 1, 1 );
 
-			VkBufferMemoryBarrier2 bufferBarrier {
-				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
-
-				.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
-
-				.buffer = rayBuffer.buffer,
-				.offset = 0,
-				.size = VK_WHOLE_SIZE,
-			};
-
+			VkBufferMemoryBarrier2 bufferBarrier = makeBufferBarrier( rayBuffer.buffer, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT );
 			VkDependencyInfo barrierDependency {
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
 				.bufferMemoryBarrierCount = 1,
@@ -1148,37 +1171,8 @@ void PrometheusInstance::initComputePasses () {
 			const uint32_t& fillValueU32 = reinterpret_cast< const uint32_t& >( fillValue );
 			vkCmdFillBuffer( cmd, rayBuffer.buffer, 0, globalData.numBounces * globalData.numRays * sizeof( raySegment ), fillValueU32 );
 
-			VkImageMemoryBarrier2 barrierC {
-				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-
-				.srcStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
-				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
-
-				// now the blur has finished, we are using the filtered reads until the next agent raster
-				.oldLayout = VK_IMAGE_LAYOUT_GENERAL,
-				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
-
-				.image = lineColorAttachment.image,
-				.subresourceRange = {
-					VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
-				}
-			};
-
-			VkBufferMemoryBarrier2 barrierB {
-				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
-				.srcStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
-				.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
-
-				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.buffer = rayBuffer.buffer,
-				.offset = 0,
-				.size = VK_WHOLE_SIZE
-			};
+			VkImageMemoryBarrier2 barrierC = makeImageBarrier( lineColorAttachment.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT );
+			VkBufferMemoryBarrier2 barrierB = makeBufferBarrier( rayBuffer.buffer, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT );
 
 			VkDependencyInfo barrierDependency {
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -1275,25 +1269,7 @@ void PrometheusInstance::initComputePasses () {
 			// and the actual compute dispatch for pixels - this is sized for the full buffer
 			vkCmdDispatch( cmd, ( ImageBufferResolution.width + 15 ) / 16, ( ImageBufferResolution.height + 15 ) / 16, 1 );
 
-			VkImageMemoryBarrier2 barrierC {
-				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-
-				.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
-
-				// now the blur has finished, we are using the filtered reads until the next agent raster
-				.oldLayout = VK_IMAGE_LAYOUT_GENERAL,
-				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
-
-				.image = drawImage.image,
-				.subresourceRange = {
-					VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
-				}
-			};
-
+			VkImageMemoryBarrier2 barrierC = makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT );
 			VkDependencyInfo barrierDependency {
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
 				.imageMemoryBarrierCount = 1,
@@ -1437,25 +1413,7 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdDraw( cmd, ( 1 << 16 ), 1, 0, 0 );
 			vkCmdEndRendering( cmd );
 
-			VkImageMemoryBarrier2 barrierC {
-				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-
-				.srcStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
-				.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-
-				.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
-
-				// now the blur has finished, we are using the filtered reads until the next agent raster
-				.oldLayout = VK_IMAGE_LAYOUT_GENERAL,
-				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
-
-				.image = drawImage.image,
-				.subresourceRange = {
-					VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
-				}
-			};
-
+			VkImageMemoryBarrier2 barrierC = makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_READ_BIT );
 			VkDependencyInfo barrierDependency {
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
 				.imageMemoryBarrierCount = 1,
