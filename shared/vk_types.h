@@ -17,9 +17,15 @@
 #include <vk_mem_alloc.h>
 
 #include <fmt/core.h>
-
+#define GLM_ENABLE_EXPERIMENTAL
+#define GLM_FORCE_SWIZZLE
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
+#include <glm/gtx/rotate_vector.hpp>
+#include <glm/gtc/packing.hpp>
+#include <glm/gtx/string_cast.hpp>
+
 //< intro 
 
 // we will add our main reusable types here
