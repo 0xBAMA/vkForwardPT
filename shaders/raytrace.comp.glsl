@@ -181,11 +181,6 @@ bool isRefractive ( int id ) {
 	return id >= CAUCHY_FUSEDSILICA;
 }
 
-mat2 Rotate2D ( in float a ) {
-	float c = cos( a ), s = sin( a );
-	return mat2( c, s, -s, c );
-}
-
 // Hash by David_Hoskins
 #define UI0 1597334673U
 #define UI1 3812015801U
