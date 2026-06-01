@@ -5,7 +5,8 @@ layout( push_constant ) uniform constants {
 	uint wangSeed;
 } PushConstants;
 
-#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_scalar_block_layout : require  // for packing in the UBO
+#extension GL_EXT_shader_16bit_storage : require // for 8 and 16 bit types
 
 //=========================================================
 // Global config etc data in a UBO
@@ -29,7 +30,7 @@ layout( set = 0, binding = 0, scalar ) uniform globalData {
 	float gridScalar;
 	ivec2 gridDims;
 
-	// nsight layout: vec2u; vec2u; vec2; int; int; int; int; int; float; float; float; vec2i;
+	// nsight layout: vec2u; vec2u; vec4; int; int; int; int; int; float; float; float; vec2i;
 } GlobalData;
 //=========================================================
 

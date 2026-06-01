@@ -852,7 +852,7 @@ void PrometheusInstance::initResources () {
 	} () );
 
 	const float size = 30.0f;
-	for ( int i = 0; i < 5000; i++ ) {
+	for ( int i = 0; i < 15000; i++ ) {
 		const vec2 p = vec2(
 			std::uniform_real_distribution< float >( 10, ImageBufferResolution.width - 10 )( seedRNG ),
 			std::uniform_real_distribution< float >( 700, ImageBufferResolution.height - 700 )( seedRNG )
@@ -1636,10 +1636,13 @@ void PrometheusInstance::bufferRebuild () {
 		// the prefix buffer, which keeps the starting index for each cell and the number of elements per cell
 
 	uint32_t i = 0;
+	size_t cMax = 0;
 	for ( auto& cell : gridCellList ) {
 		// keeping index of first and the count
 		prefixValues.push_back( i );
 		prefixValues.push_back( cell.size() );
+
+		cMax = std::max( cMax, cell.size() );
 
 		// add the variable stride grid values
 		for ( auto& element : cell ) {
@@ -1647,6 +1650,8 @@ void PrometheusInstance::bufferRebuild () {
 			i++; // increment current index
 		}
 	}
+
+	fmt::print( "max count is {}\n", cMax );
 
 	// so at the end, we have built three buffers:
 		// geometry buffer -> 16 float representations
