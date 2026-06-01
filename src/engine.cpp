@@ -143,8 +143,11 @@ void PrometheusInstance::Draw () {
 
 	// update the UBO contents
 	static float mouseX, mouseY;
-	SDL_GetMouseState( &mouseX, &mouseY );
-	globalData.mouseLoc = glm::vec2( mouseX, mouseY );
+	auto ret = SDL_GetMouseState( &mouseX, &mouseY );
+	globalData.mouseLoc.x = mouseX;
+	globalData.mouseLoc.y = mouseY;
+	globalData.mouseLoc.z = ( ret & SDL_BUTTON_LEFT && !ImGui::GetIO().WantCaptureMouse ) ? 1.0f : 0.0f;
+	globalData.mouseLoc.w = ( ret & SDL_BUTTON_RIGHT && !ImGui::GetIO().WantCaptureMouse ) ? 1.0f : 0.0f;
 	globalData.floatBufferResolution = glm::uvec2( ImageBufferResolution.width, ImageBufferResolution.height );
 	globalData.presentBufferResolution = glm::uvec2( drawExtent.width, drawExtent.height );
 	globalData.frameNumber = frameNumber;
@@ -332,9 +335,9 @@ void PrometheusInstance::MainLoop () {
 		}
 
 		static glm::vec2 lastMousePos = glm::vec2( 0.0f );
-		if ( distance( lastMousePos, globalData.mouseLoc ) > 8.0f ) {
+		if ( distance( lastMousePos, globalData.mouseLoc.xy() ) > 8.0f ) {
 			globalData.reset = true;
-			lastMousePos = globalData.mouseLoc;
+			lastMousePos = globalData.mouseLoc.xy();
 		}
 
 		// handling minimized application

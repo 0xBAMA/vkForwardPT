@@ -590,7 +590,7 @@ void main () {
 
 	if ( lightPick == 0 ) {
 		// this is the mouse light
-		rayOrigin = subpixelJitter + GlobalData.mouseLoc + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
+		rayOrigin = subpixelJitter + GlobalData.mouseLoc.xy + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 	} else {
 		rayOrigin = subpixelJitter + params.position + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 	}

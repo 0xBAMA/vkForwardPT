@@ -14,7 +14,7 @@ layout( set = 0, binding = 0, scalar ) uniform globalData {
 	uvec2 floatBufferResolution;
 	uvec2 presentBufferResolution;
 
-	vec2 mouseLoc;
+	vec4 mouseLoc;
 
 	int numRays;
 	int numBounces;
