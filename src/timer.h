@@ -140,15 +140,18 @@ public:
 	queryPair_CPU c;
 
 	string s;
+	bool disableGPU;
 
-	unscopedTimer ( string label ) : q( label ), c( label ), s( label ) {}
+	unscopedTimer ( string label, bool _disableGPU = false ) : q( label ), c( label ), s( label ), disableGPU( _disableGPU ) {}
 
 	void tick () { // explicitly start the timer / insert initial timestamp
 		// GPU timestamp
-		int idx = timerManager->currentIndex;
-		vkCmdWriteTimestamp( * ( timerManager->cmd ), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, * ( timerManager->pool ), idx );
-		q.tStampStart = idx;
-		timerManager->currentIndex++;
+		if ( !disableGPU ) {
+			int idx = timerManager->currentIndex;
+			vkCmdWriteTimestamp( * ( timerManager->cmd ), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, * ( timerManager->pool ), idx );
+			q.tStampStart = idx;
+			timerManager->currentIndex++;
+		}
 
 		// CPU timestamp
 		c.tStart = std::chrono::system_clock::now();
@@ -156,10 +159,12 @@ public:
 
 	void tock () { // explicitly end the timer / insert final timestamp
 		// GPU timestamp
-		int idx = timerManager->currentIndex;
-		vkCmdWriteTimestamp( * ( timerManager->cmd ), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, * ( timerManager->pool ), idx );
-		q.tStampEnd = idx;
-		timerManager->currentIndex++;
+		if ( !disableGPU ) {
+			int idx = timerManager->currentIndex;
+			vkCmdWriteTimestamp( * ( timerManager->cmd ), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, * ( timerManager->pool ), idx );
+			q.tStampEnd = idx;
+			timerManager->currentIndex++;
+		}
 
 		// CPU timestamp
 		c.tStop = std::chrono::system_clock::now();
