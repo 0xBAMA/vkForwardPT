@@ -1517,116 +1517,133 @@ void PrometheusInstance::initComputePasses () {
 }
 
 void PrometheusInstance::bufferRebuild () {
-	// retained memory for the grid + resize logic
-	globalData.gridDims = glm::ivec2(
-		( std::floor( globalData.floatBufferResolution.x / globalData.gridScalar ) + 1 ),
-		( std::floor( globalData.floatBufferResolution.y / globalData.gridScalar ) + 1 ) );
 
-	const int numGridCells = globalData.gridDims.x * globalData.gridDims.y;
 	static std::vector< std::set< uint32_t > > gridCellList;
-	if ( gridCellList.size() != numGridCells ) {
-		gridCellList.resize( numGridCells );
+	{
+		unscopedTimer t ( "timer", true );
+		t.tick();
+
+		// retained memory for the grid + resize logic
+		globalData.gridDims = glm::ivec2(
+			( std::floor( globalData.floatBufferResolution.x / globalData.gridScalar ) + 1 ),
+			( std::floor( globalData.floatBufferResolution.y / globalData.gridScalar ) + 1 ) );
+
+		const int numGridCells = globalData.gridDims.x * globalData.gridDims.y;
+		if ( gridCellList.size() != numGridCells ) {
+			gridCellList.resize( numGridCells );
+		}
+
+		// I think for now we're clearing everything
+		for ( auto& cell : gridCellList ) {
+			cell.clear();
+		}
+
+		t.tock();
+		fmt::print( "prep stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 	}
 
-	// I think for now we're clearing everything
-	for ( auto& cell : gridCellList ) {
-		cell.clear();
-	}
-
-	// start by resetting the global dirty flag
-	geometryListDirty = false;
-
-	// 16-float structs
 	static std::vector< float > preppedGeoBuffer;
-	preppedGeoBuffer.clear();
-	preppedGeoBuffer.reserve( geometryList.size() * 16 );
-
 	// grid buffer holds indices, prefix holds index of first entry + count per cell
 	std::vector < uint32_t > prefixValues;
 	std::vector < uint32_t > gridValues;
 
-	const float epsilon = 0.001f;
-	uint32_t idx { 0 };
+	{
+		unscopedTimer t ( "timer", true );
+		t.tick();
 
-	// iterating through the list of geometry
+		// start by resetting the global dirty flag
+		geometryListDirty = false;
+
+		// 16-float structs
+		preppedGeoBuffer.clear();
+		preppedGeoBuffer.reserve( geometryList.size() * 16 );
+
+		const float epsilon = 0.001f;
+		uint32_t idx { 0 };
+
+		// iterating through the list of geometry
 		// reset all the dirty flags
 		// create the GPU buffer of 16-float structs
 
-	for ( auto& primitive : geometryList ) {
-		primitive.touchedSinceLastUpdate = false; // kind of useless right now, useful optimization later
+		for ( auto& primitive : geometryList ) {
+			primitive.touchedSinceLastUpdate = false; // kind of useless right now, useful optimization later
 
-		// we need to put together the geometry buffer
-		for ( auto& element : primitive.values ) {
-			preppedGeoBuffer.emplace_back( element );
-		}
+			// we need to put together the geometry buffer
+			for ( auto& element : primitive.values ) {
+				preppedGeoBuffer.emplace_back( element );
+			}
 
-		// the geometry gets now splatted into a grid structure
+			// the geometry gets now splatted into a grid structure
 			// the grid structure is kept in a 1D array...
 			// each cell has a vector of primitives
 
-		auto boundsCheck = [&]( vec2 p ) { return p.x < globalData.floatBufferResolution.x && p.y < globalData.floatBufferResolution.y && p.x >= 0.0f && p.y >= 0.0f; };
+			auto boundsCheck = [&]( vec2 p ) { return p.x < globalData.floatBufferResolution.x && p.y < globalData.floatBufferResolution.y && p.x >= 0.0f && p.y >= 0.0f; };
 
-		// the last float has the identifier...
-		int primitiveType = int( primitive.values[ 15 ] );
-		switch ( primitiveType ) { // each primitive will need to splat differently...
-		// calling insert with idx puts this index into that cell, we want to keep that index only
-			// this represents an element in the geometry list - more or less equivalent to a pointer
+			// the last float has the identifier...
+			int primitiveType = int( primitive.values[ 15 ] );
+			switch ( primitiveType ) { // each primitive will need to splat differently...
+				// calling insert with idx puts this index into that cell, we want to keep that index only
+				// this represents an element in the geometry list - more or less equivalent to a pointer
 
-		case 0: { // line segment - DDA would be better solution
-			// values are stored ax, ay, bx, by
-			const vec2 a = vec2( primitive.values[ 0 ], primitive.values[ 1 ] );
-			const vec2 b = vec2( primitive.values[ 2 ], primitive.values[ 3 ] );
-			const float d = glm::length( a - b );
-			vec2 p = vec2( 0.0f );
+			case 0: { // line segment - DDA would be better solution
+				// values are stored ax, ay, bx, by
+				const vec2 a = vec2( primitive.values[ 0 ], primitive.values[ 1 ] );
+				const vec2 b = vec2( primitive.values[ 2 ], primitive.values[ 3 ] );
+				const float d = glm::length( a - b );
+				vec2 p = vec2( 0.0f );
 
-			// iterating over the segment's length
-			for ( auto xo : { -1.0f, 0.0f, 1.0f } )
-			for ( auto yo : { -1.0f, 0.0f, 1.0f } )
-			for ( float t = 0.0f; t <= d; t += 0.1f ) {
-				// grid may not be per-pixel...
-				p = glm::mix( a, b, t / d ) + vec2( xo, yo );
-				glm::ivec2 pGrid = glm::ivec2( p / globalData.gridScalar );
+				// iterating over the segment's length
+				for ( auto xo : { -1.0f, 0.0f, 1.0f } )
+					for ( auto yo : { -1.0f, 0.0f, 1.0f } )
+						for ( float t = 0.0f; t <= d; t += 0.1f ) {
+							// grid may not be per-pixel...
+							p = glm::mix( a, b, t / d ) + vec2( xo, yo );
+							glm::ivec2 pGrid = glm::ivec2( p / globalData.gridScalar );
 
-				// and insert into the grid structure
-				if ( boundsCheck( pGrid ) ) {
-					gridCellList[ pGrid.x + globalData.gridDims.x * pGrid.y ].insert( idx );
-				}
+							// and insert into the grid structure
+							if ( boundsCheck( pGrid ) ) {
+								gridCellList[ pGrid.x + globalData.gridDims.x * pGrid.y ].insert( idx );
+							}
+						}
+				break;
 			}
-			break;
-		}
 
-		case 1: {
-			// circular arcs
+			case 1: {
+				// circular arcs
 				// centerx, centery, radius, thetastart, thetaend is the order
-			const vec2 center = vec2( primitive.values[ 0 ], primitive.values[ 1 ] );
-			const float radius = primitive.values[ 2 ];
-			const float thetaStart = primitive.values[ 3 ];
-			const float thetaEnd = primitive.values[ 4 ];
+				const vec2 center = vec2( primitive.values[ 0 ], primitive.values[ 1 ] );
+				const float radius = primitive.values[ 2 ];
+				const float thetaStart = primitive.values[ 3 ];
+				const float thetaEnd = primitive.values[ 4 ];
 
-			const float span = abs( thetaStart - thetaEnd );
-			const float circ = span * ( 2.0f * pi * radius );
+				const float span = abs( thetaStart - thetaEnd );
+				const float circ = span * ( 2.0f * pi * radius );
 
-			const float thetaIncrement = 0.618f / circ;
-			for ( float t = thetaStart - epsilon; t <= thetaEnd + epsilon; t += thetaIncrement ) {
-				for ( auto adj : { -0.1f, 0.0f, 0.1f } ) { // kind of an expensive way to do this
-					glm::vec2 p = glm::ivec2( ( center + ( radius + adj ) * vec2( cos( t ), sin( t ) ) ) / globalData.gridScalar );
-					if ( boundsCheck( p ) ) {
-						gridCellList[ p.x + globalData.gridDims.x * p.y ].insert( idx );
+				const float thetaIncrement = 0.618f / circ;
+				for ( float t = thetaStart - epsilon; t <= thetaEnd + epsilon; t += thetaIncrement ) {
+					for ( auto adj : { -0.1f, 0.0f, 0.1f } ) { // kind of an expensive way to do this
+						glm::vec2 p = glm::ivec2( ( center + ( radius + adj ) * vec2( cos( t ), sin( t ) ) ) / globalData.gridScalar );
+						if ( boundsCheck( p ) ) {
+							gridCellList[ p.x + globalData.gridDims.x * p.y ].insert( idx );
+						}
 					}
 				}
+				break;
 			}
-			break;
+
+				// case 2: // parabola - todo
+				// break;
+
+			default: // need to specify a shape if it is in the primitives list
+				break;
+			}
+
+			// incrementing, now that splatting is finished
+			idx++;
 		}
 
-		// case 2: // parabola - todo
-			// break;
-
-		default: // need to specify a shape if it is in the primitives list
-			break;
-		}
-
-		// incrementing, now that splatting is finished
-		idx++;
+		t.tock();
+		fmt::print( "splat stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 	}
 
 	// this data goes into the buffer
@@ -1634,69 +1651,76 @@ void PrometheusInstance::bufferRebuild () {
 	// once all the splatting has happened, we need to build the two GPU buffers:
 		// this grid, compacted so that the variable stride elements come one after another
 		// the prefix buffer, which keeps the starting index for each cell and the number of elements per cell
+	{
+		unscopedTimer t ( "timer", true );
+		t.tick();
 
-	uint32_t i = 0;
-	size_t cMax = 0;
-	for ( auto& cell : gridCellList ) {
-		// keeping index of first and the count
-		prefixValues.push_back( i );
-		prefixValues.push_back( cell.size() );
+		uint32_t i = 0;
+		size_t cMax = 0;
+		for ( auto& cell : gridCellList ) {
+			// keeping index of first and the count
+			prefixValues.push_back( i );
+			prefixValues.push_back( cell.size() );
 
-		cMax = std::max( cMax, cell.size() );
+			cMax = std::max( cMax, cell.size() );
 
-		// add the variable stride grid values
-		for ( auto& element : cell ) {
-			gridValues.push_back( element );
-			i++; // increment current index
+			// add the variable stride grid values
+			for ( auto& element : cell ) {
+				gridValues.push_back( element );
+				i++; // increment current index
+			}
 		}
-	}
 
-	fmt::print( "max count is {}\n", cMax );
+		fmt::print( "max count is {}\n", cMax );
 
-	// so at the end, we have built three buffers:
+		// so at the end, we have built three buffers:
 		// geometry buffer -> 16 float representations
 		// grid buffer     -> the variable stride index values, contains the contents of the cell
 		// prefix buffer   -> the index of first element and element count, per cell
 
-	static bool firstTime = true;
-	if ( !firstTime ) {
-		// delete the buffers if they have been created
-		destroyBuffer( GeometryBuffer );
-		destroyBuffer( GridBuffer );
-		destroyBuffer( PrefixBuffer );
-		firstTime = false;
-	}
-
-	// create the buffers, with the current contents...
-	GeometryBuffer	= createBuffer( preppedGeoBuffer.size() * sizeof( float ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
-	SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GeometryBuffer.buffer, "BVH Geometry Buffer" );
-	GridBuffer		= createBuffer( gridValues.size() * sizeof( uint32_t ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
-	SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GridBuffer.buffer, "BVH Grid Buffer" );
-	PrefixBuffer	= createBuffer( prefixValues.size() * sizeof( uint32_t ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
-	SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) PrefixBuffer.buffer, "BVH Prefix Buffer" );
-
-	// need to do something to visualize the buffers
-	/*
-	std::vector< uint8_t > values;
-	bool invert = true;
-	for ( auto& v : prefixValues ) {
-		if ( invert == true ) {
-			invert = false;
-		} else {
-			invert = true;
-			values.push_back( v * 100 );
-			values.push_back( v * 100 );
-			values.push_back( v * 100 );
-			values.push_back( 255 );
+		static bool firstTime = true;
+		if ( !firstTime ) {
+			// delete the buffers if they have been created
+			destroyBuffer( GeometryBuffer );
+			destroyBuffer( GridBuffer );
+			destroyBuffer( PrefixBuffer );
+			firstTime = false;
 		}
-	}
-	stbi_write_png( "test.png", globalData.gridDims.x, globalData.gridDims.y, 4, values.data(), globalData.gridDims.x * 4 );
-	*/
 
-	// transferring prepped data to the new buffers
-	memcpy( GeometryBuffer.info.pMappedData, preppedGeoBuffer.data(), preppedGeoBuffer.size() * sizeof( float ) );
-	memcpy( GridBuffer.info.pMappedData, gridValues.data(), gridValues.size() * sizeof( uint32_t ) );
-	memcpy( PrefixBuffer.info.pMappedData, prefixValues.data(), prefixValues.size() * sizeof( uint32_t ) );
+		// create the buffers, with the current contents...
+		GeometryBuffer	= createBuffer( preppedGeoBuffer.size() * sizeof( float ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GeometryBuffer.buffer, "BVH Geometry Buffer" );
+		GridBuffer		= createBuffer( gridValues.size() * sizeof( uint32_t ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GridBuffer.buffer, "BVH Grid Buffer" );
+		PrefixBuffer	= createBuffer( prefixValues.size() * sizeof( uint32_t ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) PrefixBuffer.buffer, "BVH Prefix Buffer" );
+
+		// need to do something to visualize the buffers
+		/*
+		std::vector< uint8_t > values;
+		bool invert = true;
+		for ( auto& v : prefixValues ) {
+			if ( invert == true ) {
+				invert = false;
+			} else {
+				invert = true;
+				values.push_back( v * 100 );
+				values.push_back( v * 100 );
+				values.push_back( v * 100 );
+				values.push_back( 255 );
+			}
+		}
+		stbi_write_png( "test.png", globalData.gridDims.x, globalData.gridDims.y, 4, values.data(), globalData.gridDims.x * 4 );
+		*/
+
+		// transferring prepped data to the new buffers
+		memcpy( GeometryBuffer.info.pMappedData, preppedGeoBuffer.data(), preppedGeoBuffer.size() * sizeof( float ) );
+		memcpy( GridBuffer.info.pMappedData, gridValues.data(), gridValues.size() * sizeof( uint32_t ) );
+		memcpy( PrefixBuffer.info.pMappedData, prefixValues.data(), prefixValues.size() * sizeof( uint32_t ) );
+
+		t.tock();
+		fmt::print( "upload stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+	}
 }
 
 // adding primitives to the geometry list
