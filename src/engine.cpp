@@ -1516,6 +1516,34 @@ void PrometheusInstance::initComputePasses () {
 	}
 }
 
+void PrometheusInstance::bufferRebuildGPU () {
+	// there are a few buffers which only exist temporarily, for this function
+	AllocatedBuffer bboxBuffer;				// min, max on x, y, per primitive
+	AllocatedBuffer uncompactedGridBuffer;	// preallocated space for up to 15 primitives (+ count, stride of 16 floats)
+
+	// and two pipelines which exist only for this
+	static ComputeEffect BBoxPrecompute;
+	static ComputeEffect UncompactedGridPrecompute;
+	static bool initialized = false;
+
+	if ( !initialized ) {
+		// create the pipelines for this operation
+
+	}
+
+	// 1: upload the 16-float geometry structs
+
+	// 2: create the buffers (BBox storage + uncompacted grid)
+
+	// 3: immediate submit for BBox precompute
+
+	// 4: immediate submit for uncompacted grid buffer evaluation
+
+	// 5: pull the uncompacted grid buffer to the CPU
+
+	// 6: stepping through by 16's (we only support up to 16 primitives per grid cell)
+}
+
 void PrometheusInstance::bufferRebuild () {
 
 	static std::vector< std::set< uint32_t > > gridCellList;
