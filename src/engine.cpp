@@ -165,7 +165,8 @@ void PrometheusInstance::Draw () {
 	}
 
 	if ( geometryListDirty ) {
-		bufferRebuild();
+		// bufferRebuild();
+		bufferRebuildGPU();
 	}
 
 	// start the command buffer recording
@@ -1517,6 +1518,8 @@ void PrometheusInstance::initComputePasses () {
 }
 
 void PrometheusInstance::bufferRebuildGPU () {
+
+
 	// there are a few buffers which only exist temporarily, for this function
 	AllocatedBuffer bboxBuffer;				// min, max on x, y, per primitive
 	AllocatedBuffer uncompactedGridBuffer;	// preallocated space for up to 15 primitives (+ count, stride of 16 floats)
@@ -1536,62 +1539,57 @@ void PrometheusInstance::bufferRebuildGPU () {
 		t.tock();
 	}
 
-	// 1: upload the 16-float geometry structs
-	{
+	{ // 1: upload the 16-float geometry structs
 		t.tick();
 
 		fmt::print( "initial upload stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
 
-	// 2: create the buffers (BBox storage + uncompacted grid)
-	{
+	{ // 2: create the buffers (BBox storage + uncompacted grid)
 		t.tick();
 
 		fmt::print( "buffer create stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
 
-	// 3: immediate submit for BBox precompute
-	{
+	{ // 3: immediate submit for BBox precompute
 		t.tick();
 
 		fmt::print( "bbox precompute stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
 
-
-	// 4: immediate submit for uncompacted grid buffer evaluation
-	{
+	{ // 4: immediate submit for uncompacted grid buffer evaluation
 		t.tick();
 
 		fmt::print( "uncompacted grid eval stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
 
-	// 5: pull the uncompacted grid buffer to the CPU
-	{
+	{ // 5: pull the uncompacted grid buffer to the CPU
 		t.tick();
 
 		fmt::print( "buffer download stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
 
-	// 6: stepping through by 16's (we only support up to 16 primitives per grid cell)
-	{
+	{ // 6: stepping through by 16's (we only support up to 16 primitives per grid cell)
 		t.tick();
 
 		fmt::print( "buffer process stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
 
-	// 7: upload the buffers used by the runtime traversal
-	{
+	{ // 7: upload the buffers used by the runtime traversal
 		t.tick();
 
 		fmt::print( "final buffer upload stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
+
+	// and we have passed the new data to the GPU
+	geometryListDirty = false;
 }
 
 void PrometheusInstance::bufferRebuild () {
@@ -1644,7 +1642,7 @@ void PrometheusInstance::bufferRebuild () {
 		// create the GPU buffer of 16-float structs
 
 		for ( auto& primitive : geometryList ) {
-			primitive.touchedSinceLastUpdate = false; // kind of useless right now, useful optimization later
+			// primitive.touchedSinceLastUpdate = false; // kind of useless right now, useful optimization later
 
 			// we need to put together the geometry buffer
 			for ( auto& element : primitive.values ) {
@@ -1812,7 +1810,7 @@ void PrometheusInstance::addSegment ( vec2 a, vec2 b, int material, bool invert 
 	s.values[ 13 ] = material;
 	s.values[ 14 ] = invert ? 1.0f : 0.0f;
 	s.values[ 15 ] = 0; // line segment identifier
-	s.touchedSinceLastUpdate = true;
+	// s.touchedSinceLastUpdate = true;
 	geometryList.push_back( s );
 }
 
@@ -1827,7 +1825,7 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 	s.values[ 13 ] = material;
 	s.values[ 14 ] = invert ? 1.0f : 0.0f;
 	s.values[ 15 ] = 1; // ARC identifier
-	s.touchedSinceLastUpdate = true;
+	// s.touchedSinceLastUpdate = true;
 	geometryList.push_back( s );
 }
 

@@ -68,7 +68,7 @@ struct geometryStruct {
 		// ...
 
 	// this could operate as a per-primitive dirty flag, so that they can be removed from the grid prior to re-splatting (if grid is maintained)
-	bool touchedSinceLastUpdate = true;
+	// bool touchedSinceLastUpdate = true;
 };
 
 // common configuration across all shaders
