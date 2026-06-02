@@ -22,8 +22,8 @@ layout( set = 0, binding = 2, std430 ) buffer bboxBuffer {
 vec4 getBBox ( geometryStruct g ) {
 	vec4 bbox = vec4( 0.0f );
 	switch ( int( g.data[ 15 ] ) ) {
-	case 0: // this is a line segment
-	// segment mapping:
+	case 0: { // this is a line segment
+		// segment mapping:
 		// 0: a.x
 		// 1: a.y
 		// 2: b.x
@@ -43,20 +43,61 @@ vec4 getBBox ( geometryStruct g ) {
 		bbox.w = ceil( max( a.y, b.y ) );
 
 		break;
+	}
 
-	case 1: // this is a circular arc
+	case 1: { // this is a circular arc bbox
 	// arc mapping:
 		// 0: center.x
 		// 1: center.y
 		// 2: radius
-		// 3: thetaStart
-		// 4: thetaEnd
+		// 3: thetaMin
+		// 4: thetaMax
 		// 5-12: unused
 		// 13: material ID
 		// 14: invert flag
 		// 15: 1 -> circular arc
 
+		vec2 center = vec2( g.data[ 0 ], g.data[ 1 ] ) / globalData.gridScalar;
+		float r = g.data[ 2 ] / globalData.gridScalar;
+		float aMin = g.data[ 3 ]; // minimum angle
+		float aMax = g.data[ 4 ]; // maximum angle
+
+		// need to locate the two initial points
+		vec2 p0 = center + r * vec2( cos( aMin ), sin( aMin ) );
+		vec2 p1 = center + r * vec2( cos( aMax ), sin( aMax ) );
+
+		// initial values for a bounding box, since we know the endpoints are contained
+		vec2 bMin = min( p0, p1 );
+		vec2 bMax = max( p0, p1 );
+
+		// skipping any trig
+		if ( 0.0f >= aMin && 0.0f <= aMax ) {
+			bMin = min( bMin, center + vec2( r, 0.0f ) );
+			bMax = max( bMax, center + vec2( r, 0.0f ) );
+		}
+
+		if ( piHalf >= aMin && piHalf <= aMax ) {
+			bMin = min( bMin, center + vec2( 0.0f, r ) );
+			bMax = max( bMax, center + vec2( 0.0f, r ) );
+		}
+
+		if ( pi >= aMin && pi <= aMax ) {
+			bMin = min( bMin, center + vec2( -r, 0.0f ) );
+			bMax = max( bMax, center + vec2( -r, 0.0f ) );
+		}
+
+		if ( 3.0f * piHalf >= aMin && 3.0f * piHalf <= aMax ) {
+			bMin = min( bMin, center + vec2( 0.0f, -r ) );
+			bMax = max( bMax, center + vec2( 0.0f, -r ) );
+		}
+
+		bbox.x = floor( bMin.x );
+		bbox.y = ceil( bMax.x );
+		bbox.z = floor( bMin.y );
+		bbox.w = ceil( bMax.y );
+
 		break;
+	}
 
 	default:
 		break;
