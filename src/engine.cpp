@@ -1794,6 +1794,16 @@ void PrometheusInstance::bufferRebuild () {
 
 // adding primitives to the geometry list
 void PrometheusInstance::addSegment ( vec2 a, vec2 b, int material, bool invert ) {
+// segment mapping:
+	// 0: a.x
+	// 1: a.y
+	// 2: b.x
+	// 3: b.y
+	// 4-12: unused
+	// 13: material ID
+	// 14: invert flag
+	// 15: 0 -> line segment
+
 	geometryStruct * geoData = ( geometryStruct * ) GeometryBuffer.allocation->GetMappedData();
 	if ( globalData.numPrimitives < globalData.maxPrimitives ) {
 		geoData[ globalData.numPrimitives ].values[ 0 ] = a.x;
@@ -1810,6 +1820,17 @@ void PrometheusInstance::addSegment ( vec2 a, vec2 b, int material, bool invert 
 }
 
 void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, int material, bool invert ) {
+// arc mapping:
+	// 0: center.x
+	// 1: center.y
+	// 2: radius
+	// 3: thetaMin
+	// 4: thetaMax
+	// 5-12: unused
+	// 13: material ID
+	// 14: invert flag
+	// 15: 1 -> circular arc
+
 	geometryStruct * geoData = ( geometryStruct * ) GeometryBuffer.allocation->GetMappedData();
 	if ( globalData.numPrimitives < globalData.maxPrimitives ) {
 		geoData[ globalData.numPrimitives ].values[ 0 ] = center.x;

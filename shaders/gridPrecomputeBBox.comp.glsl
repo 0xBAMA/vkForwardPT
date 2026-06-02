@@ -7,15 +7,76 @@ layout ( local_size_x = 64 ) in;
 
 #include "common.h"
 
+struct geometryStruct {
+	float data[ 16 ];
+};
+
+layout( set = 0, binding = 1, std430 ) buffer geoBuffer {
+	geometryStruct geoData[];
+};
+
+layout( set = 0, binding = 2, std430 ) buffer bboxBuffer {
+	vec4 bboxes[];
+};
+
+vec4 getBBox ( geometryStruct g ) {
+	vec4 bbox = vec4( 0.0f );
+	switch ( int( g.data[ 15 ] ) ) {
+	case 0: // this is a line segment
+	// segment mapping:
+		// 0: a.x
+		// 1: a.y
+		// 2: b.x
+		// 3: b.y
+		// 4-12: unused
+		// 13: material ID
+		// 14: invert flag
+		// 15: 0 -> line segment
+
+		vec2 a = vec2( g.data[ 0 ], g.data[ 1 ] ) / globalData.gridScalar;
+		vec2 b = vec2( g.data[ 2 ], g.data[ 3 ] ) / globalData.gridScalar;
+
+		// computing grid space bbox
+		bbox.x = floor( min( a.x, b.x ) );
+		bbox.y = ceil( max( a.x, b.x ) );
+		bbox.z = floor( min( a.y, b.y ) );
+		bbox.w = ceil( max( a.y, b.y ) );
+
+		break;
+
+	case 1: // this is a circular arc
+	// arc mapping:
+		// 0: center.x
+		// 1: center.y
+		// 2: radius
+		// 3: thetaStart
+		// 4: thetaEnd
+		// 5-12: unused
+		// 13: material ID
+		// 14: invert flag
+		// 15: 1 -> circular arc
+
+		break;
+
+	default:
+		break;
+	}
+
+	return bbox;
+}
+
 void main () {
-	// bounds checking based on current primitive count
+	// 1D bounds checking based on current primitive count
 	const uint idx = gl_GlobalInvocationID.x;
 	if ( idx < GlobalData.numPrimitives ) {
 		// load the data for this primitive
+		geometryStruct g = geoData[ idx ];
 
 		// compute the bbox
+		vec4 bbox = getBBox( g );
 
 		// store the bbox parameters to the buffer
+		bboxes[ idx ] = bbox;
 
 	}
 }
