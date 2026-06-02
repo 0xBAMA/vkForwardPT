@@ -1801,32 +1801,36 @@ void PrometheusInstance::bufferRebuild () {
 
 // adding primitives to the geometry list
 void PrometheusInstance::addSegment ( vec2 a, vec2 b, int material, bool invert ) {
-	geometryStruct s;
-	s.values[ 0 ] = a.x;
-	s.values[ 1 ] = a.y;
-	s.values[ 2 ] = b.x;
-	s.values[ 3 ] = b.y;
+	geometryStruct * geoData = ( geometryStruct * ) GeometryBuffer.allocation->GetMappedData();
+	if ( numPrimitives < maxPrimitives ) {
+		geoData[ numPrimitives ].values[ 0 ] = a.x;
+		geoData[ numPrimitives ].values[ 1 ] = a.y;
+		geoData[ numPrimitives ].values[ 2 ] = b.x;
+		geoData[ numPrimitives ].values[ 3 ] = b.y;
 
-	s.values[ 13 ] = material;
-	s.values[ 14 ] = invert ? 1.0f : 0.0f;
-	s.values[ 15 ] = 0; // line segment identifier
-	// s.touchedSinceLastUpdate = true;
-	geometryList.push_back( s );
+		geoData[ numPrimitives ].values[ 13 ] = material;
+		geoData[ numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;
+		geoData[ numPrimitives ].values[ 15 ] = 0; // line segment identifier
+
+		numPrimitives++;
+	}
 }
 
 void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, int material, bool invert ) {
-	geometryStruct s;
-	s.values[ 0 ] = center.x;
-	s.values[ 1 ] = center.y;
-	s.values[ 2 ] = radius;
-	s.values[ 3 ] = thetaStart;
-	s.values[ 4 ] = thetaEnd;
+	geometryStruct * geoData = ( geometryStruct * ) GeometryBuffer.allocation->GetMappedData();
+	if ( numPrimitives < maxPrimitives ) {
+		geoData[ numPrimitives ].values[ 0 ] = center.x;
+		geoData[ numPrimitives ].values[ 1 ] = center.y;
+		geoData[ numPrimitives ].values[ 2 ] = radius;
+		geoData[ numPrimitives ].values[ 3 ] = thetaStart;
+		geoData[ numPrimitives ].values[ 4 ] = thetaEnd;
 
-	s.values[ 13 ] = material;
-	s.values[ 14 ] = invert ? 1.0f : 0.0f;
-	s.values[ 15 ] = 1; // ARC identifier
-	// s.touchedSinceLastUpdate = true;
-	geometryList.push_back( s );
+		geoData[ numPrimitives ].values[ 13 ] = material;
+		geoData[ numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;
+		geoData[ numPrimitives ].values[ 15 ] = 1; // ARC identifier
+
+		numPrimitives++;
+	}
 }
 
 void PrometheusInstance::lightManagerMaintenance () {
