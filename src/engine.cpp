@@ -1815,8 +1815,11 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 		geoData[ globalData.numPrimitives ].values[ 0 ] = center.x;
 		geoData[ globalData.numPrimitives ].values[ 1 ] = center.y;
 		geoData[ globalData.numPrimitives ].values[ 2 ] = radius;
-		geoData[ globalData.numPrimitives ].values[ 3 ] = thetaStart;
-		geoData[ globalData.numPrimitives ].values[ 4 ] = thetaEnd;
+
+		float thetaMin = std::min( thetaStart, thetaEnd );
+		float thetaMax = std::max( thetaStart, thetaEnd );
+		geoData[ globalData.numPrimitives ].values[ 3 ] = std::fmod( thetaMin, pi * 2.0f );
+		geoData[ globalData.numPrimitives ].values[ 4 ] = std::fmod( thetaMax, pi * 2.0f );
 
 		geoData[ globalData.numPrimitives ].values[ 13 ] = material;
 		geoData[ globalData.numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;
