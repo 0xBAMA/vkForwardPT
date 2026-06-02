@@ -190,6 +190,8 @@ public:
 	AllocatedBuffer PrefixBuffer;		// containing the prefix sums + counts for indexing the grid buffer
 	AllocatedBuffer GridBuffer;			// containing a packed list of each cell's contents (requires prefix buffer to operate)
 	AllocatedBuffer GeometryBuffer;		// containing the 16-float representations of the geometry
+	AllocatedBuffer BBoxBuffer;			// containing the scratch memory for the primitives' bounding boxes
+	AllocatedBuffer UncompactedGridBuffer; // scratch memory for GPU precomputation of grid
 
 	// eventually these also need a material
 	void addSegment ( vec2 a, vec2 b, int material, bool invert = false );

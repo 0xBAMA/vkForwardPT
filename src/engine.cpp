@@ -826,6 +826,19 @@ void PrometheusInstance::initResources () {
 		SetDebugName( VK_OBJECT_TYPE_IMAGE, ( uint64_t ) lineColorAttachment.image, "Line Color Attachment" );
 	}
 
+	// buffer to hold geometry data + buffers for the grid precompute
+	{
+		// constant size allocations for Geo + BBoxes -> based on set maximum number of primtives
+		GeometryBuffer = createBuffer( maxPrimitives * sizeof( geometryStruct ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GeometryBuffer.buffer, "Geometry Buffer" );
+		BBoxBuffer = createBuffer( maxPrimitives * 4 * sizeof( float ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) BBoxBuffer.buffer, "BBox Buffer" );
+
+		// this buffer is based on the current screen resolution
+		size_t uncompactedBufferSize = ImageBufferResolution.width * ImageBufferResolution.height * 16 * sizeof( float );
+		UncompactedGridBuffer = createBuffer( uncompactedBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO );
+	}
+
 	// buffer for the rays
 	{
 		rayBuffer = createBuffer( globalData.numBounces * globalData.numRays * sizeof( raySegment ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY );
@@ -1515,73 +1528,70 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdDispatch( cmd, ( drawExtent.width + 15 ) / 16, ( drawExtent.height + 15 ) / 16, 1 );
 		};
 	}
+
+	{ // BBox precompute
+
+	}
+
+	{ // Grid eval precompute
+
+	}
 }
 
 void PrometheusInstance::bufferRebuildGPU () {
-
-
-	// there are a few buffers which only exist temporarily, for this function
-	AllocatedBuffer bboxBuffer;				// min, max on x, y, per primitive
-	AllocatedBuffer uncompactedGridBuffer;	// preallocated space for up to 15 primitives (+ count, stride of 16 floats)
-
 	// and two pipelines which exist only for this
-	static ComputeEffect BBoxPrecompute;
-	static ComputeEffect UncompactedGridPrecompute;
 	static bool initialized = false;
 
 	unscopedTimer t ( "timer", true );
 
-	if ( !initialized ) {
-		// create the pipelines for this operation
+	// the geometry list now lives on the GPU, so we are able to skip the upload step
+
+	{ // 1: resize the buffer if needed (uncompacted grid) -> this is triggered on screen resize
 		t.tick();
 
-		fmt::print( "init stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
-		t.tock();
-	}
+		size_t previousSize = UncompactedGridBuffer.allocation->GetSize();
+		size_t currentSize = globalData.gridDims.x * globalData.gridDims.y * 64; // 64 bytes per grid cell
 
-	{ // 1: upload the 16-float geometry structs
-		t.tick();
+		if ( previousSize != currentSize ) {
+			// delete
 
-		fmt::print( "initial upload stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
-		t.tock();
-	}
+			// recreate at the new size
 
-	{ // 2: create the buffers (BBox storage + uncompacted grid)
-		t.tick();
+		}
 
 		fmt::print( "buffer create stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
 
-	{ // 3: immediate submit for BBox precompute
+	{ // 2: immediate submit for BBox precompute
 		t.tick();
 
 		fmt::print( "bbox precompute stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
 
-	{ // 4: immediate submit for uncompacted grid buffer evaluation
+	{ // 3: immediate submit for uncompacted grid buffer evaluation
 		t.tick();
 
 		fmt::print( "uncompacted grid eval stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
 
-	{ // 5: pull the uncompacted grid buffer to the CPU
+	{ // 4: pull the uncompacted grid buffer to the CPU
 		t.tick();
 
 		fmt::print( "buffer download stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
 
-	{ // 6: stepping through by 16's (we only support up to 16 primitives per grid cell)
+	{ // 5: stepping through by 16's (we only support up to 16 primitives per grid cell)
 		t.tick();
 
 		fmt::print( "buffer process stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
 	}
 
-	{ // 7: upload the buffers used by the runtime traversal
+	{ // 6: upload the buffers used by the runtime traversal
 		t.tick();
 
 		fmt::print( "final buffer upload stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
