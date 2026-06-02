@@ -42,18 +42,77 @@ float sdArc ( vec2 p, vec2 c, float aMin, float aMax, float r ) {
 	return ( ingap > 0.0f ) ? min( length( p1 - p ), length( p2 - p ) ) : abs( length( v ) - length( v1 ) );
 }
 
+struct geometryStruct {
+	float data[ 16 ];
+};
+
+layout( set = 0, binding = 1, std430 ) buffer geoBuffer {
+	geometryStruct geoData[];
+};
+
+layout( set = 0, binding = 2, std430 ) buffer bboxBuffer {
+	vec4 bboxes[];
+};
+
 void main () {
 	// determine location on the image
 	uvec2 loc = gl_GlobalInvocationID.xy;
 
+	// place the test point in the middle of the grid cell
+	vec2 pTest = loc + vec2( 0.5f ); // location in grid space
+
+	// scaling the point based on the grid scalar
+	const float gs = globalData.gridScalar;
+	pTest *= gs; // convert to pixel space
+
+	// based on half of the diagonal dimension of the grid cell...
+		// if the SDF returns less than this, we need to add it to the list for this cell
+	const float dThresh = 0.708f * gs;
+
+	// grid bounds check ( we invoke per grid cell, not per pixel )
+	int count = 0;
 	if ( loc.x < globalData.gridDims.x && loc.x < globalData.gridDims.x ) {
+		// for primitives
+		for ( int i = 0; i < globalData.numPrimitives && count < 15; i++ ) {
+			// if I'm in the bbox, evaluate distance
+			vec4 bbox = bboxes[ i ];
+			if ( pTest.x <= bbox.x && pTest.x >= bbox.y && pTest.y <= bbox.z && pTest.y >= bbox.w ) {
+				bool write = false;
+				geometryStruct g = geoData[ i ];
+				switch ( int( g.data[ 15 ] ) ) {
+				case 0: { // segment
+					const vec2 a = vec2( g.data[ 0 ], g.data[ 1 ] ) / globalData.gridScalar;
+					const vec2 b = vec2( g.data[ 2 ], g.data[ 3 ] ) / globalData.gridScalar;
+					const float dSeg = sdSegment( pTest, a, b );
+					if ( dSeg < dThresh ) {
+						write = true;
+					}
+					break;
+				}
 
+				case 1: { // arc
+					vec2 center = vec2( g.data[ 0 ], g.data[ 1 ] ) / globalData.gridScalar;
+					float r = g.data[ 2 ] / globalData.gridScalar;
+					float aMin = g.data[ 3 ]; // minimum angle
+					float aMax = g.data[ 4 ]; // maximum angle
+					const float dArc = sdArc( pTest, center, aMin, aMax, r );
+					if ( dArc < dThresh ) {
+						write = true;
+					}
+					break;
+				}
+
+				default:
+					break;
+				}
+
+				if ( write ) {
+					// I need to store this index, in the grid cell
+
+				}
+			}
+		}
+
+		// store final count, capped at 15
 	}
-
-	// iterating through the list of bboxes...
-		// if I'm in the bbox, evaluate distance
-			// if I'm within some threshold, store this primitive in this grid cell
-
-	// writing a list of integer IDs into the uncompacted grid buffer (+final count, capped at 15)
-
 }
