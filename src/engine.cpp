@@ -837,6 +837,7 @@ void PrometheusInstance::initResources () {
 		// this buffer is based on the current screen resolution
 		size_t uncompactedBufferSize = ImageBufferResolution.width * ImageBufferResolution.height * 16 * sizeof( float );
 		UncompactedGridBuffer = createBuffer( uncompactedBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) UncompactedGridBuffer.buffer, "Uncompacted Grid Buffer" );
 	}
 
 	// buffer for the rays
@@ -1549,11 +1550,17 @@ void PrometheusInstance::bufferRebuildGPU () {
 	{ // 1: resize the buffer if needed (uncompacted grid) -> this is triggered on screen resize
 		t.tick();
 
+		// grid scaling + resize logic
+		globalData.gridDims = glm::ivec2(
+			( std::floor( globalData.floatBufferResolution.x / globalData.gridScalar ) + 1 ),
+			( std::floor( globalData.floatBufferResolution.y / globalData.gridScalar ) + 1 ) );
+
 		size_t previousSize = UncompactedGridBuffer.allocation->GetSize();
 		size_t currentSize = globalData.gridDims.x * globalData.gridDims.y * 64; // 64 bytes per grid cell
 
+		// todo, adding delete/resize
 		if ( previousSize != currentSize ) {
-			// delete
+			// delete the buffer
 
 			// recreate at the new size
 
@@ -1603,29 +1610,6 @@ void PrometheusInstance::bufferRebuildGPU () {
 }
 
 void PrometheusInstance::bufferRebuild () {
-	static std::vector< std::set< uint32_t > > gridCellList;
-	{
-		unscopedTimer t ( "timer", true );
-		t.tick();
-
-		// retained memory for the grid + resize logic
-		globalData.gridDims = glm::ivec2(
-			( std::floor( globalData.floatBufferResolution.x / globalData.gridScalar ) + 1 ),
-			( std::floor( globalData.floatBufferResolution.y / globalData.gridScalar ) + 1 ) );
-
-		const int numGridCells = globalData.gridDims.x * globalData.gridDims.y;
-		if ( gridCellList.size() != numGridCells ) {
-			gridCellList.resize( numGridCells );
-		}
-
-		// I think for now we're clearing everything
-		for ( auto& cell : gridCellList ) {
-			cell.clear();
-		}
-
-		t.tock();
-		fmt::print( "prep stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
-	}
 
 	static std::vector< float > preppedGeoBuffer;
 	// grid buffer holds indices, prefix holds index of first entry + count per cell
