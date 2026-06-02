@@ -1526,22 +1526,72 @@ void PrometheusInstance::bufferRebuildGPU () {
 	static ComputeEffect UncompactedGridPrecompute;
 	static bool initialized = false;
 
+	unscopedTimer t ( "timer", true );
+
 	if ( !initialized ) {
 		// create the pipelines for this operation
+		t.tick();
 
+		fmt::print( "init stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+		t.tock();
 	}
 
 	// 1: upload the 16-float geometry structs
+	{
+		t.tick();
+
+		fmt::print( "initial upload stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+		t.tock();
+	}
 
 	// 2: create the buffers (BBox storage + uncompacted grid)
+	{
+		t.tick();
+
+		fmt::print( "buffer create stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+		t.tock();
+	}
 
 	// 3: immediate submit for BBox precompute
+	{
+		t.tick();
+
+		fmt::print( "bbox precompute stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+		t.tock();
+	}
+
 
 	// 4: immediate submit for uncompacted grid buffer evaluation
+	{
+		t.tick();
+
+		fmt::print( "uncompacted grid eval stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+		t.tock();
+	}
 
 	// 5: pull the uncompacted grid buffer to the CPU
+	{
+		t.tick();
+
+		fmt::print( "buffer download stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+		t.tock();
+	}
 
 	// 6: stepping through by 16's (we only support up to 16 primitives per grid cell)
+	{
+		t.tick();
+
+		fmt::print( "buffer process stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+		t.tock();
+	}
+
+	// 7: upload the buffers used by the runtime traversal
+	{
+		t.tick();
+
+		fmt::print( "final buffer upload stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+		t.tock();
+	}
 }
 
 void PrometheusInstance::bufferRebuild () {
