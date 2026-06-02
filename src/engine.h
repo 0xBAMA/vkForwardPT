@@ -177,7 +177,12 @@ public:
 	ComputeEffect Accumulate;
 	ComputeEffect DebugLineDraw;
 
-	// there are now three new buffers + a CPU representation for implementing the grid acceleration structure
+	// for precomputing the grid acceleration structure on the GPU
+	ComputeEffect BBoxPrecompute;
+	ComputeEffect UncompactedGridPrecompute;
+
+	// there are three buffers used for the grid AS at runtime ( prefix, grid, geometry )
+		// and two that are used for precomputation ( bbox, grid precompute )
 	bool geometryListDirty = true;		// triggering the rebuild of GPU structures
 	uint32_t numPrimitives{ 0 };		// setting where the pointer into the primitive buffer is
 	uint32_t maxPrimitives{ 1000000 };	// setting the max primitive count (100k is 5x more than I've done so far... aka "plenty")
