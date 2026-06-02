@@ -829,9 +829,9 @@ void PrometheusInstance::initResources () {
 	// buffer to hold geometry data + buffers for the grid precompute
 	{
 		// constant size allocations for Geo + BBoxes -> based on set maximum number of primtives
-		GeometryBuffer = createBuffer( maxPrimitives * sizeof( geometryStruct ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO );
+		GeometryBuffer = createBuffer( globalData.maxPrimitives * sizeof( geometryStruct ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO );
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GeometryBuffer.buffer, "Geometry Buffer" );
-		BBoxBuffer = createBuffer( maxPrimitives * 4 * sizeof( float ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO );
+		BBoxBuffer = createBuffer( globalData.maxPrimitives * 4 * sizeof( float ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO );
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) BBoxBuffer.buffer, "BBox Buffer" );
 
 		// this buffer is based on the current screen resolution
@@ -1603,7 +1603,6 @@ void PrometheusInstance::bufferRebuildGPU () {
 }
 
 void PrometheusInstance::bufferRebuild () {
-
 	static std::vector< std::set< uint32_t > > gridCellList;
 	{
 		unscopedTimer t ( "timer", true );
@@ -1812,34 +1811,34 @@ void PrometheusInstance::bufferRebuild () {
 // adding primitives to the geometry list
 void PrometheusInstance::addSegment ( vec2 a, vec2 b, int material, bool invert ) {
 	geometryStruct * geoData = ( geometryStruct * ) GeometryBuffer.allocation->GetMappedData();
-	if ( numPrimitives < maxPrimitives ) {
-		geoData[ numPrimitives ].values[ 0 ] = a.x;
-		geoData[ numPrimitives ].values[ 1 ] = a.y;
-		geoData[ numPrimitives ].values[ 2 ] = b.x;
-		geoData[ numPrimitives ].values[ 3 ] = b.y;
+	if ( globalData.numPrimitives < globalData.maxPrimitives ) {
+		geoData[ globalData.numPrimitives ].values[ 0 ] = a.x;
+		geoData[ globalData.numPrimitives ].values[ 1 ] = a.y;
+		geoData[ globalData.numPrimitives ].values[ 2 ] = b.x;
+		geoData[ globalData.numPrimitives ].values[ 3 ] = b.y;
 
-		geoData[ numPrimitives ].values[ 13 ] = material;
-		geoData[ numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;
-		geoData[ numPrimitives ].values[ 15 ] = 0; // line segment identifier
+		geoData[ globalData.numPrimitives ].values[ 13 ] = material;
+		geoData[ globalData.numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;
+		geoData[ globalData.numPrimitives ].values[ 15 ] = 0; // line segment identifier
 
-		numPrimitives++;
+		globalData.numPrimitives++;
 	}
 }
 
 void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, int material, bool invert ) {
 	geometryStruct * geoData = ( geometryStruct * ) GeometryBuffer.allocation->GetMappedData();
-	if ( numPrimitives < maxPrimitives ) {
-		geoData[ numPrimitives ].values[ 0 ] = center.x;
-		geoData[ numPrimitives ].values[ 1 ] = center.y;
-		geoData[ numPrimitives ].values[ 2 ] = radius;
-		geoData[ numPrimitives ].values[ 3 ] = thetaStart;
-		geoData[ numPrimitives ].values[ 4 ] = thetaEnd;
+	if ( globalData.numPrimitives < globalData.maxPrimitives ) {
+		geoData[ globalData.numPrimitives ].values[ 0 ] = center.x;
+		geoData[ globalData.numPrimitives ].values[ 1 ] = center.y;
+		geoData[ globalData.numPrimitives ].values[ 2 ] = radius;
+		geoData[ globalData.numPrimitives ].values[ 3 ] = thetaStart;
+		geoData[ globalData.numPrimitives ].values[ 4 ] = thetaEnd;
 
-		geoData[ numPrimitives ].values[ 13 ] = material;
-		geoData[ numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;
-		geoData[ numPrimitives ].values[ 15 ] = 1; // ARC identifier
+		geoData[ globalData.numPrimitives ].values[ 13 ] = material;
+		geoData[ globalData.numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;
+		geoData[ globalData.numPrimitives ].values[ 15 ] = 1; // ARC identifier
 
-		numPrimitives++;
+		globalData.numPrimitives++;
 	}
 }
 

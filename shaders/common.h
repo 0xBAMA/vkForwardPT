@@ -30,7 +30,11 @@ layout( set = 0, binding = 0, scalar ) uniform globalData {
 	float gridScalar;
 	ivec2 gridDims;
 
-	// nsight layout: vec2u; vec2u; vec4; int; int; int; int; int; float; float; float; vec2i;
+	// for mapping into the geometry buffer
+	uint numPrimitives;
+	uint maxPrimitives;
+
+	// nsight layout: vec2u; vec2u; vec4; int; int; int; int; int; float; float; float; vec2i; uint; uint;
 } GlobalData;
 //=========================================================
 

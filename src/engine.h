@@ -91,6 +91,10 @@ struct GlobalData {
 	// for the BVH
 	float gridScalar = 1.0f; // how big to make the grid?
 	glm::ivec2 gridDims;
+
+	// for mapping into the geometry buffer
+	uint32_t numPrimitives{ 0 };		// setting where the pointer into the primitive buffer is
+	uint32_t maxPrimitives{ 1000000 };	// setting the max primitive count (100k is 5x more than I've done so far... aka "plenty")
 };
 
 // smallest scope CPU->GPU passing of information
@@ -184,8 +188,6 @@ public:
 	// there are three buffers used for the grid AS at runtime ( prefix, grid, geometry )
 		// and two that are used for precomputation ( bbox, grid precompute )
 	bool geometryListDirty = true;		// triggering the rebuild of GPU structures
-	uint32_t numPrimitives{ 0 };		// setting where the pointer into the primitive buffer is
-	uint32_t maxPrimitives{ 1000000 };	// setting the max primitive count (100k is 5x more than I've done so far... aka "plenty")
 
 	AllocatedBuffer PrefixBuffer;		// containing the prefix sums + counts for indexing the grid buffer
 	AllocatedBuffer GridBuffer;			// containing a packed list of each cell's contents (requires prefix buffer to operate)

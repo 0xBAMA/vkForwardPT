@@ -9,6 +9,11 @@ layout ( local_size_x = 8, local_size_y = 8 ) in;
 
 void main () {
 	// determine location on the image
+	uvec2 loc = gl_GlobalInvocationID.xy;
+
+	if ( loc.x < globalData.gridDims.x && loc.x < globalData.gridDims.x ) {
+
+	}
 
 	// iterating through the list of bboxes...
 		// if I'm in the bbox, evaluate distance
