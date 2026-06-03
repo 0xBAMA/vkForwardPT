@@ -897,18 +897,18 @@ void PrometheusInstance::initResources () {
 	} () );
 
 	const float size = 50.0f;
-	for ( int i = 0; i < 10; i++ ) {
+	for ( int i = 0; i < 15000; i++ ) {
 		const vec2 p = vec2(
 			std::uniform_real_distribution< float >( 10, ImageBufferResolution.width - 10 )( seedRNG ),
 			std::uniform_real_distribution< float >( 700, ImageBufferResolution.height - 700 )( seedRNG )
 		);
 		const float r = std::uniform_real_distribution< float >( 5.0f, 35.0f )( seedRNG );
-		// if ( i % 16 == 0 )
-			// addSegment( p, p + vec2(
-				// std::uniform_real_distribution< float >( -size, size )( seedRNG ),
-				// std::uniform_real_distribution< float >( -size, size )( seedRNG ) ), 0 );
-		// else
-			addArc( p, 100, -0.1f, 2.0f * pi + 0.1f, 0 );
+		if ( i % 16 != 0 )
+			addSegment( p, p + vec2(
+				std::uniform_real_distribution< float >( -size, size )( seedRNG ),
+				std::uniform_real_distribution< float >( -size, size )( seedRNG ) ), 0 );
+		else
+			addArc( p, r, 0.0f, 2.0f * pi, 0 );
 	}
 
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
