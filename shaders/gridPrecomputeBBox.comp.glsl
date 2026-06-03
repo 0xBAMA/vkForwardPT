@@ -71,22 +71,22 @@ vec4 getBBox ( geometryStruct g ) {
 		vec2 bMax = max( p0, p1 );
 
 		// skipping any trig
-		if ( 0.0f >= aMin && 0.0f <= aMax ) {
+		if ( aMin <= 0.0f && aMax >= 0.0f ) {
 			bMin = min( bMin, center + vec2( r, 0.0f ) );
 			bMax = max( bMax, center + vec2( r, 0.0f ) );
 		}
 
-		if ( piHalf >= aMin && piHalf <= aMax ) {
+		if ( aMin <= piHalf && aMax >= piHalf ) {
 			bMin = min( bMin, center + vec2( 0.0f, r ) );
 			bMax = max( bMax, center + vec2( 0.0f, r ) );
 		}
 
-		if ( pi >= aMin && pi <= aMax ) {
+		if ( aMin <= pi && aMax >= pi ) {
 			bMin = min( bMin, center + vec2( -r, 0.0f ) );
 			bMax = max( bMax, center + vec2( -r, 0.0f ) );
 		}
 
-		if ( 3.0f * piHalf >= aMin && 3.0f * piHalf <= aMax ) {
+		if ( aMin <= 3.0f * piHalf && aMax >= 3.0f * piHalf ) {
 			bMin = min( bMin, center + vec2( 0.0f, -r ) );
 			bMax = max( bMax, center + vec2( 0.0f, -r ) );
 		}

@@ -19,27 +19,18 @@ float sdSegment ( in vec2 p, in vec2 a, in vec2 b ) {
 
 // circular arc distance
 // https://www.shadertoy.com/view/3cXSRf
-float sdArc ( vec2 p, vec2 c, float aMin, float aMax, float r ) {
-	vec2 p1 = r * vec2( cos( aMin ), sin( aMin ) );
-	vec2 p2 = r * vec2( cos( aMax ), sin( aMax ) );
+float sdArc ( vec2 p, vec2 c, float r, float a0, float a1 ) {
+	vec2 d = p - c;
+	float ang = atan( d.y, d.x ) + 3.1415926535f;
 
-	vec2 v1 = p1 - c;
-	vec2 v2 = p2 - c;
+	// Assumes a0 < a1 and no wraparound through ±π
+	if ( ang >= a0 && ang <= a1 || abs( a0 - a1 ) < 0.1f )
+		return abs( length( d ) - r );
 
-	// The parameters are over-determined by one degree of freedom.
-	// If p1 and p2 are not on the same distance from c, the arc doesn't
-	// actually end in p2, but the end cap is still centered there.
-	// Uncomment this line if needed to adjust the distance from p2 to c.
-	// v2 = normalize(v2)*length(v1);
-	vec2 v = p - c;
+	vec2 e0 = c + r * vec2( cos( a0 ), sin( a0 ) );
+	vec2 e1 = c + r * vec2( cos( a1 ), sin( a1 ) );
 
-	// The signs of w.x, w.y are used to determine if we're in the gap
-	vec2 w = vec2( dot( v, -vec2( -v1.y, v1.x ) ), dot(v, vec2( -v2.y, v2.x ) ) );
-	bool longarc = ( dot( v1, vec2( -v2.y, v2.x ) ) < 0.0f ); // Arc angle > pi
-
-	// Tweak by iq: "fake" OR/AND of booleans by max/min of floats
-	float ingap = longarc ? max( w.x, w.y ) : min( w.x, w.y );
-	return ( ingap > 0.0f ) ? min( length( p1 - p ), length( p2 - p ) ) : abs( length( v ) - length( v1 ) );
+	return min( length( p - e0 ), length( p - e1 ) );
 }
 
 struct geometryStruct {
@@ -71,18 +62,19 @@ void main () {
 
 	// based on half of the diagonal dimension of the grid cell...
 		// if the SDF returns less than this, we need to add it to the list for this cell
-	const float dThresh = 0.708f * gs;
+//	const float dThresh = 0.708f * gs;
+	const float dThresh = 1.2f * gs;
 
 	// grid bounds check ( we invoke per grid cell, not per pixel )
 	int count = 0;
 	uint baseIdx = 16 * ( loc.x + GlobalData.gridDims.x * loc.y );
 
-	if ( loc.x < GlobalData.gridDims.x && loc.x < GlobalData.gridDims.x ) {
+	if ( loc.x < GlobalData.gridDims.x && loc.y < GlobalData.gridDims.y ) {
 		// for primitives
 		for ( int i = 0; i < GlobalData.numPrimitives && count < 15; i++ ) {
 			// if I'm in the bbox, evaluate distance
 			vec4 bbox = bboxes[ i ];
-			if ( pTest.x <= bbox.x && pTest.x >= bbox.y && pTest.y <= bbox.z && pTest.y >= bbox.w ) {
+			if ( pTest.x >= bbox.x && pTest.x <= bbox.y && pTest.y >= bbox.z && pTest.y <= bbox.w ) {
 				bool write = false;
 				geometryStruct g = geoData[ i ];
 
@@ -99,11 +91,11 @@ void main () {
 				}
 
 				case 1: { // arc
-					vec2 center = vec2( g.data[ 0 ], g.data[ 1 ] ) / GlobalData.gridScalar;
-					float r = g.data[ 2 ] / GlobalData.gridScalar;
-					float aMin = g.data[ 3 ]; // minimum angle
-					float aMax = g.data[ 4 ]; // maximum angle
-					const float dArc = sdArc( pTest, center, aMin, aMax, r );
+					const vec2 center = vec2( g.data[ 0 ], g.data[ 1 ] ) / GlobalData.gridScalar;
+					const float r = g.data[ 2 ] / GlobalData.gridScalar;
+					const float aMin = g.data[ 3 ]; // minimum angle
+					const float aMax = g.data[ 4 ]; // maximum angle
+					const float dArc = sdArc( pTest, center, r, aMin, aMax );
 					if ( dArc < dThresh ) {
 						write = true;
 					}

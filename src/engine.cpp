@@ -896,19 +896,19 @@ void PrometheusInstance::initResources () {
 		return std::mt19937( seq );
 	} () );
 
-	const float size = 30.0f;
-	for ( int i = 0; i < 15000; i++ ) {
+	const float size = 50.0f;
+	for ( int i = 0; i < 10; i++ ) {
 		const vec2 p = vec2(
 			std::uniform_real_distribution< float >( 10, ImageBufferResolution.width - 10 )( seedRNG ),
 			std::uniform_real_distribution< float >( 700, ImageBufferResolution.height - 700 )( seedRNG )
 		);
-		const float r = std::uniform_real_distribution< float >( 25.0f, 35.0f )( seedRNG );
-		if ( i % 16 != 0 )
-			addSegment( p, p + vec2(
-				std::uniform_real_distribution< float >( -size, size )( seedRNG ),
-				std::uniform_real_distribution< float >( -size, size )( seedRNG ) ), 0 );
-		else
-			addArc( p, r, 0.0f, 2.0f * pi, 0 );
+		const float r = std::uniform_real_distribution< float >( 5.0f, 35.0f )( seedRNG );
+		// if ( i % 16 == 0 )
+			// addSegment( p, p + vec2(
+				// std::uniform_real_distribution< float >( -size, size )( seedRNG ),
+				// std::uniform_real_distribution< float >( -size, size )( seedRNG ) ), 0 );
+		// else
+			addArc( p, 100, -0.1f, 2.0f * pi + 0.1f, 0 );
 	}
 
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
@@ -942,8 +942,6 @@ void PrometheusInstance::initResources () {
 	}
 	*/
 
-
-
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
 		// destroying buffers
@@ -954,6 +952,8 @@ void PrometheusInstance::initResources () {
 		destroyBuffer( GeometryBuffer );
 		destroyBuffer( PrefixBuffer );
 		destroyBuffer( GridBuffer );
+		destroyBuffer( BBoxBuffer );
+		destroyBuffer( UncompactedGridBuffer );
 
 		// destroying images
 		destroyImage( XYZImage );
@@ -1078,8 +1078,8 @@ void PrometheusInstance::initComputePasses () {
 				writer.write_buffer( 4, LightParametersBuffer.buffer, 256 * sizeof( LightEmitterParameters ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 				// BVH buffers
 				writer.write_buffer( 5, GeometryBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
-				// writer.write_buffer( 6, PrefixBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
-				// writer.write_buffer( 7, GridBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.write_buffer( 6, PrefixBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.write_buffer( 7, GridBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
 				writer.update_set( device, Raytrace.descriptorSet );
 			}
 
@@ -1780,7 +1780,6 @@ void PrometheusInstance::bufferRebuildGPU () {
 
 // all this might be able to be skipped... it would mean using an uncompacted buffer during traversal, and I need to figure out if that's good or bad for perf
 
-	/*
 	std::vector < uint32_t > prefixValues;
 	std::vector < uint32_t > gridValues;
 
@@ -1789,14 +1788,10 @@ void PrometheusInstance::bufferRebuildGPU () {
 	prefixValues.resize( numCells * 2, 0 );
 	gridValues.resize( numCells * 16, 0 );
 
-	int idx = 0;
 	int gidx = 0;
 
 	{ // 2: stepping through the mapped buffer by 16's (we only support up to 16 primitives per grid cell)
 		t.tick();
-
-		// float count;
-		// float cell[ 15 ];
 
 		// UncompactedGridBuffer has the data, as prepared by the prior stage
 			// stepping through by grid cells... 16 floats per
@@ -1804,18 +1799,17 @@ void PrometheusInstance::bufferRebuildGPU () {
 		for ( int i = 0; i < numCells; ++i ) {
 			int cellCount = gridBuff[ i * 16 ];
 
-			if ( cellCount != 0 )
-				fmt::print( "cell {} contains {} primitives", i, cellCount );
+			// if ( cellCount != 0 )
+				// fmt::print( "cell {} contains {} primitives", i, cellCount );
 
 			// copy cell contents to the compacted buffer
 			for ( int j = 0; j < cellCount; j++ ) {
-				gridValues[ gidx ] = gridBuff[ i * 16 + j ];
+				gridValues[ gidx ] = gridBuff[ i * 16 + j + 1 ];
 				gidx++;
 			}
 
-			prefixValues[ 2 * i + 0 ] = idx; // index
+			prefixValues[ 2 * i + 0 ] = gidx; // index
 			prefixValues[ 2 * i + 1 ] = cellCount; // count
-			idx += cellCount;
 		}
 
 		t.tock();
@@ -1844,7 +1838,6 @@ void PrometheusInstance::bufferRebuildGPU () {
 
 	// and we have latest data on the GPU
 	geometryListDirty = false;
-	*/
 }
 
 // adding primitives to the geometry list
