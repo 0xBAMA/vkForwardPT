@@ -165,7 +165,6 @@ void PrometheusInstance::Draw () {
 	}
 
 	if ( geometryListDirty ) {
-		// bufferRebuild();
 		bufferRebuildGPU();
 	}
 
@@ -830,14 +829,45 @@ void PrometheusInstance::initResources () {
 	{
 		// constant size allocations for Geo + BBoxes -> based on set maximum number of primtives
 		GeometryBuffer = createBuffer( globalData.maxPrimitives * sizeof( geometryStruct ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO );
-		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GeometryBuffer.buffer, "Geometry Buffer" );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GeometryBuffer.buffer, "BVH Geometry Buffer" );
 		BBoxBuffer = createBuffer( globalData.maxPrimitives * 4 * sizeof( float ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO );
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) BBoxBuffer.buffer, "BBox Buffer" );
 
 		// this buffer is based on the current screen resolution
-		size_t uncompactedBufferSize = ImageBufferResolution.width * ImageBufferResolution.height * 16 * sizeof( float );
-		UncompactedGridBuffer = createBuffer( uncompactedBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO );
+		// grid scaling + resize logic
+		globalData.gridDims = glm::ivec2(
+			( std::floor( ImageBufferResolution.width / globalData.gridScalar ) + 1 ),
+			( std::floor( ImageBufferResolution.height / globalData.gridScalar ) + 1 ) );
+
+		size_t uncompactedBufferSize = globalData.gridDims.x * globalData.gridDims.y * 16 * sizeof( int32_t );
+		UncompactedGridBuffer = createBuffer( uncompactedBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU );
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) UncompactedGridBuffer.buffer, "Uncompacted Grid Buffer" );
+
+		// right now this is dead weight - but if I want to support resizing, it should actually happen here, where everything gets resized
+		/*
+		{ // 1: resize the buffer if needed (uncompacted grid) -> this is triggered on screen resize
+			t.tick();
+
+			// grid scaling + resize logic
+			globalData.gridDims = glm::ivec2(
+				( std::floor( globalData.floatBufferResolution.x / globalData.gridScalar ) + 1 ),
+				( std::floor( globalData.floatBufferResolution.y / globalData.gridScalar ) + 1 ) );
+
+			size_t previousSize = UncompactedGridBuffer.allocation->GetSize();
+			size_t currentSize = globalData.gridDims.x * globalData.gridDims.y * 64; // 64 bytes per grid cell
+
+			// todo, adding delete/resize
+			if ( previousSize != currentSize ) {
+				// delete the buffer
+
+				// recreate at the new size
+
+			}
+
+			fmt::print( "buffer create stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+			t.tock();
+		}
+		*/
 	}
 
 	// buffer for the rays
@@ -880,6 +910,8 @@ void PrometheusInstance::initResources () {
 		else
 			addArc( p, r, 0.0f, 2.0f * pi, 0 );
 	}
+
+	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
 
 	/*
 	for ( int i = 0; i < 1000; i++ ) {
@@ -1046,8 +1078,8 @@ void PrometheusInstance::initComputePasses () {
 				writer.write_buffer( 4, LightParametersBuffer.buffer, 256 * sizeof( LightEmitterParameters ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 				// BVH buffers
 				writer.write_buffer( 5, GeometryBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
-				writer.write_buffer( 6, PrefixBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
-				writer.write_buffer( 7, GridBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				// writer.write_buffer( 6, PrefixBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				// writer.write_buffer( 7, GridBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
 				writer.update_set( device, Raytrace.descriptorSet );
 			}
 
@@ -1531,11 +1563,195 @@ void PrometheusInstance::initComputePasses () {
 	}
 
 	{ // BBox precompute
+		{ // descriptor layout
+			DescriptorLayoutBuilder builder;
+			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
+			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // geometry buffer
+			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // bbox buffer
+			BBoxPrecompute.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
+			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) BBoxPrecompute.descriptorSetLayout, "BBox Precompute Descriptor Set Layout" );
+		}
 
+		{ // pipeline layout + compute pipeline
+			VkPushConstantRange pushConstant{};
+			pushConstant.offset = 0;
+			pushConstant.size = sizeof( PushConstants );
+			pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+			VkPipelineLayoutCreateInfo computeLayout{};
+			computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			computeLayout.pNext = nullptr;
+			computeLayout.pSetLayouts = &BBoxPrecompute.descriptorSetLayout;
+			computeLayout.setLayoutCount = 1;
+			computeLayout.pPushConstantRanges = &pushConstant;
+			computeLayout.pushConstantRangeCount = 1;
+
+			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &BBoxPrecompute.pipelineLayout ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE_LAYOUT, ( uint64_t ) BBoxPrecompute.pipelineLayout, "BBox Precompute Pipeline Layout" );
+
+			VkShaderModule bboxShader;
+			if ( !vkutil::load_shader_module("../shaders/gridPrecomputeBBox.comp.glsl.spv", device, &bboxShader ) ) {
+				fmt::print( "Error when building the BBox Precompute Compute Shader\n" );
+			}
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) bboxShader, "BBox Precompute Shader Module" );
+
+			VkPipelineShaderStageCreateInfo stageinfo{};
+			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			stageinfo.pNext = nullptr;
+			stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+			stageinfo.module = bboxShader;
+			stageinfo.pName = "main";
+
+			VkComputePipelineCreateInfo computePipelineCreateInfo{};
+			computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+			computePipelineCreateInfo.pNext = nullptr;
+			computePipelineCreateInfo.layout = BBoxPrecompute.pipelineLayout;
+			computePipelineCreateInfo.stage = stageinfo;
+
+			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &BBoxPrecompute.pipeline ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) BBoxPrecompute.pipeline, "BBox Precompute Compute Pipeline" );
+			vkDestroyShaderModule( device, bboxShader, nullptr );
+
+			// deletors for the pipeline layout + pipeline
+			mainDeletionQueue.push_function( [ & ] () {
+				vkDestroyDescriptorSetLayout( device, BBoxPrecompute.descriptorSetLayout, nullptr );
+				vkDestroyPipelineLayout( device, BBoxPrecompute.pipelineLayout, nullptr );
+				vkDestroyPipeline( device, BBoxPrecompute.pipeline, nullptr );
+			});
+		}
+
+		// invoke() lambda
+		BBoxPrecompute.invoke = [ & ] ( VkCommandBuffer cmd ){
+			// dynamic descriptor allocation, to bind a texture
+			BBoxPrecompute.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, BBoxPrecompute.descriptorSetLayout );
+			{
+				DescriptorWriter writer;
+				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
+				writer.write_buffer( 1, GeometryBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.write_buffer( 2, BBoxBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.update_set( device, BBoxPrecompute.descriptorSet );
+			}
+
+			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, BBoxPrecompute.pipeline );
+
+			// bind the descriptor set, as just recorded
+			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, BBoxPrecompute.pipelineLayout, 0, 1, &BBoxPrecompute.descriptorSet, 0, nullptr );
+
+			// get a new wang RNG seed
+			BBoxPrecompute.pushConstants.wangSeed = genWangSeed();
+
+			// send the current value of the push constants
+			vkCmdPushConstants( cmd, BBoxPrecompute.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &BBoxPrecompute.pushConstants );
+
+			// dispatch for all primitives
+			vkCmdDispatch( cmd, ( globalData.numPrimitives + 63 ) / 64, 1, 1 );
+
+			VkBufferMemoryBarrier2 bufferBarrier = makeBufferBarrier( BBoxBuffer.buffer, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT );
+			VkDependencyInfo barrierDependency {
+				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+				.bufferMemoryBarrierCount = 1,
+				.pBufferMemoryBarriers = &bufferBarrier,
+			};
+
+			vkCmdPipelineBarrier2( cmd, &barrierDependency );
+		};
 	}
 
 	{ // Grid eval precompute
+		{ // descriptor layout
+			DescriptorLayoutBuilder builder;
+			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
+			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // geometry buffer
+			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // bbox buffer
+			builder.add_binding( 3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // uncompacted grid buffer
+			UncompactedGridPrecompute.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
+			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) UncompactedGridPrecompute.descriptorSetLayout, "Uncompacted Grid Precompute Descriptor Set Layout" );
+		}
 
+		{ // pipeline layout + compute pipeline
+			VkPushConstantRange pushConstant{};
+			pushConstant.offset = 0;
+			pushConstant.size = sizeof( PushConstants );
+			pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+			VkPipelineLayoutCreateInfo computeLayout{};
+			computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			computeLayout.pNext = nullptr;
+			computeLayout.pSetLayouts = &UncompactedGridPrecompute.descriptorSetLayout;
+			computeLayout.setLayoutCount = 1;
+			computeLayout.pPushConstantRanges = &pushConstant;
+			computeLayout.pushConstantRangeCount = 1;
+
+			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &UncompactedGridPrecompute.pipelineLayout ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE_LAYOUT, ( uint64_t ) UncompactedGridPrecompute.pipelineLayout, "Uncompacted Grid Precompute Pipeline Layout" );
+
+			VkShaderModule gridShader;
+			if ( !vkutil::load_shader_module("../shaders/gridPrecomputePrimitive.comp.glsl.spv", device, &gridShader ) ) {
+				fmt::print( "Error when building the Uncompacted Grid Precompute Compute Shader\n" );
+			}
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) gridShader, "Uncompacted Grid Precompute Shader Module" );
+
+			VkPipelineShaderStageCreateInfo stageinfo{};
+			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			stageinfo.pNext = nullptr;
+			stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+			stageinfo.module = gridShader;
+			stageinfo.pName = "main";
+
+			VkComputePipelineCreateInfo computePipelineCreateInfo{};
+			computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+			computePipelineCreateInfo.pNext = nullptr;
+			computePipelineCreateInfo.layout = UncompactedGridPrecompute.pipelineLayout;
+			computePipelineCreateInfo.stage = stageinfo;
+
+			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &UncompactedGridPrecompute.pipeline ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) UncompactedGridPrecompute.pipeline, "Uncompacted Grid Precompute Compute Pipeline" );
+			vkDestroyShaderModule( device, gridShader, nullptr );
+
+			// deletors for the pipeline layout + pipeline
+			mainDeletionQueue.push_function( [ & ] () {
+				vkDestroyDescriptorSetLayout( device, UncompactedGridPrecompute.descriptorSetLayout, nullptr );
+				vkDestroyPipelineLayout( device, UncompactedGridPrecompute.pipelineLayout, nullptr );
+				vkDestroyPipeline( device, UncompactedGridPrecompute.pipeline, nullptr );
+			});
+		}
+
+		// invoke() lambda
+		UncompactedGridPrecompute.invoke = [ & ] ( VkCommandBuffer cmd ){
+			// dynamic descriptor allocation, to bind a texture
+			UncompactedGridPrecompute.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, UncompactedGridPrecompute.descriptorSetLayout );
+			{
+				DescriptorWriter writer;
+				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
+				writer.write_buffer( 1, GeometryBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.write_buffer( 2, BBoxBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.write_buffer( 3, UncompactedGridBuffer.buffer, VK_WHOLE_SIZE, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+				writer.update_set( device, UncompactedGridPrecompute.descriptorSet );
+			}
+
+			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, UncompactedGridPrecompute.pipeline );
+
+			// bind the descriptor set, as just recorded
+			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, UncompactedGridPrecompute.pipelineLayout, 0, 1, &UncompactedGridPrecompute.descriptorSet, 0, nullptr );
+
+			// get a new wang RNG seed
+			UncompactedGridPrecompute.pushConstants.wangSeed = genWangSeed();
+
+			// send the current value of the push constants
+			vkCmdPushConstants( cmd, UncompactedGridPrecompute.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &UncompactedGridPrecompute.pushConstants );
+
+			// dispatch for all primitives
+			vkCmdDispatch( cmd,( globalData.gridDims.x + 7 ) / 8 ,  ( globalData.gridDims.y + 7 ) / 8, 1 );
+
+			VkBufferMemoryBarrier2 bufferBarrier = makeBufferBarrier( UncompactedGridBuffer.buffer, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_HOST_BIT, VK_ACCESS_2_HOST_READ_BIT );
+			VkDependencyInfo barrierDependency {
+				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+				.bufferMemoryBarrierCount = 1,
+				.pBufferMemoryBarriers = &bufferBarrier,
+			};
+
+			vkCmdPipelineBarrier2( cmd, &barrierDependency );
+		};
 	}
 }
 
@@ -1545,251 +1761,90 @@ void PrometheusInstance::bufferRebuildGPU () {
 
 	unscopedTimer t ( "timer", true );
 
-	// the geometry list now lives on the GPU, so we are able to skip the upload step
+	// the geometry list now lives on the GPU, so we are able to skip the initial upload step
 
-	{ // 1: resize the buffer if needed (uncompacted grid) -> this is triggered on screen resize
+	{ // 1: immediate submit for GPU precompute
 		t.tick();
 
-		// grid scaling + resize logic
-		globalData.gridDims = glm::ivec2(
-			( std::floor( globalData.floatBufferResolution.x / globalData.gridScalar ) + 1 ),
-			( std::floor( globalData.floatBufferResolution.y / globalData.gridScalar ) + 1 ) );
+		immediateSubmit( [ & ] ( VkCommandBuffer cmd ) {
+			// dispatch bbox precompute for each primitive
+			BBoxPrecompute.invoke( cmd );
 
-		size_t previousSize = UncompactedGridBuffer.allocation->GetSize();
-		size_t currentSize = globalData.gridDims.x * globalData.gridDims.y * 64; // 64 bytes per grid cell
+			// dispatch grid eval for each grid cell
+			UncompactedGridPrecompute.invoke( cmd );
+		});
 
-		// todo, adding delete/resize
-		if ( previousSize != currentSize ) {
-			// delete the buffer
-
-			// recreate at the new size
-
-		}
-
-		fmt::print( "buffer create stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 		t.tock();
+		fmt::print( "precompute stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 	}
 
-	{ // 2: immediate submit for BBox precompute
-		t.tick();
+// all this might be able to be skipped... it would mean using an uncompacted buffer during traversal, and I need to figure out if that's good or bad for perf
 
-		fmt::print( "bbox precompute stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
-		t.tock();
-	}
-
-	{ // 3: immediate submit for uncompacted grid buffer evaluation
-		t.tick();
-
-		fmt::print( "uncompacted grid eval stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
-		t.tock();
-	}
-
-	{ // 4: pull the uncompacted grid buffer to the CPU
-		t.tick();
-
-		fmt::print( "buffer download stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
-		t.tock();
-	}
-
-	{ // 5: stepping through by 16's (we only support up to 16 primitives per grid cell)
-		t.tick();
-
-		fmt::print( "buffer process stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
-		t.tock();
-	}
-
-	{ // 6: upload the buffers used by the runtime traversal
-		t.tick();
-
-		fmt::print( "final buffer upload stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
-		t.tock();
-	}
-
-	// and we have passed the new data to the GPU
-	geometryListDirty = false;
-}
-
-void PrometheusInstance::bufferRebuild () {
-
-	static std::vector< float > preppedGeoBuffer;
-	// grid buffer holds indices, prefix holds index of first entry + count per cell
+	/*
 	std::vector < uint32_t > prefixValues;
 	std::vector < uint32_t > gridValues;
 
-	{
-		unscopedTimer t ( "timer", true );
+	// allocating sufficient memory to store the
+	const int numCells = globalData.gridDims.x * globalData.gridDims.y;
+	prefixValues.resize( numCells * 2, 0 );
+	gridValues.resize( numCells * 16, 0 );
+
+	int idx = 0;
+	int gidx = 0;
+
+	{ // 2: stepping through the mapped buffer by 16's (we only support up to 16 primitives per grid cell)
 		t.tick();
 
-		// start by resetting the global dirty flag
-		geometryListDirty = false;
+		// float count;
+		// float cell[ 15 ];
 
-		// 16-float structs
-		preppedGeoBuffer.clear();
-		preppedGeoBuffer.reserve( geometryList.size() * 16 );
+		// UncompactedGridBuffer has the data, as prepared by the prior stage
+			// stepping through by grid cells... 16 floats per
+		int32_t * gridBuff = ( int32_t * ) UncompactedGridBuffer.allocation->GetMappedData();
+		for ( int i = 0; i < numCells; ++i ) {
+			int cellCount = gridBuff[ i * 16 ];
 
-		const float epsilon = 0.001f;
-		uint32_t idx { 0 };
+			if ( cellCount != 0 )
+				fmt::print( "cell {} contains {} primitives", i, cellCount );
 
-		// iterating through the list of geometry
-		// reset all the dirty flags
-		// create the GPU buffer of 16-float structs
-
-		for ( auto& primitive : geometryList ) {
-			// primitive.touchedSinceLastUpdate = false; // kind of useless right now, useful optimization later
-
-			// we need to put together the geometry buffer
-			for ( auto& element : primitive.values ) {
-				preppedGeoBuffer.emplace_back( element );
+			// copy cell contents to the compacted buffer
+			for ( int j = 0; j < cellCount; j++ ) {
+				gridValues[ gidx ] = gridBuff[ i * 16 + j ];
+				gidx++;
 			}
 
-			// the geometry gets now splatted into a grid structure
-			// the grid structure is kept in a 1D array...
-			// each cell has a vector of primitives
-
-			auto boundsCheck = [&]( vec2 p ) { return p.x < globalData.floatBufferResolution.x && p.y < globalData.floatBufferResolution.y && p.x >= 0.0f && p.y >= 0.0f; };
-
-			// the last float has the identifier...
-			int primitiveType = int( primitive.values[ 15 ] );
-			switch ( primitiveType ) { // each primitive will need to splat differently...
-				// calling insert with idx puts this index into that cell, we want to keep that index only
-				// this represents an element in the geometry list - more or less equivalent to a pointer
-
-			case 0: { // line segment - DDA would be better solution
-				// values are stored ax, ay, bx, by
-				const vec2 a = vec2( primitive.values[ 0 ], primitive.values[ 1 ] );
-				const vec2 b = vec2( primitive.values[ 2 ], primitive.values[ 3 ] );
-				const float d = glm::length( a - b );
-				vec2 p = vec2( 0.0f );
-
-				// iterating over the segment's length
-				for ( auto xo : { -1.0f, 0.0f, 1.0f } )
-					for ( auto yo : { -1.0f, 0.0f, 1.0f } )
-						for ( float t = 0.0f; t <= d; t += 0.1f ) {
-							// grid may not be per-pixel...
-							p = glm::mix( a, b, t / d ) + vec2( xo, yo );
-							glm::ivec2 pGrid = glm::ivec2( p / globalData.gridScalar );
-
-							// and insert into the grid structure
-							if ( boundsCheck( pGrid ) ) {
-								gridCellList[ pGrid.x + globalData.gridDims.x * pGrid.y ].insert( idx );
-							}
-						}
-				break;
-			}
-
-			case 1: {
-				// circular arcs
-				// centerx, centery, radius, thetastart, thetaend is the order
-				const vec2 center = vec2( primitive.values[ 0 ], primitive.values[ 1 ] );
-				const float radius = primitive.values[ 2 ];
-				const float thetaStart = primitive.values[ 3 ];
-				const float thetaEnd = primitive.values[ 4 ];
-
-				const float span = abs( thetaStart - thetaEnd );
-				const float circ = span * ( 2.0f * pi * radius );
-
-				const float thetaIncrement = 0.618f / circ;
-				for ( float t = thetaStart - epsilon; t <= thetaEnd + epsilon; t += thetaIncrement ) {
-					for ( auto adj : { -0.1f, 0.0f, 0.1f } ) { // kind of an expensive way to do this
-						glm::vec2 p = glm::ivec2( ( center + ( radius + adj ) * vec2( cos( t ), sin( t ) ) ) / globalData.gridScalar );
-						if ( boundsCheck( p ) ) {
-							gridCellList[ p.x + globalData.gridDims.x * p.y ].insert( idx );
-						}
-					}
-				}
-				break;
-			}
-
-				// case 2: // parabola - todo
-				// break;
-
-			default: // need to specify a shape if it is in the primitives list
-				break;
-			}
-
-			// incrementing, now that splatting is finished
-			idx++;
+			prefixValues[ 2 * i + 0 ] = idx; // index
+			prefixValues[ 2 * i + 1 ] = cellCount; // count
+			idx += cellCount;
 		}
 
 		t.tock();
-		fmt::print( "splat stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+		fmt::print( "buffer process stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 	}
 
-	// this data goes into the buffer
-
-	// once all the splatting has happened, we need to build the two GPU buffers:
-		// this grid, compacted so that the variable stride elements come one after another
-		// the prefix buffer, which keeps the starting index for each cell and the number of elements per cell
-	{
-		unscopedTimer t ( "timer", true );
+	{ // 3: upload the buffers used by the runtime traversal
 		t.tick();
-
-		uint32_t i = 0;
-		size_t cMax = 0;
-		for ( auto& cell : gridCellList ) {
-			// keeping index of first and the count
-			prefixValues.push_back( i );
-			prefixValues.push_back( cell.size() );
-
-			cMax = std::max( cMax, cell.size() );
-
-			// add the variable stride grid values
-			for ( auto& element : cell ) {
-				gridValues.push_back( element );
-				i++; // increment current index
-			}
-		}
-
-		fmt::print( "max count is {}\n", cMax );
-
-		// so at the end, we have built three buffers:
-		// geometry buffer -> 16 float representations
-		// grid buffer     -> the variable stride index values, contains the contents of the cell
-		// prefix buffer   -> the index of first element and element count, per cell
-
-		static bool firstTime = true;
-		if ( !firstTime ) {
-			// delete the buffers if they have been created
-			destroyBuffer( GeometryBuffer );
-			destroyBuffer( GridBuffer );
-			destroyBuffer( PrefixBuffer );
-			firstTime = false;
-		}
 
 		// create the buffers, with the current contents...
-		GeometryBuffer	= createBuffer( preppedGeoBuffer.size() * sizeof( float ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
-		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GeometryBuffer.buffer, "BVH Geometry Buffer" );
-		GridBuffer		= createBuffer( gridValues.size() * sizeof( uint32_t ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+		size_t gbSize = gidx * sizeof( int32_t );
+		GridBuffer		= createBuffer( gbSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) GridBuffer.buffer, "BVH Grid Buffer" );
-		PrefixBuffer	= createBuffer( prefixValues.size() * sizeof( uint32_t ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+
+		size_t pbSize = numCells * 2 * sizeof( int32_t );
+		PrefixBuffer	= createBuffer( pbSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) PrefixBuffer.buffer, "BVH Prefix Buffer" );
 
-		// need to do something to visualize the buffers
-		/*
-		std::vector< uint8_t > values;
-		bool invert = true;
-		for ( auto& v : prefixValues ) {
-			if ( invert == true ) {
-				invert = false;
-			} else {
-				invert = true;
-				values.push_back( v * 100 );
-				values.push_back( v * 100 );
-				values.push_back( v * 100 );
-				values.push_back( 255 );
-			}
-		}
-		stbi_write_png( "test.png", globalData.gridDims.x, globalData.gridDims.y, 4, values.data(), globalData.gridDims.x * 4 );
-		*/
-
 		// transferring prepped data to the new buffers
-		memcpy( GeometryBuffer.info.pMappedData, preppedGeoBuffer.data(), preppedGeoBuffer.size() * sizeof( float ) );
-		memcpy( GridBuffer.info.pMappedData, gridValues.data(), gridValues.size() * sizeof( uint32_t ) );
-		memcpy( PrefixBuffer.info.pMappedData, prefixValues.data(), prefixValues.size() * sizeof( uint32_t ) );
+		memcpy( GridBuffer.info.pMappedData, gridValues.data(), gbSize );
+		memcpy( PrefixBuffer.info.pMappedData, prefixValues.data(), pbSize );
 
 		t.tock();
-		fmt::print( "upload stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
+		fmt::print( "final buffer upload stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
 	}
+
+	// and we have latest data on the GPU
+	geometryListDirty = false;
+	*/
 }
 
 // adding primitives to the geometry list
@@ -1837,10 +1892,10 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 		geoData[ globalData.numPrimitives ].values[ 1 ] = center.y;
 		geoData[ globalData.numPrimitives ].values[ 2 ] = radius;
 
-		float thetaMin = std::min( thetaStart, thetaEnd );
-		float thetaMax = std::max( thetaStart, thetaEnd );
-		geoData[ globalData.numPrimitives ].values[ 3 ] = std::fmod( thetaMin, pi * 2.0f );
-		geoData[ globalData.numPrimitives ].values[ 4 ] = std::fmod( thetaMax, pi * 2.0f );
+		float thetaMin = std::clamp( std::min( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
+		float thetaMax = std::clamp( std::max( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
+		geoData[ globalData.numPrimitives ].values[ 3 ] = thetaMin;
+		geoData[ globalData.numPrimitives ].values[ 4 ] = thetaMax;
 
 		geoData[ globalData.numPrimitives ].values[ 13 ] = material;
 		geoData[ globalData.numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;

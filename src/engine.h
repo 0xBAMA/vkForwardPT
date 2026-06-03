@@ -201,7 +201,6 @@ public:
 	// void addParabola ( vec2 center, );
 
 	// there is really only one function associated with this, which manages the buffer rebuild
-	void bufferRebuild (); // geometry buffer is constructed... geometry is splatted into grid... prefix buffer is constructed from grid
 	void bufferRebuildGPU (); // gotta go fast
 
 	// as far as editing features, this will require:

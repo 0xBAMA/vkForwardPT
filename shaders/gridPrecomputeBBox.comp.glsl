@@ -33,8 +33,8 @@ vec4 getBBox ( geometryStruct g ) {
 		// 14: invert flag
 		// 15: 0 -> line segment
 
-		vec2 a = vec2( g.data[ 0 ], g.data[ 1 ] ) / globalData.gridScalar;
-		vec2 b = vec2( g.data[ 2 ], g.data[ 3 ] ) / globalData.gridScalar;
+		vec2 a = vec2( g.data[ 0 ], g.data[ 1 ] ) / GlobalData.gridScalar;
+		vec2 b = vec2( g.data[ 2 ], g.data[ 3 ] ) / GlobalData.gridScalar;
 
 		// computing grid space bbox
 		bbox.x = floor( min( a.x, b.x ) );
@@ -57,8 +57,8 @@ vec4 getBBox ( geometryStruct g ) {
 		// 14: invert flag
 		// 15: 1 -> circular arc
 
-		vec2 center = vec2( g.data[ 0 ], g.data[ 1 ] ) / globalData.gridScalar;
-		float r = g.data[ 2 ] / globalData.gridScalar;
+		vec2 center = vec2( g.data[ 0 ], g.data[ 1 ] ) / GlobalData.gridScalar;
+		float r = g.data[ 2 ] / GlobalData.gridScalar;
 		float aMin = g.data[ 3 ]; // minimum angle
 		float aMax = g.data[ 4 ]; // maximum angle
 
@@ -118,6 +118,5 @@ void main () {
 
 		// store the bbox parameters to the buffer
 		bboxes[ idx ] = bbox;
-
 	}
 }

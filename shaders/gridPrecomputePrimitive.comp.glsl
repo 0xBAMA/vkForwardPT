@@ -54,6 +54,10 @@ layout( set = 0, binding = 2, std430 ) buffer bboxBuffer {
 	vec4 bboxes[];
 };
 
+layout( set = 0, binding = 3, std430 ) buffer gridCellsUncompacted {
+	int gridCells[];
+};
+
 void main () {
 	// determine location on the image
 	uvec2 loc = gl_GlobalInvocationID.xy;
@@ -62,7 +66,7 @@ void main () {
 	vec2 pTest = loc + vec2( 0.5f ); // location in grid space
 
 	// scaling the point based on the grid scalar
-	const float gs = globalData.gridScalar;
+	const float gs = GlobalData.gridScalar;
 	pTest *= gs; // convert to pixel space
 
 	// based on half of the diagonal dimension of the grid cell...
@@ -71,18 +75,22 @@ void main () {
 
 	// grid bounds check ( we invoke per grid cell, not per pixel )
 	int count = 0;
-	if ( loc.x < globalData.gridDims.x && loc.x < globalData.gridDims.x ) {
+	uint baseIdx = 16 * ( loc.x + GlobalData.gridDims.x * loc.y );
+
+	if ( loc.x < GlobalData.gridDims.x && loc.x < GlobalData.gridDims.x ) {
 		// for primitives
-		for ( int i = 0; i < globalData.numPrimitives && count < 15; i++ ) {
+		for ( int i = 0; i < GlobalData.numPrimitives && count < 15; i++ ) {
 			// if I'm in the bbox, evaluate distance
 			vec4 bbox = bboxes[ i ];
 			if ( pTest.x <= bbox.x && pTest.x >= bbox.y && pTest.y <= bbox.z && pTest.y >= bbox.w ) {
 				bool write = false;
 				geometryStruct g = geoData[ i ];
+
+				// handling different primitive types
 				switch ( int( g.data[ 15 ] ) ) {
 				case 0: { // segment
-					const vec2 a = vec2( g.data[ 0 ], g.data[ 1 ] ) / globalData.gridScalar;
-					const vec2 b = vec2( g.data[ 2 ], g.data[ 3 ] ) / globalData.gridScalar;
+					const vec2 a = vec2( g.data[ 0 ], g.data[ 1 ] ) / GlobalData.gridScalar;
+					const vec2 b = vec2( g.data[ 2 ], g.data[ 3 ] ) / GlobalData.gridScalar;
 					const float dSeg = sdSegment( pTest, a, b );
 					if ( dSeg < dThresh ) {
 						write = true;
@@ -91,8 +99,8 @@ void main () {
 				}
 
 				case 1: { // arc
-					vec2 center = vec2( g.data[ 0 ], g.data[ 1 ] ) / globalData.gridScalar;
-					float r = g.data[ 2 ] / globalData.gridScalar;
+					vec2 center = vec2( g.data[ 0 ], g.data[ 1 ] ) / GlobalData.gridScalar;
+					float r = g.data[ 2 ] / GlobalData.gridScalar;
 					float aMin = g.data[ 3 ]; // minimum angle
 					float aMax = g.data[ 4 ]; // maximum angle
 					const float dArc = sdArc( pTest, center, aMin, aMax, r );
@@ -108,11 +116,13 @@ void main () {
 
 				if ( write ) {
 					// I need to store this index, in the grid cell
-
+					gridCells[ baseIdx + 1 + count ] = i;
+					count++;
 				}
 			}
 		}
 
 		// store final count, capped at 15
+		gridCells[ baseIdx ] = min( count, 15 );
 	}
 }
