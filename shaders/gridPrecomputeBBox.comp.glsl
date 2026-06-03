@@ -91,10 +91,11 @@ vec4 getBBox ( geometryStruct g ) {
 			bMax = max( bMax, center + vec2( 0.0f, -r ) );
 		}
 
-		bbox.x = floor( bMin.x );
-		bbox.y = ceil( bMax.x );
-		bbox.z = floor( bMin.y );
-		bbox.w = ceil( bMax.y );
+		const float bias = 0.25f;
+		bbox.x = floor( bMin.x - bias );
+		bbox.y = ceil( bMax.x + bias );
+		bbox.z = floor( bMin.y - bias );
+		bbox.w = ceil( bMax.y + bias );
 
 		break;
 	}
