@@ -175,6 +175,21 @@ public:
 
 	// debug line state
 	AllocatedBuffer debugLineDrawBuffer;
+	int debugLineDrawNumLines{ 8 }; // start with scratch for mouse crosshair
+	static constexpr float debugDrawMaxDepth{ 1.0f };
+	static constexpr float debugDrawMinDepth{ 0.0f };
+
+	// text rendering, with pixel location + select from the list of available font LUTs (tinyfont, fatfont, code page 437)
+	int addDebugString ( vec2 position, std::string &displayText, vec3 color, int fontSelect, float zDepth = debugDrawMaxDepth );
+	// void deleteDebugString ( int idx ); // tbd, use the return value from the add?
+	// an "updateDebugString"/"updateDebugLine", kind of idea
+
+	// 2D line segment
+	int addDebugDrawLine ( vec2 a, vec2 b, vec3 color, float zDepthA = debugDrawMaxDepth, float zDepthB = debugDrawMaxDepth );
+	// void deleteDebugDrawLine ( int idx );
+
+	// 2D bounding box helper, draws 4 lines
+	int addDebugDrawBox ( vec2 min, vec2 max, vec3 color, float zDepth = debugDrawMaxDepth );
 
 	// main compute shaders
 	ComputeEffect Raytrace;

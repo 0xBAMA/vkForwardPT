@@ -1934,6 +1934,29 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 	}
 }
 
+// text rendering, with pixel location + select from the list of available font LUTs (tinyfont, fatfont, code page 437)
+int PrometheusInstance::addDebugString ( vec2 position, std::string &displayText, vec3 color, int fontSelect, float zDepth ) {
+
+
+	return debugLineDrawNumLines; // tbd, second counter
+}
+// void deleteDebugString ( int idx ); // tbd, use the return value from the add?
+
+// 2D line segment
+int PrometheusInstance::addDebugDrawLine ( vec2 a, vec2 b, vec3 color, float zDepthA, float zDepthB ) {
+
+	return debugLineDrawNumLines;
+}
+// void deleteDebugDrawLine ( int idx );
+
+// 2D bounding box helper, draws 4 lines
+int PrometheusInstance::addDebugDrawBox ( vec2 min, vec2 max, vec3 color, float zDepth ) {
+
+	return debugLineDrawNumLines;
+}
+
+
+
 void PrometheusInstance::lightManagerMaintenance () {
 	// three resources need to be kept up:
 		// spectral sampling IS
