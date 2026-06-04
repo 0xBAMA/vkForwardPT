@@ -2414,7 +2414,7 @@ void PrometheusInstance::immediateSubmit( std::function< void( VkCommandBuffer c
 	// submit command buffer to the queue and execute it.
 	//  _renderFence will now block until the graphic commands finish execution
 	VK_CHECK( vkQueueSubmit2( graphicsQueue, 1, &submit, immediateFence ) );
-	VK_CHECK( vkWaitForFences( device, 1, &immediateFence, true, 9999999999 ) );
+	VK_CHECK( vkWaitForFences( device, 1, &immediateFence, true, 99999999999 ) );
 }
 
 void PrometheusInstance::drawImgui ( VkCommandBuffer cmd, VkImageView targetImageView ) {
