@@ -896,20 +896,56 @@ void PrometheusInstance::initResources () {
 		return std::mt19937( seq );
 	} () );
 
+	// it would be great to be able to add a line + text renderer
+		// with state, so I can call reset when I want (or never)
+
+	// in particular here, I want to draw boxes around the grids here, and randomize them
+		// including the labels for the different diameters and the range of theta covered
+
+	// it would also be nice to have a Z component, because then I've got a way to order things
+		// this is something that could be shared between the two passes (text + lines) and would
+		// actually enable full 3D rendering of lines if you really wanted to do that... neat
+
+	// addDebugString();
+	// addDebugDrawLine();
+	// addDebugDrawBox();
+
+	float sizeRamp = 1.5f;
+	for ( int xB = 300; xB < ImageBufferResolution.width - 300; xB += 400 ) {
+		for ( int yB = 300; yB < ImageBufferResolution.height - 300; yB += 300 ) {
+			vec2 basePoint = vec2( xB, yB );
+			for ( float xO = 0.0f; xO < 2.0f * 168.0f; xO += sizeRamp ) {
+				for ( float yO = 0.0f; yO < 200.0f; yO += sizeRamp ) {
+					vec2 offset = vec2( xO, yO );
+
+					const int m = std::uniform_int_distribution< int >( 9, 16 )( seedRNG );
+					addArc( basePoint + offset, sizeRamp * 0.45, pi / 2.0f,  pi + pi / 2.0f, m );
+				}
+			}
+			sizeRamp *= 1.15f;
+		}
+		if ( sizeRamp > 100.0f ) break;
+	}
+
+	/*
 	const float size = 50.0f;
-	for ( int i = 0; i < 15000; i++ ) {
+	const float margin = 600.0f;
+	for ( int i = 0; i < 5000; i++ ) {
 		const vec2 p = vec2(
-			std::uniform_real_distribution< float >( 10, ImageBufferResolution.width - 10 )( seedRNG ),
-			std::uniform_real_distribution< float >( 700, ImageBufferResolution.height - 700 )( seedRNG )
+			std::uniform_real_distribution< float >( margin, ImageBufferResolution.width - margin )( seedRNG ),
+			std::uniform_real_distribution< float >( margin, ImageBufferResolution.height - margin )( seedRNG )
 		);
-		const float r = std::uniform_real_distribution< float >( 5.0f, 35.0f )( seedRNG );
-		if ( i % 16 != 0 )
+		const float r = std::uniform_real_distribution< float >( 5.0f, 45.0f )( seedRNG );
+		const int m = std::uniform_int_distribution< int >( 9, 16 )( seedRNG );
+		const int m2 = std::uniform_int_distribution< int >( 1, 3 )( seedRNG );
+		if ( i % 16 == 0 )
 			addSegment( p, p + vec2(
 				std::uniform_real_distribution< float >( -size, size )( seedRNG ),
-				std::uniform_real_distribution< float >( -size, size )( seedRNG ) ), 0 );
+				std::uniform_real_distribution< float >( -size, size )( seedRNG ) ), m );
 		else
-			addArc( p, r, 0.0f, 2.0f * pi, 0 );
+			addArc( p, r, 0.0f, 2.0f * pi, m );
 	}
+	*/
 
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
 

@@ -199,7 +199,7 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 	ivec3 mapPos0 = ivec3( floor( hitLocation + 0.0f ) );
 	vec3 sideDist0 = ( sign( forwards ) * ( vec3( mapPos0 ) - hitLocation ) + ( sign( forwards ) * 0.5f ) + 0.5f ) * deltaDist;
 
-	#define MAX_RAY_STEPS 5000
+	#define MAX_RAY_STEPS 10000
 	for ( int i = 0; i < MAX_RAY_STEPS && gridBoundsCheck( mapPos0 ); i++ ) {
 		// Core of https://www.shadertoy.com/view/4dX3zl Branchless Voxel Raycasting
 		bvec3 mask1 = lessThanEqual( sideDist0.xyz, min( sideDist0.yzx, sideDist0.zxy ) );
@@ -250,7 +250,7 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 							result.dist = dClosest = t;
 
 							// todo material properties
-							result.materialType = ( ( primitiveBaseIdx / 16 ) % 6 == 0 ) ? DIFFUSE : SELLMEIER_BOROSILICATE_BK7;
+							result.materialType = int( geometryParameters[ primitiveBaseIdx + 13 ] );
 							result.IoR = getIORForMaterial( result.materialType );
 							result.roughness = 0.0f;
 							result.albedo = 0.99f;
@@ -312,7 +312,7 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 								}
 
 								// todo material handling
-								result.materialType = SELLMEIER_BOROSILICATE_BK7;
+								result.materialType = int( geometryParameters[ primitiveBaseIdx + 13 ] );
 								result.IoR = getIORForMaterial( result.materialType );
 								result.roughness = 0.0f;
 								result.albedo = 0.99f;
