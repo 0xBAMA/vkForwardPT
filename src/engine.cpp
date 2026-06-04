@@ -402,8 +402,8 @@ void PrometheusInstance::MainLoop () {
 					ImGui::SliderFloat( "Resolution Scale", &renderScale, 0.05f, 1.0f ); // this should also apply to the raster step + accumulate step
 					ImGui::Separator();
 					ImGui::Separator();
-
-					{
+					static bool lsVisible = true;
+					if ( ImGui::CollapsingHeader( "Show/Hide Load/Save Dialog", &lsVisible ) ) {
 						static std::chrono::time_point< std::chrono::system_clock > tLastFileListUpdate = std::chrono::system_clock::now();
 
 						static std::vector< std::string > savesList;
