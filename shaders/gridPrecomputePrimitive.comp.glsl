@@ -6,6 +6,7 @@
 layout ( local_size_x = 8, local_size_y = 8 ) in;
 
 #include "common.h"
+#include "random.h"
 
 // line segment distance
 // https://www.shadertoy.com/view/3tdSDj
@@ -21,7 +22,7 @@ float sdSegment ( in vec2 p, in vec2 a, in vec2 b ) {
 // https://www.shadertoy.com/view/3cXSRf
 float sdArc ( vec2 p, vec2 c, float r, float a0, float a1 ) {
 	vec2 d = p - c;
-	float ang = atan( d.y, d.x ) + 3.1415926535f;
+	float ang = atan( d.y, d.x );// + 3.1415926535f;
 
 	// Assumes a0 < a1 and no wraparound through ±π
 	if ( ang >= a0 && ang <= a1 || abs( a0 - a1 ) < 0.1f )
@@ -50,20 +51,23 @@ layout( set = 0, binding = 3, std430 ) buffer gridCellsUncompacted {
 };
 
 void main () {
+
 	// determine location on the image
 	uvec2 loc = gl_GlobalInvocationID.xy;
 
+	// seeding RNG
+	seed = PushConstants.wangSeed + loc.x * 6969 + loc.y * 8675309;
+
 	// place the test point in the middle of the grid cell
-	vec2 pTest = loc + vec2( 0.5f ); // location in grid space
+	vec2 pTest = loc; // location in grid space
 
 	// scaling the point based on the grid scalar
 	const float gs = GlobalData.gridScalar;
 	pTest *= gs; // convert to pixel space
 
-	// based on half of the diagonal dimension of the grid cell...
+	// based on half of the diagonal dimension of the grid cell... rounded up
 		// if the SDF returns less than this, we need to add it to the list for this cell
-//	const float dThresh = 0.708f * gs;
-	const float dThresh = 1.2f * gs;
+	const float dThresh = 0.708f * gs;
 
 	// grid bounds check ( we invoke per grid cell, not per pixel )
 	int count = 0;
@@ -83,9 +87,11 @@ void main () {
 				case 0: { // segment
 					const vec2 a = vec2( g.data[ 0 ], g.data[ 1 ] ) / GlobalData.gridScalar;
 					const vec2 b = vec2( g.data[ 2 ], g.data[ 3 ] ) / GlobalData.gridScalar;
-					const float dSeg = sdSegment( pTest, a, b );
-					if ( dSeg < dThresh ) {
-						write = true;
+					for ( int k = 0; k < 64 && !write; k++ ) {
+						const float dSeg = sdSegment( pTest + rFloat2() * gs, a, b );
+						if ( dSeg < dThresh ) {
+							write = true;
+						}
 					}
 					break;
 				}
@@ -95,9 +101,11 @@ void main () {
 					const float r = g.data[ 2 ] / GlobalData.gridScalar;
 					const float aMin = g.data[ 3 ]; // minimum angle
 					const float aMax = g.data[ 4 ]; // maximum angle
-					const float dArc = sdArc( pTest, center, r, aMin, aMax );
-					if ( dArc < dThresh ) {
-						write = true;
+					for ( int k = 0; k < 64 && !write; k++ ) {
+						const float dArc = sdArc( pTest + rFloat2(), center, r, aMin, aMax );
+						if ( dArc < dThresh ) {
+							write = true;
+						}
 					}
 					break;
 				}
