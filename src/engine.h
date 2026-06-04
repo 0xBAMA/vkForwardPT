@@ -78,7 +78,7 @@ struct GlobalData {
 
 	glm::vec4 mouseLoc;
 
-	int numRays{ 64 * 250 };
+	int numRays{ 64 * 100 };
 	int numBounces{ 256 };
 
 	int frameNumber{ 0 };
@@ -94,7 +94,7 @@ struct GlobalData {
 
 	// for mapping into the geometry buffer
 	uint32_t numPrimitives{ 0 };		// setting where the pointer into the primitive buffer is
-	uint32_t maxPrimitives{ 1000000 };	// setting the max primitive count (100k is 5x more than I've done so far... aka "plenty")
+	uint32_t maxPrimitives{ 10000000 };	// setting the max primitive count (100k is 5x more than I've done so far... aka "plenty")
 };
 
 // smallest scope CPU->GPU passing of information
