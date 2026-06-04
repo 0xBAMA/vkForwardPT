@@ -13,6 +13,9 @@ float NormalizedRandomFloat () {
 	return float( wangHash() ) / 4294967296.0f;
 }
 
+#define rFloat() NormalizedRandomFloat()
+#define rFloat2() vec2(NormalizedRandomFloat(),NormalizedRandomFloat())
+
 uint rng_state;
 uint PCGHash() {
 	rng_state = rng_state * 747796405u + 2891336453u;
