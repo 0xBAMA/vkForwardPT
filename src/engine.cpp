@@ -182,6 +182,10 @@ void PrometheusInstance::Draw () {
 	vkutil::transition_imageD( cmd, depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, lineColorAttachment.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 
+	vkutil::transition_image( cmd, font_codepage437.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
+	vkutil::transition_image( cmd, font_fatfont.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
+	vkutil::transition_image( cmd, font_tinyfont.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
+
 	vkutil::transition_image( cmd, PreviewAtlas.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, PickISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, SpectrumISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
@@ -893,6 +897,27 @@ void PrometheusInstance::initResources () {
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) debugStringConfigBuffer.buffer, "Debug Text UBO" );
 	}
 
+	{ // Load font LUTs from disk...
+		// code page 437
+		int w, h, channels;
+		unsigned char * data = stbi_load( "../fontLUTs/codepage437.png", &w, &h, &channels, 0 );
+		VkExtent3D extent = { uint32_t( w ), uint32_t( h ), 1 };
+		font_codepage437 = createImage( data, extent, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT );
+		stbi_image_free( data );
+
+		// fatfont
+		data = stbi_load( "../fontLUTs/fatFont.png", &w, &h, &channels, 0 );
+		extent = { uint32_t( w ), uint32_t( h ), 1 };
+		font_fatfont = createImage( data, extent, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT );
+		stbi_image_free( data );
+
+		// tinyfont
+		data = stbi_load( "../fontLUTs/tinyFont.png", &w, &h, &channels, 0 );
+		extent = { uint32_t( w ), uint32_t( h ), 1 };
+		font_tinyfont = createImage( data, extent, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT );
+		stbi_image_free( data );
+	}
+
 	// placeholder
 	// addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 250.0f, 0.0f, 1.0f * pi, 0 );
 	// addSegment( vec2( 100.0f ), vec2( 400.0f, 356.0f ), 0 );
@@ -1010,6 +1035,9 @@ void PrometheusInstance::initResources () {
 		destroyImage( PreviewAtlas );
 		destroyImage( SpectrumISImage );
 		destroyImage( PickISImage );
+		destroyImage( font_codepage437 );
+		destroyImage( font_fatfont );
+		destroyImage( font_tinyfont );
 	});
 }
 
