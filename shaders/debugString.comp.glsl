@@ -40,7 +40,7 @@ layout ( set = 0, binding = 7 ) uniform sampler2D font_tinyfont;
 ivec2 glyphSize;
 
 // glyph mask from the LUT
-bool getGlyphMask ( uvec2 pixel, uint8_t pickedGlyph ) {
+bool getGlyphMask ( uvec2 pixel, uint pickedGlyph ) {
 
 	// off-glyph returns false
 	if ( pixel.x >= glyphSize.x || pixel.y >= glyphSize.y )

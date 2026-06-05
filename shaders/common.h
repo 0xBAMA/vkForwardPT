@@ -5,8 +5,9 @@ layout( push_constant ) uniform constants {
 	uint wangSeed;
 } PushConstants;
 
-#extension GL_EXT_scalar_block_layout : require  // for packing in the UBO
-#extension GL_EXT_shader_16bit_storage : require // for 8 and 16 bit types
+#extension GL_EXT_scalar_block_layout  : require  // for packing in the UBO
+#extension GL_EXT_shader_8bit_storage  : require  // for 8 and 16 bit types
+#extension GL_EXT_shader_16bit_storage : require
 
 //=========================================================
 // Global config etc data in a UBO
