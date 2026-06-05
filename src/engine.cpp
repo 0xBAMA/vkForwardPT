@@ -180,6 +180,7 @@ void PrometheusInstance::Draw () {
 	vkutil::transition_image( cmd, XYZImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_imageD( cmd, depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
+	vkutil::transition_image( cmd, depthImageCache.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, lineColorAttachment.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 
 	vkutil::transition_image( cmd, font_codepage437.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
@@ -213,6 +214,11 @@ void PrometheusInstance::Draw () {
 	{ // do the debug line draw over top of the final LDR color
 		scopedTimer start( "Debug Line Draw" );
 		DebugLineDraw.invoke( cmd );
+	}
+
+	{ // do the debug string draw
+		scopedTimer start( "Debug String Draw" );
+		DebugStringDraw.invoke( cmd );
 	}
 
 	// transition the images for the copy
@@ -897,6 +903,11 @@ void PrometheusInstance::initResources () {
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) debugStringConfigBuffer.buffer, "Debug Text UBO" );
 	}
 
+	{ // actually need to blit depth to another target, unfortunately
+		depthImageCache = createImage( depthImage.imageExtent, VK_FORMAT_R32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT );
+		SetDebugName( VK_OBJECT_TYPE_IMAGE, ( uint64_t ) depthImageCache.image, "Debug Text Depth" );
+	}
+
 	{ // Load font LUTs from disk...
 		// code page 437
 		int w, h, channels;
@@ -918,6 +929,7 @@ void PrometheusInstance::initResources () {
 		stbi_image_free( data );
 	}
 
+
 	// placeholder
 	// addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 250.0f, 0.0f, 1.0f * pi, 0 );
 	// addSegment( vec2( 100.0f ), vec2( 400.0f, 356.0f ), 0 );
@@ -927,6 +939,18 @@ void PrometheusInstance::initResources () {
 		std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
 		return std::mt19937( seq );
 	} () );
+
+	for ( int i = 0; i < 100; i++ ) {
+		const float p = std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG );
+		const float sizeRamp = std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG );
+		addDebugString( vec2( std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG ), std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG ) ),
+			fmt::format( "Test String {}", i ), vec3(
+			std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ),
+			std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ),
+			std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) ),
+		std::uniform_int_distribution< int >( 0, 3 )( seedRNG ),
+		std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) );
+	}
 
 	// it would be great to be able to add a line + text renderer
 		// with state, so I can call reset when I want (or never)
@@ -946,7 +970,7 @@ void PrometheusInstance::initResources () {
 	for ( int xB = 300; xB < ImageBufferResolution.width - 300; xB += 400 ) {
 		for ( int yB = 300; yB < ImageBufferResolution.height - 300; yB += 300 ) {
 
-			addDebugDrawBox( vec2( xB, yB ), vec2( xB + 2.0f * 168.0f, yB + 200.0f ), vec3( 1.0f ) );
+			addDebugDrawBox( vec2( xB, yB ), vec2( xB + 2.0f * 168.0f, yB + 200.0f ), vec3( 1.0f ), 0.5f );
 
 			const float sizeRamp = std::uniform_real_distribution< float >( 5.0f, 150.0f )( seedRNG );
 			vec2 basePoint = vec2( xB, yB );
@@ -1038,6 +1062,7 @@ void PrometheusInstance::initResources () {
 		destroyImage( font_codepage437 );
 		destroyImage( font_fatfont );
 		destroyImage( font_tinyfont );
+		destroyImage( depthImageCache );
 	});
 }
 
@@ -1439,12 +1464,13 @@ void PrometheusInstance::initComputePasses () {
 
 			// access to the result of the debug line drawing
 			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // color image
-			builder.add_binding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // depth image
+			builder.add_binding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // depth image for the text
+			builder.add_binding( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // the depth result from the lines
 
 			// font LUTs
-			builder.add_binding( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // code page 437
-			builder.add_binding( 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // fatfont
-			builder.add_binding( 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // tinyfont
+			builder.add_binding( 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // code page 437
+			builder.add_binding( 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // fatfont
+			builder.add_binding( 7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // tinyfont
 
 			DebugStringDraw.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
 			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) DebugStringDraw.descriptorSetLayout, "Debug String Draw Descriptor Set Layout" );
@@ -1507,16 +1533,17 @@ void PrometheusInstance::initComputePasses () {
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 
 				// the config UBO
-				writer.write_buffer( 1, debugLineDrawBuffer.buffer, sizeof( debugStringConfig ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
+				writer.write_buffer( 1, debugStringConfigBuffer.buffer, sizeof( debugStringConfig ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 
 				// the color + depth attachments
 				writer.write_image( 2, drawImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
-				writer.write_image( 3, depthImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
+				writer.write_image( 3, depthImageCache.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
+				writer.write_image( 4, depthImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
 
 				// the font LUTs
-				writer.write_image( 4, font_codepage437.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
-				writer.write_image( 5, font_fatfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
-				writer.write_image( 6, font_tinyfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				writer.write_image( 5, font_codepage437.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				writer.write_image( 6, font_fatfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				writer.write_image( 7, font_tinyfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
 
 				writer.update_set( device, DebugStringDraw.descriptorSet );
 			}
@@ -1532,17 +1559,34 @@ void PrometheusInstance::initComputePasses () {
 			// send the current value of the push constants
 			vkCmdPushConstants( cmd, DebugStringDraw.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &DebugStringDraw.pushConstants );
 
-			// dispatch for all the pixels
-			vkCmdDispatch( cmd, globalData.numRays / 64, 1, 1 );
-
-			VkBufferMemoryBarrier2 bufferBarrier = makeBufferBarrier( rayBuffer.buffer, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT );
-			VkDependencyInfo barrierDependency {
-				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-				.bufferMemoryBarrierCount = 1,
-				.pBufferMemoryBarriers = &bufferBarrier,
+			// specify the dependency once
+			VkImageMemoryBarrier2 imageMemoryBarriers[] = {
+				makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT ),
+				makeImageBarrier( depthImageCache.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT )
 			};
 
-			vkCmdPipelineBarrier2( cmd, &barrierDependency );
+			VkDependencyInfo barrierDependency {
+				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+				.bufferMemoryBarrierCount = 0,
+				.pBufferMemoryBarriers = nullptr,
+				.imageMemoryBarrierCount = 2,
+				.pImageMemoryBarriers = imageMemoryBarriers,
+			};
+
+			// copy the string configs into the buffer
+			debugStringConfig * debugStringConfigGPU = ( debugStringConfig * ) debugStringConfigBuffer.allocation->GetMappedData();
+
+			// iterating through the list of strings
+			for ( auto& s : debugStrings ) {
+				// copy to the GPU
+				memcpy( debugStringConfigGPU, &s, sizeof( debugStringConfig ) );
+
+				// dispatch the shader -> only for one line, we are not evaluating newlines -> loose fit using workgroup of 16
+				vkCmdDispatch( cmd, s.debugStringLength, 1, 1 );
+
+				// insert barriers so the strings correctly depth test
+				vkCmdPipelineBarrier2( cmd, &barrierDependency );
+			}
 		};
 	}
 
@@ -2128,7 +2172,7 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 }
 
 // text rendering, with pixel location + select from the list of available font LUTs (tinyfont, fatfont, code page 437)
-int PrometheusInstance::addDebugString ( vec2 position, std::string &displayText, vec3 color, int fontSelect, float zDepth ) {
+int PrometheusInstance::addDebugString ( vec2 position, std::string displayText, vec3 color, int fontSelect, float zDepth ) {
 	debugStringConfig s;
 
 	// for runtime usage
@@ -2609,6 +2653,7 @@ void PrometheusInstance::createSwapchain ( uint32_t w, uint32_t h ) {
 	VkImageUsageFlags depthImageUsages{};
 	depthImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	depthImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
 	VkImageCreateInfo dimg_info = vkinit::image_create_info( depthImage.imageFormat, depthImageUsages, drawImageExtent );
 	//allocate and create the depth image
 	vmaCreateImage( allocator, &dimg_info, &rimg_allocinfo, &depthImage.image, &depthImage.allocation, nullptr );

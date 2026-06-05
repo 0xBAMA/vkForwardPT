@@ -30,11 +30,12 @@ layout( set = 0, binding = 1, scalar ) uniform debugStringConfig {
 // color attachment + depth attachment -> need read/write access
 layout ( rgba16f, set = 0, binding = 2 ) uniform image2D colorImage;
 layout ( r32f, set = 0, binding = 3 ) uniform image2D depthImage;
+layout ( set = 0, binding = 4 ) uniform sampler2D depthImageSampler;
 
 // font LUTs -> bind all of them, and switch with an integer
-layout ( set = 0, binding = 4 ) uniform sampler2D font_Codepage437;
-layout ( set = 0, binding = 5 ) uniform sampler2D font_fatfont;
-layout ( set = 0, binding = 6 ) uniform sampler2D font_tinyfont;
+layout ( set = 0, binding = 5 ) uniform sampler2D font_Codepage437;
+layout ( set = 0, binding = 6 ) uniform sampler2D font_fatfont;
+layout ( set = 0, binding = 7 ) uniform sampler2D font_tinyfont;
 
 // global state -> set in main(), first thing
 ivec2 glyphSize;
@@ -73,7 +74,10 @@ bool getGlyphMask ( uvec2 pixel, uint pickedGlyph ) {
 
 // should this sample write, based on depth?
 bool compareDepth () {
-	float depthSample = imageLoad( depthImage, ivec2( gl_GlobalInvocationID.xy ) ).r;
+	float depthSample = max(
+		imageLoad( depthImage, ivec2( gl_GlobalInvocationID.xy ) ).r,
+		texelFetch( depthImageSampler, ivec2( gl_GlobalInvocationID.xy ), 0 ).r
+	);
 	return ( depthSample < StringConfig.debugStringDepth );
 }
 

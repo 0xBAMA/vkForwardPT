@@ -197,7 +197,7 @@ public:
 	static constexpr float debugDrawMinDepth{ 1.0f }; // closest to screen
 
 	// text rendering, with pixel location + select from the list of available font LUTs (tinyfont, fatfont, code page 437)
-	int addDebugString ( vec2 position, std::string &displayText, vec3 color, int fontSelect, float zDepth = debugDrawMaxDepth );
+	int addDebugString ( vec2 position, std::string displayText, vec3 color, int fontSelect, float zDepth = debugDrawMaxDepth );
 
 	// 2D line segment
 	int addDebugDrawLine ( vec2 a, vec2 b, vec3 color, float zDepthA = debugDrawMaxDepth, float zDepthB = debugDrawMaxDepth );
@@ -224,6 +224,12 @@ public:
 	AllocatedBuffer GeometryBuffer;		// containing the 16-float representations of the geometry
 	AllocatedBuffer BBoxBuffer;			// containing the scratch memory for the primitives' bounding boxes
 	AllocatedBuffer UncompactedGridBuffer; // scratch memory for GPU precomputation of grid
+
+	// font LUT textures
+	AllocatedImage font_codepage437;
+	AllocatedImage font_fatfont;
+	AllocatedImage font_tinyfont;
+	AllocatedImage depthImageCache; // the raster depth is copied here for the text to use
 
 	// eventually these also need a material
 	void addSegment ( vec2 a, vec2 b, int material, bool invert = false );
