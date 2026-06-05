@@ -1369,7 +1369,7 @@ void PrometheusInstance::initComputePasses () {
 			// and the actual compute dispatch for pixels - this is sized for the full buffer
 			vkCmdDispatch( cmd, ( ImageBufferResolution.width + 15 ) / 16, ( ImageBufferResolution.height + 15 ) / 16, 1 );
 
-			VkImageMemoryBarrier2 barrierC = makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT );
+			VkImageMemoryBarrier2 barrierC = makeImageBarrier( XYZImage.image, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT );
 			VkDependencyInfo barrierDependency {
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
 				.imageMemoryBarrierCount = 1,
@@ -1524,9 +1524,10 @@ void PrometheusInstance::initComputePasses () {
 			pipelineBuilder.set_polygon_mode( VK_POLYGON_MODE_FILL );
 			pipelineBuilder.set_cull_mode( VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE );
 			pipelineBuilder.set_multisampling_none();
-			pipelineBuilder.enable_blending_additive();
+			pipelineBuilder.disable_blending();
 			pipelineBuilder.enable_depthtest( true, VK_COMPARE_OP_GREATER_OR_EQUAL );
 			pipelineBuilder.set_color_attachment_format( drawImage.imageFormat );
+			pipelineBuilder.set_depth_format( depthImage.imageFormat );
 			DebugLineDraw.pipeline = pipelineBuilder.build_pipeline( device );
 			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) DebugLineDraw.pipeline, "Debug Line Raster Pipeline" );
 
@@ -1606,9 +1607,19 @@ void PrometheusInstance::initComputePasses () {
 			scissor.extent.height = ImageBufferResolution.height;
 			vkCmdSetScissor( cmd, 0, 1, &scissor );
 
-			// draw all the agents as points
+			// draw line segments
 			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,  DebugLineDraw.pipelineLayout, 0, 1, &DebugLineDraw.descriptorSet, 0, nullptr );
 			vkCmdPushConstants( cmd, DebugLineDraw.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &DebugLineDraw.pushConstants );
+
+			const VkClearDepthStencilValue depthClearValue = { 0.0f, 0 };
+			const VkImageSubresourceRange range = {
+				.aspectMask =  VK_IMAGE_ASPECT_DEPTH_BIT,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1,
+			};
+			vkCmdClearDepthStencilImage( cmd, depthImage.image, VK_IMAGE_LAYOUT_GENERAL, &depthClearValue, 1, &range );
 
 			// launch a draw command to do the fullscreen triangle
 			vkCmdDraw( cmd, ( 1 << 16 ), 1, 0, 0 );
