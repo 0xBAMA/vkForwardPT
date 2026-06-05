@@ -627,6 +627,7 @@ void PrometheusInstance::initVulkan () {
 	features12.bufferDeviceAddress = true;
 	features12.descriptorIndexing = true;
 	features12.scalarBlockLayout = true;
+	features12.uniformAndStorageBuffer8BitAccess = true;
 
 	//use vkbootstrap to select a gpu.
 	//We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct features
