@@ -1510,11 +1510,15 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdDraw( cmd, ( 1 << 16 ), 1, 0, 0 );
 			vkCmdEndRendering( cmd );
 
-			VkImageMemoryBarrier2 barrierC = makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_READ_BIT );
+			VkImageMemoryBarrier2 barrierC[] = {
+				makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT ),
+				makeImageBarrier( depthImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT )
+			};
+
 			VkDependencyInfo barrierDependency {
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-				.imageMemoryBarrierCount = 1,
-				.pImageMemoryBarriers = &barrierC
+				.imageMemoryBarrierCount = 2,
+				.pImageMemoryBarriers = barrierC
 			};
 
 			vkCmdPipelineBarrier2( cmd, &barrierDependency );
