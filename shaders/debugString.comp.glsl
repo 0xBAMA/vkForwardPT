@@ -28,13 +28,13 @@ layout( set = 0, binding = 1, scalar ) uniform debugStringConfig {
 } StringConfig;
 
 // color attachment + depth attachment -> need read/write access
-layout ( rgba16f, set = 0, binding = 3 ) uniform image2D colorImage;
-layout ( r32f, set = 0, binding = 4 ) uniform image2D depthImage;
+layout ( rgba16f, set = 0, binding = 2 ) uniform image2D colorImage;
+layout ( r32f, set = 0, binding = 3 ) uniform image2D depthImage;
 
 // font LUTs -> bind all of them, and switch with an integer
-layout ( set = 0, binding = 5 ) uniform sampler2D font_Codepage437;
-layout ( set = 0, binding = 6 ) uniform sampler2D font_fatfont;
-layout ( set = 0, binding = 7 ) uniform sampler2D font_tinyfont;
+layout ( set = 0, binding = 4 ) uniform sampler2D font_Codepage437;
+layout ( set = 0, binding = 5 ) uniform sampler2D font_fatfont;
+layout ( set = 0, binding = 6 ) uniform sampler2D font_tinyfont;
 
 // global state -> set in main(), first thing
 ivec2 glyphSize;
