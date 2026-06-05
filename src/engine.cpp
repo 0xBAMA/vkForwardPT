@@ -996,6 +996,7 @@ void PrometheusInstance::initResources () {
 		destroyBuffer( rayBuffer );
 		destroyBuffer( LightParametersBuffer );
 		destroyBuffer( debugLineDrawBuffer );
+		destroyBuffer( debugStringConfigBuffer );
 		destroyBuffer( GeometryBuffer );
 		destroyBuffer( PrefixBuffer );
 		destroyBuffer( GridBuffer );
@@ -1384,6 +1385,17 @@ void PrometheusInstance::initComputePasses () {
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
+			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // string config UBO
+
+			// font LUTs
+			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // code page 437
+			builder.add_binding( 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // fatfont
+			builder.add_binding( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // tinyfont
+
+			// access to the result of the debug line drawing
+			builder.add_binding( 5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // color image
+			builder.add_binding( 6, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // depth image
+
 			DebugStringDraw.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
 			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) DebugStringDraw.descriptorSetLayout, "Debug String Draw Descriptor Set Layout" );
 		}

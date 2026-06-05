@@ -46,18 +46,22 @@ bool getGlyphMask ( uvec2 pixel, uint pickedGlyph ) {
 	if ( pixel.x >= glyphSize.x || pixel.y >= glyphSize.y )
 		return false;
 
-	// char -> corresponding glyph
-	ivec2 baseLocation = glyphSize.xy * ivec2( pickedGlyph % 16, pickedGlyph / 16 );
+	// invalid glyph
+	if ( pickedGlyph > 255 )
+		return false;
 
-	vec4 glyphSample;
+	// char -> corresponding location on the glyph LUT
+	ivec2 loc = ivec2( pixel ) + glyphSize.xy * ivec2( pickedGlyph % 16, pickedGlyph / 16 );
+
+	float glyphSample;
 	switch ( StringConfig.debugStringFontPick ) {
-		case 0: glyphSample = texelFetch( font_Codepage437, baseLocation + pixel, 0 ).a;
+		case 0: glyphSample = texelFetch( font_Codepage437, loc, 0 ).a;
 		break;
 
-		case 1: glyphSample = texelFetch( font_fatfont, baseLocation + pixel, 0 ).a;
+		case 1: glyphSample = texelFetch( font_fatfont, loc, 0 ).a;
 		break;
 
-		case 2: glyphSample = texelFetch( font_tinyfont, baseLocation + pixel, 0 ).a;
+		case 2: glyphSample = texelFetch( font_tinyfont, loc, 0 ).a;
 		break;
 
 		default: break;
@@ -69,7 +73,7 @@ bool getGlyphMask ( uvec2 pixel, uint pickedGlyph ) {
 
 // should this sample write, based on depth?
 bool compareDepth () {
-	float depthSample = imageLoad( depthImage, gl_GlobalInvocationID.xy );
+	float depthSample = imageLoad( depthImage, ivec2( gl_GlobalInvocationID.xy ) ).r;
 	return ( depthSample < StringConfig.debugStringDepth );
 }
 
@@ -77,13 +81,13 @@ bool compareDepth () {
 void main () {
 	// populate the glyph size in global scope
 	switch ( StringConfig.debugStringFontPick ) {
-	case 0: glyphSize = textureSize( font_Codepage437, 0 ) / 16;
+	case 0: glyphSize = textureSize( font_Codepage437, 0 ) / ivec2( 16 );
 		break;
 
-	case 1: glyphSize = textureSize( font_fatfont, 0 ) / 16;
+	case 1: glyphSize = textureSize( font_fatfont, 0 ) / ivec2( 16 );
 		break;
 
-	case 2: glyphSize = textureSize( font_tinyfont, 0 ) / 16;
+	case 2: glyphSize = textureSize( font_tinyfont, 0 ) / ivec2( 16 );
 		break;
 
 	default: break;
@@ -98,7 +102,7 @@ void main () {
 		shouldWrite = false; // out of bounds only needs to do simple greater than check
 
 	// fetch glyph id -> check glyph mask
-	uint8_t myGlyph = StringConfig.debugStringData[ gl_GlobalInvocationID.x / ( glyphSize.x + 1 ) ];
+	uint myGlyph = uint( StringConfig.debugStringData[ gl_GlobalInvocationID.x / ( glyphSize.x + 1 ) ] );
 	uvec2 pixelOffset = uvec2( gl_GlobalInvocationID.x % ( glyphSize.x + 1 ), gl_GlobalInvocationID.y );
 	onGlyph = getGlyphMask( pixelOffset, myGlyph );
 
@@ -115,10 +119,10 @@ void main () {
 	// if we have not rejected yet... write color, depth
 	if ( shouldWrite ) {
 		// update depth with string depth
-		imageStore( depthImage, gl_GlobalInvocationID.xy, vec4( StringConfig.debugStringDepth ) );
+		imageStore( depthImage, ivec2( gl_GlobalInvocationID.xy ), vec4( StringConfig.debugStringDepth ) );
 
 		// update color with foreground or background color
-		vec3 c = onGlyph ? StringConfig.debugStringFillColor : StringConfig.debugStringBackgroundColor;
-		imageStore( colorImage, gl_LocalInvocationID.xy, vec4( c, 1.0f ) );
+		vec3 c = onGlyph ? StringConfig.debugStringFillColor.rgb : StringConfig.debugStringBackgroundColor.rgb;
+		imageStore( colorImage, ivec2( gl_LocalInvocationID.xy ), vec4( c, 1.0f ) );
 	}
 }
