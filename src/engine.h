@@ -114,6 +114,17 @@ struct debugLinePoint {
 	vec4 color;
 };
 
+struct debugStringConfig {
+	// writing a string of N characters to the image
+	vec2 debugStringWriteLocation;
+	vec4 debugStringFillColor;
+	vec4 debugStringBackgroundColor;
+	uint32_t debugStringFontPick;
+	uint32_t debugStringLength;
+	float debugStringDepth;
+	uint8_t debugStringData[ 4096 ];
+};
+
 constexpr unsigned int FRAME_OVERLAP = 2;
 constexpr bool useValidationLayers = true;
 
@@ -176,17 +187,20 @@ public:
 	// debug line state
 	AllocatedBuffer debugLineDrawBuffer;
 	int debugLineDrawNumLines{ 8 }; // start with scratch for mouse crosshair
-	static constexpr float debugDrawMaxDepth{ 1.0f };
-	static constexpr float debugDrawMinDepth{ 0.0f };
+
+	// debug string state -> user can keep index and overwrite the string scratch memory at runtime
+	std::vector< debugStringConfig > debugStrings;
+	AllocatedBuffer debugStringConfigBuffer; // the string config structs get copied to this buffer
+
+	// using reverse Z, GREATER_OR_EQUAL depth compare op
+	static constexpr float debugDrawMaxDepth{ 0.0f }; // farthest from screen
+	static constexpr float debugDrawMinDepth{ 1.0f }; // closest to screen
 
 	// text rendering, with pixel location + select from the list of available font LUTs (tinyfont, fatfont, code page 437)
 	int addDebugString ( vec2 position, std::string &displayText, vec3 color, int fontSelect, float zDepth = debugDrawMaxDepth );
-	// void deleteDebugString ( int idx ); // tbd, use the return value from the add?
-	// an "updateDebugString"/"updateDebugLine", kind of idea
 
 	// 2D line segment
 	int addDebugDrawLine ( vec2 a, vec2 b, vec3 color, float zDepthA = debugDrawMaxDepth, float zDepthB = debugDrawMaxDepth );
-	// void deleteDebugDrawLine ( int idx );
 
 	// 2D bounding box helper, draws 4 lines
 	int addDebugDrawBox ( vec2 min, vec2 max, vec3 color, float zDepth = debugDrawMaxDepth );
@@ -195,6 +209,7 @@ public:
 	ComputeEffect Raytrace;
 	ComputeEffect Accumulate;
 	ComputeEffect DebugLineDraw;
+	ComputeEffect DebugStringDraw;
 
 	// for precomputing the grid acceleration structure on the GPU
 	ComputeEffect BBoxPrecompute;
