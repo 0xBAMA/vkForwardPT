@@ -911,21 +911,26 @@ void PrometheusInstance::initResources () {
 	// addDebugDrawLine();
 	// addDebugDrawBox();
 
-	float sizeRamp = 1.5f;
+	// float sizeRamp = 1.5f;
 	for ( int xB = 300; xB < ImageBufferResolution.width - 300; xB += 400 ) {
 		for ( int yB = 300; yB < ImageBufferResolution.height - 300; yB += 300 ) {
+
+			addDebugDrawBox( vec2( xB, yB ), vec2( xB + 2.0f * 168.0f, yB + 200.0f ), vec3( 1.0f ) );
+
+			const float sizeRamp = std::uniform_real_distribution< float >( 5.0f, 150.0f )( seedRNG );
 			vec2 basePoint = vec2( xB, yB );
 			for ( float xO = 0.0f; xO < 2.0f * 168.0f; xO += sizeRamp ) {
 				for ( float yO = 0.0f; yO < 200.0f; yO += sizeRamp ) {
 					vec2 offset = vec2( xO, yO );
 
-					const int m = std::uniform_int_distribution< int >( 9, 16 )( seedRNG );
-					addArc( basePoint + offset, sizeRamp * 0.45, pi / 2.0f,  pi + pi / 2.0f, m );
+					const int m = std::uniform_int_distribution< int >( 12, 14 )( seedRNG );
+					// addArc( basePoint + offset, sizeRamp * 0.45, pi / 2.0f,  pi + pi / 2.0f, m );
+					addArc( basePoint + offset, sizeRamp * 0.45, 0.0f,  pi * 2.0f, 12 );
 				}
 			}
-			sizeRamp *= 1.15f;
+			// sizeRamp *= 1.2f;
 		}
-		if ( sizeRamp > 100.0f ) break;
+		// if ( sizeRamp > 100.0f ) break;
 	}
 
 	/*
