@@ -1939,25 +1939,32 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 // text rendering, with pixel location + select from the list of available font LUTs (tinyfont, fatfont, code page 437)
 int PrometheusInstance::addDebugString ( vec2 position, std::string &displayText, vec3 color, int fontSelect, float zDepth ) {
 
-
-	return debugLineDrawNumLines; // tbd, second counter
+	return debugLineDrawNumLines;
 }
-// void deleteDebugString ( int idx ); // tbd, use the return value from the add?
 
 // 2D line segment
 int PrometheusInstance::addDebugDrawLine ( vec2 a, vec2 b, vec3 color, float zDepthA, float zDepthB ) {
+	// need to update the buffer with the new line
+	debugLinePoint* linePointData = ( debugLinePoint * ) debugLineDrawBuffer.allocation->GetMappedData();
 
+	linePointData[ debugLineDrawNumLines + 0 ].position = vec4( a, zDepthA, 1.0f );
+	linePointData[ debugLineDrawNumLines + 0 ].color = vec4( color, 1.0f );
+	linePointData[ debugLineDrawNumLines + 1 ].position = vec4( b, zDepthB, 1.0f );
+	linePointData[ debugLineDrawNumLines + 1 ].color = vec4( color, 1.0f );
+
+	debugLineDrawNumLines += 2;
 	return debugLineDrawNumLines;
 }
-// void deleteDebugDrawLine ( int idx );
 
 // 2D bounding box helper, draws 4 lines
 int PrometheusInstance::addDebugDrawBox ( vec2 min, vec2 max, vec3 color, float zDepth ) {
+	addDebugDrawLine( min, vec2( min.x, max.y ), color, zDepth, zDepth );
+	addDebugDrawLine( min, vec2( max.x, min.y ), color, zDepth, zDepth );
+	addDebugDrawLine( max, vec2( min.x, max.y ), color, zDepth, zDepth );
+	addDebugDrawLine( max, vec2( max.x, min.y ), color, zDepth, zDepth );
 
 	return debugLineDrawNumLines;
 }
-
-
 
 void PrometheusInstance::lightManagerMaintenance () {
 	// three resources need to be kept up:
