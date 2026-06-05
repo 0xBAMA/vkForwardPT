@@ -1633,10 +1633,19 @@ void PrometheusInstance::initComputePasses () {
 			}
 
 			// additive raster for the agent locations
-			VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 			VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
-			VkRenderingAttachmentInfo depthAttachment = vkinit::attachment_info( depthImage.imageView, &clearColor, VK_IMAGE_LAYOUT_GENERAL );
+			VkRenderingAttachmentInfo depthAttachment = vkinit::attachment_info( depthImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
 			VkRenderingInfo renderInfo = vkinit::rendering_info( ImageBufferResolution, &colorAttachment, &depthAttachment );
+
+			const VkClearDepthStencilValue depthClearValue = { 0.0f, 0 };
+			const VkImageSubresourceRange range = {
+				.aspectMask =  VK_IMAGE_ASPECT_DEPTH_BIT,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1,
+			};
+			vkCmdClearDepthStencilImage( cmd, depthImage.image, VK_IMAGE_LAYOUT_GENERAL, &depthClearValue, 1, &range );
 
 			vkCmdBeginRendering( cmd, &renderInfo );
 			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, DebugLineDraw.pipeline );
@@ -1672,16 +1681,6 @@ void PrometheusInstance::initComputePasses () {
 			// draw line segments
 			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,  DebugLineDraw.pipelineLayout, 0, 1, &DebugLineDraw.descriptorSet, 0, nullptr );
 			vkCmdPushConstants( cmd, DebugLineDraw.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &DebugLineDraw.pushConstants );
-
-			const VkClearDepthStencilValue depthClearValue = { 0.0f, 0 };
-			const VkImageSubresourceRange range = {
-				.aspectMask =  VK_IMAGE_ASPECT_DEPTH_BIT,
-				.baseMipLevel = 0,
-				.levelCount = 1,
-				.baseArrayLayer = 0,
-				.layerCount = 1,
-			};
-			vkCmdClearDepthStencilImage( cmd, depthImage.image, VK_IMAGE_LAYOUT_GENERAL, &depthClearValue, 1, &range );
 
 			// launch a draw command to do the fullscreen triangle
 			vkCmdDraw( cmd, ( 1 << 16 ), 1, 0, 0 );
