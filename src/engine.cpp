@@ -1415,7 +1415,7 @@ void PrometheusInstance::initComputePasses () {
 			pipelineBuilder.set_cull_mode( VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE );
 			pipelineBuilder.set_multisampling_none();
 			pipelineBuilder.enable_blending_additive();
-			pipelineBuilder.disable_depthtest();
+			pipelineBuilder.enable_depthtest( true, VK_COMPARE_OP_GREATER_OR_EQUAL );
 			pipelineBuilder.set_color_attachment_format( drawImage.imageFormat );
 			DebugLineDraw.pipeline = pipelineBuilder.build_pipeline( device );
 			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) DebugLineDraw.pipeline, "Debug Line Raster Pipeline" );
@@ -1444,15 +1444,15 @@ void PrometheusInstance::initComputePasses () {
 			{ // mouse position crosshair
 				const int sO = 7;
 				const int bO = 15;
-				linePointData[ 0 ].position = vec4( globalData.mouseLoc.x + bO, globalData.mouseLoc.y, 0.0f, 1.0f );
-				linePointData[ 1 ].position = vec4( globalData.mouseLoc.x + sO, globalData.mouseLoc.y, 0.0f, 1.0f );
-				linePointData[ 2 ].position = vec4( globalData.mouseLoc.x - bO, globalData.mouseLoc.y, 0.0f, 1.0f );
-				linePointData[ 3 ].position = vec4( globalData.mouseLoc.x - sO, globalData.mouseLoc.y, 0.0f, 1.0f );
+				linePointData[ 0 ].position = vec4( globalData.mouseLoc.x + bO, globalData.mouseLoc.y, 0.5f, 1.0f );
+				linePointData[ 1 ].position = vec4( globalData.mouseLoc.x + sO, globalData.mouseLoc.y, 0.5f, 1.0f );
+				linePointData[ 2 ].position = vec4( globalData.mouseLoc.x - bO, globalData.mouseLoc.y, 0.5f, 1.0f );
+				linePointData[ 3 ].position = vec4( globalData.mouseLoc.x - sO, globalData.mouseLoc.y, 0.5f, 1.0f );
 
-				linePointData[ 4 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + bO, 0.0f, 1.0f );
-				linePointData[ 5 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + sO, 0.0f, 1.0f );
-				linePointData[ 6 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - bO, 0.0f, 1.0f );
-				linePointData[ 7 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - sO, 0.0f, 1.0f );
+				linePointData[ 4 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + bO, 0.5f, 1.0f );
+				linePointData[ 5 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + sO, 0.5f, 1.0f );
+				linePointData[ 6 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - bO, 0.5f, 1.0f );
+				linePointData[ 7 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - sO, 0.5f, 1.0f );
 
 				for ( int i = 0; i < 8; ++i ) {
 					linePointData[ i ].color = vec4( 1.0f );
@@ -1460,8 +1460,10 @@ void PrometheusInstance::initComputePasses () {
 			}
 
 			// additive raster for the agent locations
+			VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 			VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
-			VkRenderingInfo renderInfo = vkinit::rendering_info( ImageBufferResolution, &colorAttachment, nullptr );
+			VkRenderingAttachmentInfo depthAttachment = vkinit::attachment_info( depthImage.imageView, &clearColor, VK_IMAGE_LAYOUT_GENERAL );
+			VkRenderingInfo renderInfo = vkinit::rendering_info( ImageBufferResolution, &colorAttachment, &depthAttachment );
 
 			vkCmdBeginRendering( cmd, &renderInfo );
 			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, DebugLineDraw.pipeline );

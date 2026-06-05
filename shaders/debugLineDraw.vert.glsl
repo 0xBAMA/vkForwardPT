@@ -20,6 +20,7 @@ void main () {
 	int idx = gl_VertexIndex;
 
 	gl_Position = vec4( remap( points[ idx ].position.x, 0.0f, GlobalData.floatBufferResolution.x, -1.0f, 1.0f ),
-						remap( points[ idx ].position.y, 0.0f, GlobalData.floatBufferResolution.y, -1.0f, 1.0f ), 0.0f, 1.0f );
+						remap( points[ idx ].position.y, 0.0f, GlobalData.floatBufferResolution.y, -1.0f, 1.0f ),
+						points[ idx ].position.z, 1.0f );
 	colorRGB = points[ idx ].color.rgb;
 }
