@@ -1380,6 +1380,105 @@ void PrometheusInstance::initComputePasses () {
 		};
 	}
 
+	{ // Debug Text Draw
+		{ // descriptor layout
+			DescriptorLayoutBuilder builder;
+			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
+			DebugStringDraw.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
+			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) DebugStringDraw.descriptorSetLayout, "Debug String Draw Descriptor Set Layout" );
+		}
+
+		{ // pipeline layout + compute pipeline
+			VkPushConstantRange pushConstant{};
+			pushConstant.offset = 0;
+			pushConstant.size = sizeof( PushConstants );
+			pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+			VkPipelineLayoutCreateInfo computeLayout{};
+			computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			computeLayout.pNext = nullptr;
+			computeLayout.pSetLayouts = &DebugStringDraw.descriptorSetLayout;
+			computeLayout.setLayoutCount = 1;
+			computeLayout.pPushConstantRanges = &pushConstant;
+			computeLayout.pushConstantRangeCount = 1;
+
+			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &DebugStringDraw.pipelineLayout ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE_LAYOUT, ( uint64_t ) DebugStringDraw.pipelineLayout, "Debug String Draw Pipeline Layout" );
+
+			VkShaderModule DebugStringDrawShader;
+			if ( !vkutil::load_shader_module("../shaders/debugString.comp.glsl.spv", device, &DebugStringDrawShader ) ) {
+				fmt::print( "Error when building the Debug String Draw Compute Shader\n" );
+			}
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) DebugStringDrawShader, "Debug String Draw Shader Module" );
+
+			VkPipelineShaderStageCreateInfo stageinfo{};
+			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			stageinfo.pNext = nullptr;
+			stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+			stageinfo.module = DebugStringDrawShader;
+			stageinfo.pName = "main";
+
+			VkComputePipelineCreateInfo computePipelineCreateInfo{};
+			computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+			computePipelineCreateInfo.pNext = nullptr;
+			computePipelineCreateInfo.layout = DebugStringDraw.pipelineLayout;
+			computePipelineCreateInfo.stage = stageinfo;
+
+			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &DebugStringDraw.pipeline ) );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) Raytrace.pipeline, "Debug String Draw Compute Pipeline" );
+			vkDestroyShaderModule( device, DebugStringDrawShader, nullptr );
+
+			// deletors for the pipeline layout + pipeline
+			mainDeletionQueue.push_function( [ & ] () {
+				vkDestroyDescriptorSetLayout( device, DebugStringDraw.descriptorSetLayout, nullptr );
+				vkDestroyPipelineLayout( device, DebugStringDraw.pipelineLayout, nullptr );
+				vkDestroyPipeline( device, DebugStringDraw.pipeline, nullptr );
+			});
+		}
+
+		// invoke() lambda
+		DebugStringDraw.invoke = [ & ] ( VkCommandBuffer cmd ){
+			// dynamic descriptor allocation, to bind a texture
+			DebugStringDraw.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, DebugStringDraw.descriptorSetLayout );
+			{
+				DescriptorWriter writer;
+				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
+
+				// the config UBO
+
+				// the font LUTs
+
+				// the color attachment
+				// the depth attachment
+
+				writer.update_set( device, DebugStringDraw.descriptorSet );
+			}
+
+			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, DebugStringDraw.pipeline );
+
+			// bind the descriptor set, as just recorded
+			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, DebugStringDraw.pipelineLayout, 0, 1, &DebugStringDraw.descriptorSet, 0, nullptr );
+
+			// get a new wang RNG seed
+			DebugStringDraw.pushConstants.wangSeed = genWangSeed();
+
+			// send the current value of the push constants
+			vkCmdPushConstants( cmd, DebugStringDraw.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &DebugStringDraw.pushConstants );
+
+			// dispatch for all the pixels
+			vkCmdDispatch( cmd, globalData.numRays / 64, 1, 1 );
+
+			VkBufferMemoryBarrier2 bufferBarrier = makeBufferBarrier( rayBuffer.buffer, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT );
+			VkDependencyInfo barrierDependency {
+				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+				.bufferMemoryBarrierCount = 1,
+				.pBufferMemoryBarriers = &bufferBarrier,
+			};
+
+			vkCmdPipelineBarrier2( cmd, &barrierDependency );
+		};
+	}
+
 	{ //debug line drawing layer, need to be able to draw boxes for debugging and for user geometry manipulation widgets
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
