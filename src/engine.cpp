@@ -2612,6 +2612,9 @@ void PrometheusInstance::createSwapchain ( uint32_t w, uint32_t h ) {
 	VkImageViewCreateInfo dview_info = vkinit::imageview_create_info( depthImage.imageFormat, depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT );
 	VK_CHECK( vkCreateImageView( device, &dview_info, nullptr, &depthImage.imageView ) );
 
+	SetDebugName( VK_OBJECT_TYPE_IMAGE, ( uint64_t ) drawImage.image, "Draw Image" );
+	SetDebugName( VK_OBJECT_TYPE_IMAGE, ( uint64_t ) depthImage.image, "Depth Image" );
+
 	// add to deletion queues
 	mainDeletionQueue.push_function( [ = ] () {
 		vkDestroyImageView( device, drawImage.imageView, nullptr );
