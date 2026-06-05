@@ -51,13 +51,13 @@ bool getGlyphMask ( uvec2 pixel, uint pickedGlyph ) {
 
 	vec4 glyphSample;
 	switch ( StringConfig.debugStringFontPick ) {
-		case 0: glyphSample = texelFetch( font_Codepage437, baseLocation + pixel, 0 ) / 16;
+		case 0: glyphSample = texelFetch( font_Codepage437, baseLocation + pixel, 0 ).a;
 		break;
 
-		case 1: glyphSample = texelFetch( font_fatfont, baseLocation + pixel, 0 ) / 16;
+		case 1: glyphSample = texelFetch( font_fatfont, baseLocation + pixel, 0 ).a;
 		break;
 
-		case 2: glyphSample = texelFetch( font_tinyfont, baseLocation + pixel, 0 ) / 16;
+		case 2: glyphSample = texelFetch( font_tinyfont, baseLocation + pixel, 0 ).a;
 		break;
 
 		default: break;

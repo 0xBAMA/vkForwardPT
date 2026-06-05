@@ -887,6 +887,11 @@ void PrometheusInstance::initResources () {
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) debugLineDrawBuffer.buffer, "Debug Line SSBO" );
 	}
 
+	{ // UBO for the text renderer
+		debugStringConfigBuffer = createBuffer( sizeof( debugStringConfig ), VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) debugStringConfigBuffer.buffer, "Debug Text UBO" );
+	}
+
 	// placeholder
 	// addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 250.0f, 0.0f, 1.0f * pi, 0 );
 	// addSegment( vec2( 100.0f ), vec2( 400.0f, 356.0f ), 0 );
