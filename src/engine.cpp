@@ -216,10 +216,10 @@ void PrometheusInstance::Draw () {
 		DebugLineDraw.invoke( cmd );
 	}
 
-	{ // do the debug string draw
-		scopedTimer start( "Debug String Draw" );
-		DebugStringDraw.invoke( cmd );
-	}
+	// { // do the debug string draw
+		// scopedTimer start( "Debug String Draw" );
+		// DebugStringDraw.invoke( cmd );
+	// }
 
 	// transition the images for the copy
 	vkutil::transition_image( cmd, drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
@@ -899,7 +899,7 @@ void PrometheusInstance::initResources () {
 	}
 
 	{ // UBO for the text renderer
-		debugStringConfigBuffer = createBuffer( sizeof( debugStringConfig ), VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+		debugStringConfigBuffer = createBuffer( 1024 * sizeof( debugStringConfig ), VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) debugStringConfigBuffer.buffer, "Debug Text UBO" );
 	}
 
@@ -940,15 +940,15 @@ void PrometheusInstance::initResources () {
 		return std::mt19937( seq );
 	} () );
 
-	for ( int i = 0; i < 100; i++ ) {
-		const float p = std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG );
-		const float sizeRamp = std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG );
-		addDebugString( vec2( std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG ), std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG ) ),
+	for ( int i = 0; i < 10; i++ ) {
+		const float pX = std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG );
+		const float pY = std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG );
+		addDebugString( vec2( pX, pY ),
 			fmt::format( "Test String {}", i ), vec3(
 			std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ),
 			std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ),
 			std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) ),
-		std::uniform_int_distribution< int >( 0, 3 )( seedRNG ),
+		std::uniform_int_distribution< int >( 0, 2 )( seedRNG ),
 		std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) );
 	}
 
@@ -1456,7 +1456,7 @@ void PrometheusInstance::initComputePasses () {
 		};
 	}
 
-	{ // Debug Text Draw
+	{ // Debug Text Draw -> this is going to be redone as a raster process
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
@@ -1533,7 +1533,7 @@ void PrometheusInstance::initComputePasses () {
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 
 				// the config UBO
-				writer.write_buffer( 1, debugStringConfigBuffer.buffer, sizeof( debugStringConfig ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
+				writer.write_buffer( 1, debugStringConfigBuffer.buffer, 1024 * sizeof( debugStringConfig ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 
 				// the color + depth attachments
 				writer.write_image( 2, drawImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
@@ -1576,10 +1576,13 @@ void PrometheusInstance::initComputePasses () {
 			// copy the string configs into the buffer
 			debugStringConfig * debugStringConfigGPU = ( debugStringConfig * ) debugStringConfigBuffer.allocation->GetMappedData();
 
+			// debugStringConfigGPU ( int * );
+
+			// copy the data for the strings to the GPU
+			memcpy( debugStringConfigGPU + 4, &debugStrings[ 0 ], debugStrings.size() * sizeof( debugStringConfig ) );
+
 			// iterating through the list of strings
 			for ( auto& s : debugStrings ) {
-				// copy to the GPU
-				memcpy( debugStringConfigGPU, &s, sizeof( debugStringConfig ) );
 
 				// dispatch the shader -> only for one line, we are not evaluating newlines -> loose fit using workgroup of 16
 				vkCmdDispatch( cmd, s.debugStringLength, 1, 1 );
@@ -2185,6 +2188,8 @@ int PrometheusInstance::addDebugString ( vec2 position, std::string displayText,
 
 	// add to the list of strings
 	debugStrings.push_back( s );
+
+	// fmt::print( "added new string {} at {} {}\n", string( ( char * ) debugStrings[ debugStrings.size() - 1 ].debugStringData ), position.x, position.y );
 
 	// index of the string in the list
 	return debugStrings.size() - 1;

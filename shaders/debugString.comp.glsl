@@ -17,7 +17,7 @@ layout ( local_size_x = 16, local_size_y = 16 ) in;
 	// the string -> this is a sequence of bytes, I can store uint8_t's with
 
 // UBO configuration for writing a string of N characters to the image
-layout( set = 0, binding = 1, scalar ) uniform debugStringConfig {
+struct stringConfig {
 	vec2 debugStringWriteLocation;
 	vec4 debugStringFillColor;
 	vec4 debugStringBackgroundColor;
@@ -25,6 +25,10 @@ layout( set = 0, binding = 1, scalar ) uniform debugStringConfig {
 	uint debugStringLength;
 	float debugStringDepth;
 	uint8_t debugStringData[ 4096 ];
+};
+
+layout( set = 0, binding = 1, scalar ) uniform debugStringConfig {
+	stringConfig debugStrings[ 1024 ];
 } StringConfig;
 
 // color attachment + depth attachment -> need read/write access
@@ -75,8 +79,8 @@ bool getGlyphMask ( uvec2 pixel, uint pickedGlyph ) {
 // should this sample write, based on depth?
 bool compareDepth () {
 	float depthSample = max(
-		imageLoad( depthImage, ivec2( gl_GlobalInvocationID.xy ) ).r,
-		texelFetch( depthImageSampler, ivec2( gl_GlobalInvocationID.xy ), 0 ).r
+		imageLoad( depthImage, ivec2( floor( StringConfig.debugStringWriteLocation ) ) + ivec2( gl_GlobalInvocationID.xy ) ).r,
+		texelFetch( depthImageSampler, ivec2( floor( StringConfig.debugStringWriteLocation ) ) + ivec2( gl_GlobalInvocationID.xy ), 0 ).r
 	);
 	return ( depthSample < StringConfig.debugStringDepth );
 }
@@ -102,31 +106,32 @@ void main () {
 	bool onGlyph = false;
 
 	// in valid range for string?
-	if ( gl_GlobalInvocationID.x > ( ( glyphSize.x + 1 ) * StringConfig.debugStringLength ) || gl_GlobalInvocationID.y > glyphSize.y )
-		shouldWrite = false; // out of bounds only needs to do simple greater than check
+//	if ( gl_GlobalInvocationID.x > ( ( glyphSize.x + 1 ) * StringConfig.debugStringLength ) || gl_GlobalInvocationID.y > glyphSize.y )
+//		shouldWrite = false; // out of bounds only needs to do simple greater than check
 
-	// fetch glyph id -> check glyph mask
-	uint myGlyph = uint( StringConfig.debugStringData[ gl_GlobalInvocationID.x / ( glyphSize.x + 1 ) ] );
-	uvec2 pixelOffset = uvec2( gl_GlobalInvocationID.x % ( glyphSize.x + 1 ), gl_GlobalInvocationID.y );
-	onGlyph = getGlyphMask( pixelOffset, myGlyph );
-
-	// invisible foreground or background possible, or both if you want
-	if ( !onGlyph && ( StringConfig.debugStringBackgroundColor.a == 0.0f ) )
-		shouldWrite = false;
-	else if ( onGlyph && ( StringConfig.debugStringFillColor.a == 0.0f ) )
-		shouldWrite = false;
-
-	// fetch depth -> compare to the UBO depth value for this string
-	if ( compareDepth() )
-		shouldWrite = false;
+//	// fetch glyph id -> check glyph mask
+//	uint myGlyph = uint( StringConfig.debugStringData[ gl_GlobalInvocationID.x / ( glyphSize.x + 1 ) ] );
+//	uvec2 pixelOffset = uvec2( gl_GlobalInvocationID.x % ( glyphSize.x + 1 ), gl_GlobalInvocationID.y );
+//	onGlyph = getGlyphMask( pixelOffset, myGlyph );
+//
+//	// invisible foreground or background possible, or both if you want
+//	if ( !onGlyph && ( StringConfig.debugStringBackgroundColor.a == 0.0f ) )
+//		shouldWrite = false;
+//	else if ( onGlyph && ( StringConfig.debugStringFillColor.a == 0.0f ) )
+//		shouldWrite = false;
+//
+//	// fetch depth -> compare to the UBO depth value for this string
+//	if ( compareDepth() )
+//		shouldWrite = false;
 
 	// if we have not rejected yet... write color, depth
 	if ( shouldWrite ) {
 		// update depth with string depth
-		imageStore( depthImage, ivec2( gl_GlobalInvocationID.xy ), vec4( StringConfig.debugStringDepth ) );
+		imageStore( depthImage, ivec2( floor( StringConfig.debugStringWriteLocation ) ) + ivec2( gl_GlobalInvocationID.xy ), vec4( StringConfig.debugStringDepth ) );
 
 		// update color with foreground or background color
-		vec3 c = onGlyph ? StringConfig.debugStringFillColor.rgb : StringConfig.debugStringBackgroundColor.rgb;
-		imageStore( colorImage, ivec2( gl_LocalInvocationID.xy ), vec4( c, 1.0f ) );
+//		vec3 c = onGlyph ? StringConfig.debugStringFillColor.rgb : StringConfig.debugStringBackgroundColor.rgb;
+		vec3 c = StringConfig.debugStringFillColor.rgb;
+		imageStore( colorImage, ivec2( floor( StringConfig.debugStringWriteLocation ) ) + ivec2( gl_LocalInvocationID.xy ), vec4( c, 1.0f ) );
 	}
 }
