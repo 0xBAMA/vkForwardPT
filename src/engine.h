@@ -274,9 +274,11 @@ public:
 	bool stopRendering { false };
 	int frameNumber { 0 };
 
+	// resources related to the BVH
+
 	void initDefaultData ();
 	// for buffer setup
-	AllocatedBuffer createBuffer( size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage );
+	AllocatedBuffer createBuffer( size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, string label = "" );
 	void destroyBuffer( const AllocatedBuffer& buffer );
 
 	// basic Vulkan necessities, environmental handles
@@ -298,8 +300,6 @@ public:
 	void updateImage ( AllocatedImage& image, void* data, int bytesPerTexel );
 	void screenshot (); // save the contents of the framebuffer
 	void destroyImage ( const AllocatedImage& img );
-
-	void SetDebugName( VkObjectType type, uint64_t handle, const char* name );
 
 	// and some default textures
 	AllocatedImage whiteImage;

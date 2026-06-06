@@ -43,6 +43,7 @@ struct AllocatedBuffer {
 	VkBuffer buffer;
 	VmaAllocation allocation;
 	VmaAllocationInfo info;
+	VkDeviceAddress deviceAddress;
 };
 
 //> intro
@@ -55,3 +56,60 @@ struct AllocatedBuffer {
         }                                                               \
     } while (0)
 //< intro
+
+static VkInstance* globalVkInstancePtr = nullptr;
+static VkDevice* globalVkDevicePtr = nullptr;
+static VmaAllocator* vmaGlobalAllocatorPtr = nullptr;
+
+static void SetDebugName ( VkObjectType type, uint64_t handle, const char* name ) {
+	// Must call extension functions through a function pointer:
+	PFN_vkSetDebugUtilsObjectNameEXT pfnSetDebugUtilsObjectNameEXT = ( PFN_vkSetDebugUtilsObjectNameEXT ) vkGetInstanceProcAddr( *globalVkInstancePtr, "vkSetDebugUtilsObjectNameEXT" );
+
+	// // Set a name on the image
+	// const VkDebugUtilsObjectNameInfoEXT imageNameInfo =
+	// {
+	// 	.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+	// 	.pNext = NULL,
+	// 	.objectType = VK_OBJECT_TYPE_IMAGE,
+	// 	.objectHandle = (uint64_t)image,
+	// 	.pObjectName = "Brick Diffuse Texture",
+	// };
+	//
+	// pfnSetDebugUtilsObjectNameEXT(device, &imageNameInfo);
+
+	VkDebugUtilsObjectNameInfoEXT info{};
+	info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+	info.pNext = NULL;
+	info.objectType = type;
+	info.objectHandle = handle;
+	info.pObjectName = name;
+
+	pfnSetDebugUtilsObjectNameEXT( *globalVkDevicePtr, &info );
+}
+
+static AllocatedBuffer createBuffer ( size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, std::string debugName = "" ) {
+	// allocate buffer
+	VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+	bufferInfo.pNext = nullptr;
+	bufferInfo.size = allocSize;
+	bufferInfo.usage = usage | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT;
+
+	VmaAllocationCreateInfo vmaallocInfo = {};
+	vmaallocInfo.usage = memoryUsage;
+	vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+	AllocatedBuffer newBuffer;
+
+	// allocate the buffer
+	VK_CHECK( vmaCreateBuffer( *vmaGlobalAllocatorPtr, &bufferInfo, &vmaallocInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.info ) );
+
+	VkBufferDeviceAddressInfo deviceAddressInfo = {};
+	deviceAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+	deviceAddressInfo.buffer = newBuffer.buffer;
+	newBuffer.deviceAddress = vkGetBufferDeviceAddress( *globalVkDevicePtr, &deviceAddressInfo  );
+
+	if ( debugName != "" ) {
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) newBuffer.buffer, debugName.c_str() );
+	}
+
+	return newBuffer;
+}

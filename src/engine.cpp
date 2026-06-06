@@ -40,32 +40,6 @@ using namespace std::chrono_literals;
 // heightmap gen
 #include <third_party/diamondSquare/diamondSquare.h>
 
-void PrometheusInstance::SetDebugName ( VkObjectType type, uint64_t handle, const char* name ) {
-	// Must call extension functions through a function pointer:
-	PFN_vkSetDebugUtilsObjectNameEXT pfnSetDebugUtilsObjectNameEXT = ( PFN_vkSetDebugUtilsObjectNameEXT ) vkGetInstanceProcAddr( instance, "vkSetDebugUtilsObjectNameEXT" );
-
-	// // Set a name on the image
-	// const VkDebugUtilsObjectNameInfoEXT imageNameInfo =
-	// {
-	// 	.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
-	// 	.pNext = NULL,
-	// 	.objectType = VK_OBJECT_TYPE_IMAGE,
-	// 	.objectHandle = (uint64_t)image,
-	// 	.pObjectName = "Brick Diffuse Texture",
-	// };
-	//
-	// pfnSetDebugUtilsObjectNameEXT(device, &imageNameInfo);
-
-	VkDebugUtilsObjectNameInfoEXT info{};
-	info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-	info.pNext = NULL;
-	info.objectType = type;
-	info.objectHandle = handle;
-	info.pObjectName = name;
-
-	pfnSetDebugUtilsObjectNameEXT( device, &info );
-}
-
 //============================================================================================================================
 //============================================================================================================================
 // Initialization
