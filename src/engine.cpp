@@ -2270,12 +2270,12 @@ void PrometheusInstance::lightManagerMaintenance () {
 	}
 }
 
-AllocatedBuffer PrometheusInstance::createBuffer ( size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage ) {
+AllocatedBuffer PrometheusInstance::createBuffer ( size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, string label ) {
 	// allocate buffer
 	VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
 	bufferInfo.pNext = nullptr;
 	bufferInfo.size = allocSize;
-	bufferInfo.usage = usage;
+	bufferInfo.usage = usage | VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT;
 
 	VmaAllocationCreateInfo vmaallocInfo = {};
 	vmaallocInfo.usage = memoryUsage;
@@ -2285,6 +2285,14 @@ AllocatedBuffer PrometheusInstance::createBuffer ( size_t allocSize, VkBufferUsa
 	// allocate the buffer
 	VK_CHECK( vmaCreateBuffer( allocator, &bufferInfo, &vmaallocInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.info ) );
 
+	VkBufferDeviceAddressInfo deviceAddressInfo = {};
+	deviceAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+	deviceAddressInfo.buffer = newBuffer.buffer;
+	newBuffer.deviceAddress = vkGetBufferDeviceAddress( *globalVkDevicePtr, &deviceAddressInfo  );
+
+	if ( label != "" ) {
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) newBuffer.buffer, label.c_str() );
+	}
 	return newBuffer;
 }
 
