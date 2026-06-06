@@ -10,6 +10,8 @@
 #include <vk_initializers.h>
 #include <vk_images.h>
 
+#include <third_party/volk/volk.h>
+
 #include "VkBootstrap.h"
 #include <array>
 #include <thread>
@@ -610,6 +612,9 @@ void PrometheusInstance::ShutDown () {
 // Helpers
 //===========================================================================================================================
 void PrometheusInstance::initVulkan () {
+
+	VK_CHECK(volkInitialize());
+
 	// make the vulkan instance, with basic debug features
 	vkb::InstanceBuilder builder;
 	auto inst_ret = builder.set_app_name( "Prometheus" )
@@ -623,6 +628,8 @@ void PrometheusInstance::initVulkan () {
 	//grab the instance
 	instance = vkb_inst.instance;
 	debugMessenger = vkb_inst.debug_messenger;
+
+	volkLoadInstance( instance );
 
 	// create a surface to render to
 	SDL_Vulkan_CreateSurface( window, instance, NULL, &surface );
@@ -658,6 +665,7 @@ void PrometheusInstance::initVulkan () {
 	// Get the VkDevice handle used in the rest of a vulkan application
 	device = vkbDevice.device;
 	physicalDevice = physicalDeviceSelect.physical_device;
+	volkLoadDevice( device );
 
 	// reporting some platform info
 	VkPhysicalDeviceProperties temp;
@@ -704,12 +712,17 @@ void PrometheusInstance::initVulkan () {
 		fmt::print( "Timestamps Unsupported\n\n" );
 	}
 
+	VmaVulkanFunctions funcs{};
+	funcs.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+	funcs.vkGetDeviceProcAddr   = vkGetDeviceProcAddr;
+
 	// initialize the memory allocator
 	VmaAllocatorCreateInfo allocatorInfo = {};
 	allocatorInfo.physicalDevice = physicalDevice;
 	allocatorInfo.device = device;
 	allocatorInfo.instance = instance;
 	allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+	allocatorInfo.pVulkanFunctions = &funcs;
 	vmaCreateAllocator( &allocatorInfo, &allocator );
 
 	mainDeletionQueue.push_function( [ & ] () {

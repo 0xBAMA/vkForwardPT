@@ -1,3 +1,5 @@
+#include "../src/third_party/volk/volk.h"
+
 #include <vk_images.h>
 #include <vk_initializers.h>
 

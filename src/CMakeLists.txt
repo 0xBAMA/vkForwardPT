@@ -9,6 +9,8 @@ add_executable ( Prometheus
 		Prometheus.h
 		engine.cpp
 		engine.h
+		third_party/volk/volk.h
+		third_party/volk/volk.c
 )
 
 set_property( TARGET Prometheus PROPERTY CXX_STANDARD 20 )

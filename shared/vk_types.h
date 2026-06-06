@@ -12,7 +12,9 @@
 #include <functional>
 #include <deque>
 
-#include <vulkan/vulkan.h>
+#define VK_NO_PROTOTYPES
+// #include <vulkan/vulkan.h>
+#include "../src/third_party/volk/volk.h"
 #include <vulkan/vk_enum_string_helper.h>
 #include <vk_mem_alloc.h>
 
