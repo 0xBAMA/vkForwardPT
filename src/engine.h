@@ -20,6 +20,59 @@ const float tau = 2.0f * pi;
 const float sqrtpi = 1.7724538509f;
 #endif
 
+struct BLASCreateInfo {
+	VkGeometryFlagsKHR geometryFlags = {};
+	VkBuildAccelerationStructureFlagsKHR buildFlags = {};
+
+	VkFormat vertexFormat        = VK_FORMAT_R32G32B32_SFLOAT;
+	VkDeviceAddress vertexBuffer = 0;
+	VkDeviceAddress indexBuffer  = 0;
+	VkDeviceSize vertexStride    = 0;
+	uint32_t numVertices         = 0;
+	VkIndexType indexType        = VK_INDEX_TYPE_UINT32;
+	uint32_t numIndices          = 0;
+};
+
+struct BLASRecord {
+	// Vulkan API stuff
+	VkAccelerationStructureKHR AShandle;
+	AllocatedBuffer ASBuffer;
+
+	// Address of the acceleration structure
+	VkDeviceSize address_;
+
+	// record of parameters used to create this BLAS
+	BLASCreateInfo createInfo;
+};
+
+struct TLASInstance {
+	VkTransformMatrixKHR transform = {};
+	uint32_t instanceCustomIndex : 24 = 0;
+	uint32_t mask : 8 = 0;
+	uint32_t shaderBindingTableOffset : 24 = 0;
+	VkGeometryInstanceFlagBitsKHR flags : 8 = {};
+	VkDeviceAddress BLASAddress = 0;
+};
+static_assert(sizeof(TLASInstance) == sizeof(VkAccelerationStructureInstanceKHR));
+
+struct TLASCreateInfo {
+	VkGeometryFlagsKHR geometryFlags = {};
+	VkBuildAccelerationStructureFlagsKHR buildFlags = {};
+
+	AllocatedBuffer instanceBuffer;
+};
+
+struct TLASRecord {
+	VkAccelerationStructureKHR handle;
+	// Buffer holding the actual AS data
+	AllocatedBuffer buffer;
+	// Address of the acceleration structure
+	VkDeviceSize address;
+	// std::optional<DescriptorInfo> descriptorInfo_;
+
+	TLASCreateInfo createInfo;
+};
+
 struct DeletionQueue {
 	std::deque< std::function< void() > > deletors;
 
@@ -160,6 +213,11 @@ inline uint32_t genWangSeed () {
 
 class PrometheusInstance {
 public:
+	// RT state
+	TLASRecord mainTLAS;
+
+	std::vector< BLASRecord > BLASRecords;
+	void addBLAS ( BLASCreateInfo createInfo, string name );
 
 	// profiling data
 	timerManager_t timer;
@@ -363,6 +421,7 @@ private:
 	void initComputePasses ();
 	void initImgui ();
 	void initResources ();
+	void initBVH ();
 	void initLights();
 
 	// main loop helpers
