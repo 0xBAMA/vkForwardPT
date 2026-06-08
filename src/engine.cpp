@@ -358,39 +358,39 @@ void PrometheusInstance::MainLoop () {
 			// some imgui UI to test
 			// ImGui::ShowDemoWindow();
 
-			// showing the profiler - 1 frame delay, so we have to wait for frame 1 for the first results
-			if ( frameNumber != 0 ) {
-				int color = 0;
-				std::vector< legit::ProfilerTask > tasks_CPU;
-				std::vector< legit::ProfilerTask > tasks_GPU;
+			if ( showMenu ) {
+				// showing the profiler - 1 frame delay, so we have to wait for frame 1 for the first results
+				if ( frameNumber != 0 ) {
+					int color = 0;
+					std::vector< legit::ProfilerTask > tasks_CPU;
+					std::vector< legit::ProfilerTask > tasks_GPU;
 
-				for ( size_t i = 0; i < timerManager->timingResults.size(); i++ ) {
-					color++;
-					color = color % legit::Colors::colorList.size();
-					legit::ProfilerTask pt_CPU;
-					legit::ProfilerTask pt_GPU;
+					for ( size_t i = 0; i < timerManager->timingResults.size(); i++ ) {
+						color++;
+						color = color % legit::Colors::colorList.size();
+						legit::ProfilerTask pt_CPU;
+						legit::ProfilerTask pt_GPU;
 
-					// calculate start and end times
-					pt_CPU.startTime = timerManager->timingResults[ i ].tStartCPU / 1000.0f;
-					pt_CPU.endTime = timerManager->timingResults[ i ].tStopCPU / 1000.0f;
-					pt_CPU.name = timerManager->timingResults[ i ].label;
-					pt_CPU.color = legit::Colors::colorList[ color ]; // do better
-					tasks_CPU.push_back( pt_CPU );
+						// calculate start and end times
+						pt_CPU.startTime = timerManager->timingResults[ i ].tStartCPU / 1000.0f;
+						pt_CPU.endTime = timerManager->timingResults[ i ].tStopCPU / 1000.0f;
+						pt_CPU.name = timerManager->timingResults[ i ].label;
+						pt_CPU.color = legit::Colors::colorList[ color ]; // do better
+						tasks_CPU.push_back( pt_CPU );
 
-					pt_GPU.startTime = timerManager->timingResults[ i ].tStartGPU / 1000.0f;
-					pt_GPU.endTime = timerManager->timingResults[ i ].tStopGPU / 1000.0f;
-					pt_GPU.name = timerManager->timingResults[ i ].label;
-					pt_GPU.color = legit::Colors::colorList[ color ]; // do better
-					tasks_GPU.push_back( pt_GPU );
+						pt_GPU.startTime = timerManager->timingResults[ i ].tStartGPU / 1000.0f;
+						pt_GPU.endTime = timerManager->timingResults[ i ].tStopGPU / 1000.0f;
+						pt_GPU.name = timerManager->timingResults[ i ].label;
+						pt_GPU.color = legit::Colors::colorList[ color ]; // do better
+						tasks_GPU.push_back( pt_GPU );
+					}
+
+					static ImGuiUtils::ProfilersWindow profilerWindow; // add new profiling data and render
+					profilerWindow.cpuGraph.LoadFrameData( &tasks_CPU[ 0 ], tasks_CPU.size() );
+					profilerWindow.gpuGraph.LoadFrameData( &tasks_GPU[ 0 ], tasks_GPU.size() );
+					profilerWindow.Render(); // GPU graph is presented on top, CPU on bottom
 				}
 
-				static ImGuiUtils::ProfilersWindow profilerWindow; // add new profiling data and render
-				profilerWindow.cpuGraph.LoadFrameData( &tasks_CPU[ 0 ], tasks_CPU.size() );
-				profilerWindow.gpuGraph.LoadFrameData( &tasks_GPU[ 0 ], tasks_GPU.size() );
-				profilerWindow.Render(); // GPU graph is presented on top, CPU on bottom
-			}
-
-			if ( showMenu ) {
 				if ( ImGui::Begin( "Edit" ) ) {
 
 					ImGui::SliderFloat( "Brightness Scale", &globalData.brightnessScalar, 0.3f, 5.0f, "%.5f", ImGuiSliderFlags_Logarithmic ); // this should also apply to the raster step + accumulate step
@@ -636,6 +636,7 @@ void PrometheusInstance::initVulkan () {
 		.set_required_features_13( features13 )
 		.set_required_features_12( features12 )
 		.add_required_extension( "VK_KHR_maintenance9" ) // for VK_QUERY_POOL_CREATE_RESET_BIT_KHR
+		.add_required_extension( "VK_KHR_acceleration_structure" )
 		.set_surface( surface )
 		.select()
 		.value();
@@ -792,6 +793,7 @@ void PrometheusInstance::initDescriptors  () {
 		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 6 },
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 6 },
 		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6 },
+		{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 6 },
 	};
 
 	globalDescriptorAllocator.init( device, 10, sizes );
@@ -1216,7 +1218,108 @@ void PrometheusInstance::initBVH () {
 	TLASCreateInfo createInfo;
 	std::string name = "MAIN TLAS";
 
-	    const VkAccelerationStructureGeometryKHR geometryInfo = {
+	// creating the initial mesh
+	{ // creating the heightmap
+		const uint32_t dim = 4096;
+			long unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
+
+			std::default_random_engine engine{ seed };
+			std::uniform_real_distribution< float > distribution{ 0.0f, 1.0f };
+
+			// #define TILE
+#ifdef TILE
+			const auto size = dim;
+#else
+			const auto size = dim + 1; // for no_wrap
+#endif
+
+			const auto edge = size - 1;
+			std::vector< std::vector< float > > data;
+			data.resize( size );
+			for ( uint32_t i = 0; i < size; i++ ) {
+				data[ i ].resize( size );
+			}
+
+			// data[ 0 ][ 0 ] = data[ edge ][ 0 ] = data[ 0 ][ edge ] = data[ edge ][ edge ] = 0.25f;
+
+			std::uniform_real_distribution< float > distribution_init{ 0.0f, 1.5f };
+			data[ 0 ][ 0 ] = distribution_init( engine );
+			data[ edge ][ 0 ] = distribution_init( engine );
+			data[ 0 ][ edge ] = distribution_init( engine );
+			data[ edge ][ edge ] = distribution_init( engine );
+
+#ifdef TILE
+			heightfield::diamond_square_wrap
+		#else
+			heightfield::diamond_square_no_wrap
+		#endif
+			(size,
+				// random
+				[ &engine, &distribution ]( float range ) {
+					return distribution( engine ) * range;
+				},
+				// variance
+				[]( int level ) -> float {
+					return std::pow( 0.5f, level );
+					// return static_cast<float>( std::numeric_limits<float>::max() / 2 ) * std::pow(0.5f, level);
+					// return static_cast<float>(std::numeric_limits<float>::max()/1.6) * std::pow(0.5f, level);
+				},
+				// at
+				[ &data ]( int x, int y ) -> float& {
+					return data[ x ][ y ];
+				}
+			);
+
+		// we have the thing in data[ x ][ y ], need it in a linearized format (+ integer conversion and tracking the normalization factor)
+		std::vector< vec3 > vboData;
+		auto gridToWorld = [ & ]( int i ) -> float {
+			return remap( i, 0, dim, -1.0f, 1.0f );
+		};
+
+		for ( size_t x = 0; x < dim - 1; x++ ) {
+			for ( size_t y = 0; y < dim - 1; y++ ) {
+				float aH = std::clamp( data[ x ][ y ], 0.0f, 5.0f );
+				float bH = std::clamp( data[ x + 1 ][ y ], 0.0f, 5.0f );
+				float cH = std::clamp( data[ x ][ y + 1 ], 0.0f, 5.0f );
+				float dH = std::clamp( data[ x + 1 ][ y + 1 ], 0.0f, 5.0f );
+
+			/* need to create 2 triangles, total 6 verts
+				A ( 0 )	@=======@ B ( 1 )
+						|      /|
+						|     / |
+						|    /  |
+						|   /   |
+						|  /    |
+						| /     |
+						|/      |
+				C ( 2 )	@=======@ D ( 3 ) --> X */
+
+				// ABC
+				vboData.emplace_back( vec3( gridToWorld( x ), gridToWorld( y ), aH ) );
+				vboData.emplace_back( vec3( gridToWorld( x + 1 ), gridToWorld( y ), bH ) );
+				vboData.emplace_back( vec3( gridToWorld( x ), gridToWorld( y + 1 ), cH ) );
+
+				// CBD
+				vboData.emplace_back( vec3( gridToWorld( x ), gridToWorld( y + 1 ), cH ) );
+				vboData.emplace_back( vec3( gridToWorld( x + 1 ), gridToWorld( y ), bH ) );
+				vboData.emplace_back( vec3( gridToWorld( x + 1 ), gridToWorld( y + 1 ), dH ) );
+			}
+		}
+
+		// index buffer is required -> create the trivial IBO needeed here
+		std::vector< uint32_t > indices( vboData.size() );
+		std::iota( indices.begin(), indices.end(), 0 );
+
+		// uploading instance buffer and vertex buffer data
+		// SetDebugName( VK_OBJECT_TYPE_IMAGE, ( uint64_t ) Heightmap.image, "Heightmap" );
+
+		// filling out the create struct with the information about the mesh
+
+	}
+
+	// mesh should now be prepped for BVH build
+
+	const VkAccelerationStructureGeometryKHR geometryInfo = {
       .sType        = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
       .geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
       .geometry     = {.instances =
