@@ -175,7 +175,7 @@ struct debugStringConfig {
 	uint32_t debugStringFontPick;
 	uint32_t debugStringLength;
 	float debugStringDepth;
-	uint8_t debugStringData[ 4096 ];
+	uint8_t debugStringData[ 1024 ];
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;

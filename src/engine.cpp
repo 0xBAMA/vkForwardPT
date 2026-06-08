@@ -193,10 +193,10 @@ void PrometheusInstance::Draw () {
 		DebugLineDraw.invoke( cmd );
 	}
 
-	// { // do the debug string draw
-		// scopedTimer start( "Debug String Draw" );
-		// DebugStringDraw.invoke( cmd );
-	// }
+	{ // do the debug string draw
+		scopedTimer start( "Debug String Draw" );
+		DebugStringDraw.invoke( cmd );
+	}
 
 	// transition the images for the copy
 	vkutil::transition_image( cmd, drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
@@ -895,9 +895,9 @@ void PrometheusInstance::initResources () {
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) debugLineDrawBuffer.buffer, "Debug Line SSBO" );
 	}
 
-	{ // UBO for the text renderer
-		debugStringConfigBuffer = createBuffer( 1024 * sizeof( debugStringConfig ), VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
-		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) debugStringConfigBuffer.buffer, "Debug Text UBO" );
+	{ // SSBO for the text renderer
+		debugStringConfigBuffer = createBuffer( 1024 * sizeof( debugStringConfig ), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) debugStringConfigBuffer.buffer, "Debug Text SSBO" );
 	}
 
 	{ // actually need to blit depth to another target, unfortunately
@@ -937,9 +937,10 @@ void PrometheusInstance::initResources () {
 		return std::mt19937( seq );
 	} () );
 
-	for ( int i = 0; i < 10; i++ ) {
-		const float pX = std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG );
-		const float pY = std::uniform_real_distribution< float >( 200.0f, 500.0f )( seedRNG );
+	/*
+	for ( int i = 0; i < 100; i++ ) {
+		const float pX = std::uniform_real_distribution< float >( 200.0f, ImageBufferResolution.width - 200.0f )( seedRNG );
+		const float pY = std::uniform_real_distribution< float >( 200.0f, ImageBufferResolution.height - 200.0f )( seedRNG );
 		addDebugString( vec2( pX, pY ),
 			fmt::format( "Test String {}", i ), vec3(
 			std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ),
@@ -948,6 +949,7 @@ void PrometheusInstance::initResources () {
 		std::uniform_int_distribution< int >( 0, 2 )( seedRNG ),
 		std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) );
 	}
+	*/
 
 	// it would be great to be able to add a line + text renderer
 		// with state, so I can call reset when I want (or never)
@@ -967,8 +969,6 @@ void PrometheusInstance::initResources () {
 	for ( int xB = 300; xB < ImageBufferResolution.width - 300; xB += 400 ) {
 		for ( int yB = 300; yB < ImageBufferResolution.height - 300; yB += 300 ) {
 
-			addDebugDrawBox( vec2( xB, yB ), vec2( xB + 2.0f * 168.0f, yB + 200.0f ), vec3( 1.0f ), 0.5f );
-
 			const float sizeRamp = std::uniform_real_distribution< float >( 5.0f, 150.0f )( seedRNG );
 			vec2 basePoint = vec2( xB, yB );
 			for ( float xO = 0.0f; xO < 2.0f * 168.0f; xO += sizeRamp ) {
@@ -980,6 +980,10 @@ void PrometheusInstance::initResources () {
 					addArc( basePoint + offset, sizeRamp * 0.45, 0.0f,  pi * 2.0f, 12 );
 				}
 			}
+
+			addDebugDrawBox( vec2( xB, yB ), vec2( xB + 2.0f * 168.0f, yB + 200.0f ), vec3( 1.0f ), 0.5f );
+			addDebugString( vec2( xB + 168.0f, yB + 100.0f ), "Arc Test R=" + std::to_string( sizeRamp ), vec3( 0.618f ), 0 );
+
 			// sizeRamp *= 1.2f;
 		}
 		// if ( sizeRamp > 100.0f ) break;
@@ -1545,7 +1549,7 @@ void PrometheusInstance::initComputePasses () {
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
 			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // Ray state buffer
-			lineRaster.descriptorSetLayout = builder.build( device,  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT );
+			lineRaster.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT );
 			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) lineRaster.descriptorSetLayout, "Line Raster Descriptor Set Layout" );
 		}
 
@@ -1760,23 +1764,18 @@ void PrometheusInstance::initComputePasses () {
 		};
 	}
 
-	{ // Debug Text Draw -> this is going to be redone as a raster process
+	{ // Debug Text Draw
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
-			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // string config UBO
-
-			// access to the result of the debug line drawing
-			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // color image
-			builder.add_binding( 3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // depth image for the text
-			builder.add_binding( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // the depth result from the lines
+			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ); // string config UBO
 
 			// font LUTs
-			builder.add_binding( 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // code page 437
-			builder.add_binding( 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // fatfont
-			builder.add_binding( 7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // tinyfont
+			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // code page 437
+			builder.add_binding( 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // fatfont
+			builder.add_binding( 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ); // tinyfont
 
-			DebugStringDraw.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
+			DebugStringDraw.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT );
 			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) DebugStringDraw.descriptorSetLayout, "Debug String Draw Descriptor Set Layout" );
 		}
 
@@ -1784,7 +1783,7 @@ void PrometheusInstance::initComputePasses () {
 			VkPushConstantRange pushConstant{};
 			pushConstant.offset = 0;
 			pushConstant.size = sizeof( PushConstants );
-			pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
 
 			VkPipelineLayoutCreateInfo computeLayout{};
 			computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1797,28 +1796,35 @@ void PrometheusInstance::initComputePasses () {
 			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &DebugStringDraw.pipelineLayout ) );
 			SetDebugName( VK_OBJECT_TYPE_PIPELINE_LAYOUT, ( uint64_t ) DebugStringDraw.pipelineLayout, "Debug String Draw Pipeline Layout" );
 
-			VkShaderModule DebugStringDrawShader;
-			if ( !vkutil::load_shader_module("../shaders/debugString.comp.glsl.spv", device, &DebugStringDrawShader ) ) {
-				fmt::print( "Error when building the Debug String Draw Compute Shader\n" );
+			VkShaderModule stringFragShader;
+			if ( !vkutil::load_shader_module( "../shaders/debugStringDraw.frag.glsl.spv", device, &stringFragShader ) ) {
+				fmt::print( "Error when building the Debug String Draw Fragment shader module\n" );
 			}
-			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) DebugStringDrawShader, "Debug String Draw Shader Module" );
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) stringFragShader, "Debug String Fragment Shader Module" );
 
-			VkPipelineShaderStageCreateInfo stageinfo{};
-			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			stageinfo.pNext = nullptr;
-			stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-			stageinfo.module = DebugStringDrawShader;
-			stageinfo.pName = "main";
+			VkShaderModule stringVertexShader;
+			if ( !vkutil::load_shader_module( "../shaders/debugStringDraw.vert.glsl.spv", device, &stringVertexShader ) ) {
+				fmt::print( "Error when building the Debug String Draw Vertex shader module\n" );
+			}
+			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) stringVertexShader, "Debug String Vertex Shader Module" );
 
-			VkComputePipelineCreateInfo computePipelineCreateInfo{};
-			computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-			computePipelineCreateInfo.pNext = nullptr;
-			computePipelineCreateInfo.layout = DebugStringDraw.pipelineLayout;
-			computePipelineCreateInfo.stage = stageinfo;
+			PipelineBuilder pipelineBuilder;
+			pipelineBuilder._pipelineLayout = DebugStringDraw.pipelineLayout;
+			pipelineBuilder.set_shaders( stringVertexShader, stringFragShader );
+			pipelineBuilder.set_input_topology( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST );
+			pipelineBuilder.set_polygon_mode( VK_POLYGON_MODE_FILL );
+			pipelineBuilder.set_cull_mode( VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE );
+			pipelineBuilder.set_multisampling_none();
+			pipelineBuilder.disable_blending();
+			pipelineBuilder.enable_depthtest( true, VK_COMPARE_OP_GREATER_OR_EQUAL );
+			pipelineBuilder.set_color_attachment_format( drawImage.imageFormat );
+			pipelineBuilder.set_depth_format( depthImage.imageFormat );
+			DebugStringDraw.pipeline = pipelineBuilder.build_pipeline( device );
+			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) DebugStringDraw.pipeline, "Debug String Raster Pipeline" );
 
-			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &DebugStringDraw.pipeline ) );
-			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) Raytrace.pipeline, "Debug String Draw Compute Pipeline" );
-			vkDestroyShaderModule( device, DebugStringDrawShader, nullptr );
+			// cleanup
+			vkDestroyShaderModule( device, stringFragShader, nullptr );
+			vkDestroyShaderModule( device, stringVertexShader, nullptr );
 
 			// deletors for the pipeline layout + pipeline
 			mainDeletionQueue.push_function( [ & ] () {
@@ -1837,63 +1843,66 @@ void PrometheusInstance::initComputePasses () {
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 
 				// the config UBO
-				writer.write_buffer( 1, debugStringConfigBuffer.buffer, 1024 * sizeof( debugStringConfig ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
-
-				// the color + depth attachments
-				writer.write_image( 2, drawImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
-				writer.write_image( 3, depthImageCache.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
-				writer.write_image( 4, depthImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				writer.write_buffer( 1, debugStringConfigBuffer.buffer, 1024 * sizeof( debugStringConfig ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
 
 				// the font LUTs
-				writer.write_image( 5, font_codepage437.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
-				writer.write_image( 6, font_fatfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
-				writer.write_image( 7, font_tinyfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				writer.write_image( 2, font_codepage437.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				writer.write_image( 3, font_fatfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+				writer.write_image( 4, font_tinyfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
 
 				writer.update_set( device, DebugStringDraw.descriptorSet );
 			}
 
-			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, DebugStringDraw.pipeline );
+			VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
+			VkRenderingAttachmentInfo depthAttachment = vkinit::attachment_info( depthImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
+			VkRenderingInfo renderInfo = vkinit::rendering_info( ImageBufferResolution, &colorAttachment, &depthAttachment );
 
-			// bind the descriptor set, as just recorded
-			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, DebugStringDraw.pipelineLayout, 0, 1, &DebugStringDraw.descriptorSet, 0, nullptr );
+			vkCmdBeginRendering( cmd, &renderInfo );
+			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, DebugStringDraw.pipeline );
 
-			// get a new wang RNG seed
-			DebugStringDraw.pushConstants.wangSeed = genWangSeed();
+			//set dynamic viewport and scissor
+			VkViewport viewport = {};
+			viewport.x = 0;
+			viewport.y = 0;
+			viewport.width = float( ImageBufferResolution.width * renderScale );
+			viewport.height = float( ImageBufferResolution.height * renderScale );
+			viewport.minDepth = 0.0f;
+			viewport.maxDepth = 1.0f;
+			vkCmdSetViewport( cmd, 0, 1, &viewport );
 
-			// send the current value of the push constants
-			vkCmdPushConstants( cmd, DebugStringDraw.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &DebugStringDraw.pushConstants );
-
-			// specify the dependency once
-			VkImageMemoryBarrier2 imageMemoryBarriers[] = {
-				makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT ),
-				makeImageBarrier( depthImageCache.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT )
-			};
-
-			VkDependencyInfo barrierDependency {
-				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-				.bufferMemoryBarrierCount = 0,
-				.pBufferMemoryBarriers = nullptr,
-				.imageMemoryBarrierCount = 2,
-				.pImageMemoryBarriers = imageMemoryBarriers,
-			};
+			VkRect2D scissor = {};
+			scissor.offset.x = 0;
+			scissor.offset.y = 0;
+			scissor.extent.width = ImageBufferResolution.width;
+			scissor.extent.height = ImageBufferResolution.height;
+			vkCmdSetScissor( cmd, 0, 1, &scissor );
 
 			// copy the string configs into the buffer
 			debugStringConfig * debugStringConfigGPU = ( debugStringConfig * ) debugStringConfigBuffer.allocation->GetMappedData();
 
-			// debugStringConfigGPU ( int * );
-
 			// copy the data for the strings to the GPU
-			memcpy( debugStringConfigGPU + 4, &debugStrings[ 0 ], debugStrings.size() * sizeof( debugStringConfig ) );
+			memcpy( debugStringConfigGPU, &debugStrings[ 0 ], debugStrings.size() * sizeof( debugStringConfig ) );
 
-			// iterating through the list of strings
-			for ( auto& s : debugStrings ) {
+			// draw line segments
+			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,  DebugStringDraw.pipelineLayout, 0, 1, &DebugStringDraw.descriptorSet, 0, nullptr );
+			vkCmdPushConstants( cmd, DebugStringDraw.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &DebugStringDraw.pushConstants );
 
-				// dispatch the shader -> only for one line, we are not evaluating newlines -> loose fit using workgroup of 16
-				vkCmdDispatch( cmd, s.debugStringLength, 1, 1 );
+			// launch a draw command to do the fullscreen triangle
+			vkCmdDraw( cmd, debugStrings.size() * 6, 1, 0, 0 );
+			vkCmdEndRendering( cmd );
 
-				// insert barriers so the strings correctly depth test
-				vkCmdPipelineBarrier2( cmd, &barrierDependency );
-			}
+			VkImageMemoryBarrier2 barrierC[] = {
+				makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_READ_BIT ),
+				makeImageBarrierD( depthImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_READ_BIT )
+			};
+
+			VkDependencyInfo barrierDependency {
+				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+				.imageMemoryBarrierCount = 2,
+				.pImageMemoryBarriers = barrierC
+			};
+
+			vkCmdPipelineBarrier2( cmd, &barrierDependency );
 		};
 	}
 
@@ -1988,7 +1997,6 @@ void PrometheusInstance::initComputePasses () {
 				}
 			}
 
-			// additive raster for the agent locations
 			VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
 			VkRenderingAttachmentInfo depthAttachment = vkinit::attachment_info( depthImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
 			VkRenderingInfo renderInfo = vkinit::rendering_info( ImageBufferResolution, &colorAttachment, &depthAttachment );
@@ -2043,8 +2051,8 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdEndRendering( cmd );
 
 			VkImageMemoryBarrier2 barrierC[] = {
-				makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT ),
-				makeImageBarrierD( depthImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT )
+				makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_READ_BIT ),
+				makeImageBarrierD( depthImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_READ_BIT )
 			};
 
 			VkDependencyInfo barrierDependency {
