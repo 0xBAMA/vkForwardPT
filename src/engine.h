@@ -253,15 +253,16 @@ public:
 	// using reverse Z, GREATER_OR_EQUAL depth compare op
 	static constexpr float debugDrawMaxDepth{ 0.0f }; // farthest from screen
 	static constexpr float debugDrawMinDepth{ 1.0f }; // closest to screen
+	static constexpr float debugDrawMidDepth{ 0.5f }; // midpoint
 
 	// text rendering, with pixel location + select from the list of available font LUTs (tinyfont, fatfont, code page 437)
-	int addDebugString ( vec2 position, std::string displayText, vec3 color, int fontSelect, float zDepth = debugDrawMaxDepth );
+	int addDebugString ( vec2 position, std::string displayText, vec3 color, int fontSelect, float zDepth = debugDrawMidDepth );
 
 	// 2D line segment
-	int addDebugDrawLine ( vec2 a, vec2 b, vec3 color, float zDepthA = debugDrawMaxDepth, float zDepthB = debugDrawMaxDepth );
+	int addDebugDrawLine ( vec2 a, vec2 b, vec3 color, float zDepthA = debugDrawMidDepth, float zDepthB = debugDrawMidDepth );
 
 	// 2D bounding box helper, draws 4 lines
-	int addDebugDrawBox ( vec2 min, vec2 max, vec3 color, float zDepth = debugDrawMaxDepth );
+	int addDebugDrawBox ( vec2 min, vec2 max, vec3 color, float zDepth = debugDrawMidDepth );
 
 	// main compute shaders
 	ComputeEffect Raytrace;
