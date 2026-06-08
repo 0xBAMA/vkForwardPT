@@ -72,7 +72,7 @@ void PrometheusInstance::Init () {
 	initCommandStructures();
 	initSyncStructures();
 	initResources();
-	// initBVH();
+	initBVH();
 	initDescriptors();
 	initComputePasses();
 	initImgui();
@@ -141,9 +141,9 @@ void PrometheusInstance::Draw () {
 		globalData.framesSinceReset = 0;
 	}
 
-	if ( geometryListDirty ) {
-		bufferRebuildGPU();
-	}
+	// if ( geometryListDirty ) {
+		// bufferRebuildGPU();
+	// }
 
 	// start the command buffer recording
 	VK_CHECK( vkBeginCommandBuffer( cmd, &cmdBeginInfo ) );
@@ -168,6 +168,7 @@ void PrometheusInstance::Draw () {
 	vkutil::transition_image( cmd, PickISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, SpectrumISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 
+	/*
 	{ // compute shader to do one update of the raytrace process
 		scopedTimer start( "Raytrace" );
 		Raytrace.invoke( cmd );
@@ -181,6 +182,12 @@ void PrometheusInstance::Draw () {
 	{ // accumulate the result into a buffer
 		scopedTimer start( "Accumulate" );
 		Accumulate.invoke( cmd );
+	}
+	*/
+
+	{ // placeholder test for building BLAS + TLAS + doing ray queries in a shader
+		scopedTimer start( "Hardware RT Test" );
+		HRTTest.invoke( cmd );
 	}
 
 	{ // compute shader to accumulate the raster result + put the resolved final image into the drawImage...
@@ -1569,7 +1576,7 @@ void PrometheusInstance::initComputePasses () {
 		};
 	}
 
-	{ // Line Rasterization
+	if ( false ) { // Line Rasterization
 		{ // descriptor layout
 			// we're eventually going to just want 32-bit uint IDs out of this process, but for now I think color makes sense...
 				// we of course also need depth for the z-testing.
@@ -1700,7 +1707,7 @@ void PrometheusInstance::initComputePasses () {
 		};
 	}
 
-	{ // Accumulate
+	if ( false ) { // Accumulate
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
