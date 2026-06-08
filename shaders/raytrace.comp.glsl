@@ -131,7 +131,7 @@ float evaluateSellmeier ( vec3 B, vec3 C, float wms ) {
 
 // support for glass behavior
 float Reflectance ( const float cosTheta, const float IoR ) {
-	#if 0
+	#if 1
 	// Use Schlick's approximation for reflectance
 	float r0 = ( 1.0f - IoR ) / ( 1.0f + IoR );
 	r0 = r0 * r0;
