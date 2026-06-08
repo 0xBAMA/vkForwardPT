@@ -72,7 +72,7 @@ void PrometheusInstance::Init () {
 	initCommandStructures();
 	initSyncStructures();
 	initResources();
-	initBVH();
+	// initBVH();
 	initDescriptors();
 	initComputePasses();
 	initImgui();

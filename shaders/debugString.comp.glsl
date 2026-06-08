@@ -59,7 +59,7 @@ bool getGlyphMask ( uvec2 pixel, uint pickedGlyph ) {
 	ivec2 loc = ivec2( pixel ) + glyphSize.xy * ivec2( pickedGlyph % 16, pickedGlyph / 16 );
 
 	float glyphSample;
-	switch ( StringConfig.debugStringFontPick ) {
+	switch ( StringConfig.debugStrings[ 0 ].debugStringFontPick ) {
 		case 0: glyphSample = texelFetch( font_Codepage437, loc, 0 ).a;
 		break;
 
@@ -79,16 +79,16 @@ bool getGlyphMask ( uvec2 pixel, uint pickedGlyph ) {
 // should this sample write, based on depth?
 bool compareDepth () {
 	float depthSample = max(
-		imageLoad( depthImage, ivec2( floor( StringConfig.debugStringWriteLocation ) ) + ivec2( gl_GlobalInvocationID.xy ) ).r,
-		texelFetch( depthImageSampler, ivec2( floor( StringConfig.debugStringWriteLocation ) ) + ivec2( gl_GlobalInvocationID.xy ), 0 ).r
+		imageLoad( depthImage, ivec2( floor( StringConfig.debugStrings[ 0 ].debugStringWriteLocation ) ) + ivec2( gl_GlobalInvocationID.xy ) ).r,
+		texelFetch( depthImageSampler, ivec2( floor( StringConfig.debugStrings[ 0 ].debugStringWriteLocation ) ) + ivec2( gl_GlobalInvocationID.xy ), 0 ).r
 	);
-	return ( depthSample < StringConfig.debugStringDepth );
+	return ( depthSample < StringConfig.debugStrings[ 0 ].debugStringDepth );
 }
 
 // we have a simple decision
 void main () {
 	// populate the glyph size in global scope
-	switch ( StringConfig.debugStringFontPick ) {
+	switch ( StringConfig.debugStrings[ 0 ].debugStringFontPick ) {
 	case 0: glyphSize = textureSize( font_Codepage437, 0 ) / ivec2( 16 );
 		break;
 
@@ -127,11 +127,11 @@ void main () {
 	// if we have not rejected yet... write color, depth
 	if ( shouldWrite ) {
 		// update depth with string depth
-		imageStore( depthImage, ivec2( floor( StringConfig.debugStringWriteLocation ) ) + ivec2( gl_GlobalInvocationID.xy ), vec4( StringConfig.debugStringDepth ) );
+		imageStore( depthImage, ivec2( floor( StringConfig.debugStrings[ 0 ].debugStringWriteLocation ) ) + ivec2( gl_GlobalInvocationID.xy ), vec4( StringConfig.debugStrings[ 0 ].debugStringDepth ) );
 
 		// update color with foreground or background color
 //		vec3 c = onGlyph ? StringConfig.debugStringFillColor.rgb : StringConfig.debugStringBackgroundColor.rgb;
-		vec3 c = StringConfig.debugStringFillColor.rgb;
-		imageStore( colorImage, ivec2( floor( StringConfig.debugStringWriteLocation ) ) + ivec2( gl_LocalInvocationID.xy ), vec4( c, 1.0f ) );
+		vec3 c = StringConfig.debugStrings[ 0 ].debugStringFillColor.rgb;
+		imageStore( colorImage, ivec2( floor( StringConfig.debugStrings[ 0 ].debugStringWriteLocation ) ) + ivec2( gl_LocalInvocationID.xy ), vec4( c, 1.0f ) );
 	}
 }
