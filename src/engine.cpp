@@ -926,30 +926,12 @@ void PrometheusInstance::initResources () {
 		stbi_image_free( data );
 	}
 
-
-	// placeholder
-	// addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 250.0f, 0.0f, 1.0f * pi, 0 );
-	// addSegment( vec2( 100.0f ), vec2( 400.0f, 356.0f ), 0 );
-
+	// placeholder init
 	std::mt19937 seedRNG( [] {
 		std::random_device rd;
 		std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
 		return std::mt19937( seq );
 	} () );
-
-	/*
-	for ( int i = 0; i < 100; i++ ) {
-		const float pX = std::uniform_real_distribution< float >( 200.0f, ImageBufferResolution.width - 200.0f )( seedRNG );
-		const float pY = std::uniform_real_distribution< float >( 200.0f, ImageBufferResolution.height - 200.0f )( seedRNG );
-		addDebugString( vec2( pX, pY ),
-			fmt::format( "Test String {}", i ), vec3(
-			std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ),
-			std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ),
-			std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) ),
-		std::uniform_int_distribution< int >( 0, 2 )( seedRNG ),
-		std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) );
-	}
-	*/
 
 	// it would be great to be able to add a line + text renderer
 		// with state, so I can call reset when I want (or never)
@@ -989,56 +971,7 @@ void PrometheusInstance::initResources () {
 		// if ( sizeRamp > 100.0f ) break;
 	}
 
-	/*
-	const float size = 50.0f;
-	const float margin = 600.0f;
-	for ( int i = 0; i < 5000; i++ ) {
-		const vec2 p = vec2(
-			std::uniform_real_distribution< float >( margin, ImageBufferResolution.width - margin )( seedRNG ),
-			std::uniform_real_distribution< float >( margin, ImageBufferResolution.height - margin )( seedRNG )
-		);
-		const float r = std::uniform_real_distribution< float >( 5.0f, 45.0f )( seedRNG );
-		const int m = std::uniform_int_distribution< int >( 9, 16 )( seedRNG );
-		const int m2 = std::uniform_int_distribution< int >( 1, 3 )( seedRNG );
-		if ( i % 16 == 0 )
-			addSegment( p, p + vec2(
-				std::uniform_real_distribution< float >( -size, size )( seedRNG ),
-				std::uniform_real_distribution< float >( -size, size )( seedRNG ) ), m );
-		else
-			addArc( p, r, 0.0f, 2.0f * pi, m );
-	}
-	*/
-
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
-
-	/*
-	for ( int i = 0; i < 1000; i++ ) {
-		const vec2 p = vec2(
-			std::uniform_real_distribution< float >( 0, ImageBufferResolution.width )( seedRNG ),
-			std::uniform_real_distribution< float >( 0, ImageBufferResolution.height )( seedRNG )
-		);
-		const float r = std::uniform_real_distribution< float >( 25.0f, 35.0f )( seedRNG );
-		const float t0 = std::uniform_real_distribution< float >( 0.0f, pi / 4.0f )( seedRNG );
-		const float t1 = std::uniform_real_distribution< float >( pi / 2.0f, pi )( seedRNG );
-		// addArc( p, r, 0.0f, 2.0f * pi, 0 );
-		addArc( p, r, t0, t1, 0 );
-	}
-	*/
-
-	/*
-	for ( int x = 0; x < 40; x++ ) {
-		for ( int y = 0; y < 100; y++ ) {
-			vec2 p = vec2( 100 + 6 * x, 100 + 6 *y );
-			float r = 2.0f;
-			addArc( p, r, 0.0f, 2.0f * pi, 0 );
-
-			p = vec2( 800 + 64 * x, 100 + 64 * y );
-			r = 28.0f;
-			if ( p.y < 1200 && p.x < 2400 )
-				addArc( p, r, 0.0f, 2.0f * pi, 0 );
-		}
-	}
-	*/
 
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
