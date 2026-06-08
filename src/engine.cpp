@@ -801,6 +801,7 @@ void PrometheusInstance::initDescriptors  () {
 			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 },
 			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 },
+			{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 4 },
 		};
 
 		frameData[ i ].frameDescriptors = DescriptorAllocatorGrowable{};
