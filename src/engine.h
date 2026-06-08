@@ -219,6 +219,9 @@ public:
 	std::vector< BLASRecord > BLASRecords;
 	void addBLAS ( BLASCreateInfo createInfo, string name );
 
+	// testing the hardware RT setup
+	ComputeEffect HRTTest;
+
 	// profiling data
 	timerManager_t timer;
 	int timestampPeriod;
