@@ -16,12 +16,11 @@ layout( set = 0, binding = 2 ) uniform accelerationStructureEXT tlas;
 void main () {
 
 	// basic camera setup for testing the hardware ray queries...
-	mat3 rot = Rotate3D( 0.5f, vec3( 1.0f ) );
-	vec3 rayOrigin = rot * vec3(
-		remap( gl_GlobalInvocationID.x, 0.0f, imageSize( accumulator ).x, -1.0f, 1.0f ),
-		remap( gl_GlobalInvocationID.y, 0.0f, imageSize( accumulator ).y, -1.0f, 1.0f ),
-		10.0f );
-	vec3 rayDirection = rot * vec3( 0.0f, 0.0f, -1.0f );
+	vec3 rayOrigin = vec3( 0.0f, 0.0f, 3.0f );
+	vec3 rayDirection =
+		Rotate3D( 0.1f * GlobalData.frameNumber + remap( gl_GlobalInvocationID.y, 0.0f, imageSize( accumulator ).y, -0.5f, 0.5f ), vec3( 1.0f, 0.0f, 0.0f ) ) *
+		Rotate3D( 0.03f * GlobalData.frameNumber + remap( gl_GlobalInvocationID.x, 0.0f, imageSize( accumulator ).x, -0.5f, 0.5f ), vec3( 0.0f, 1.0f, 0.0f ) ) *
+		vec3( 0.0f, 0.0f, -1.0f );
 
 	// initializing the query
 	rayQueryEXT rayQuery;
@@ -44,10 +43,10 @@ void main () {
 
 	// Ray hit a triangle
 	if( rayQueryGetIntersectionTypeEXT( rayQuery, true ) == gl_RayQueryCommittedIntersectionTriangleEXT ) {
-		color = vec3( 0.0f, 1.0f, 0.0f );
+		color = vec3( 1.0f );
 	} else { // otherwise the ray escapes
 		color = vec3( 0.0f, 0.0f, 0.5f );
 	}
 
-	imageStore( accumulator, ivec2( gl_GlobalInvocationID.xy ), vec4( color, 1.0f ) );
+	imageStore( accumulator, ivec2( gl_GlobalInvocationID.xy ), vec4( saturate( color + rayDirection / 5.0f ), 1.0f ) );
 }
