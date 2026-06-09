@@ -39,9 +39,9 @@ inline std::string fixedWidthNumberString ( int32_t value, int32_t width = 5, co
 	return oss.str();
 }
 
-inline std::string fixedWidthNumberStringF ( float value, int32_t width = 5, const char fill = ' ' ) {
+inline std::string fixedWidthNumberStringF ( float value, int32_t width = 5, int32_t decimals = 2, const char fill = ' ' ) {
 	std::ostringstream oss;
-	oss << std::setw( width ) << std::setfill( fill ) << value;
+	oss << std::fixed << std::setprecision( decimals ) << std::setw( width ) << std::setfill( fill ) << value;
 	return oss.str();
 }
 
