@@ -12,6 +12,7 @@
 
 #include "lightManager.h"
 #include "timer.h"
+#include <meshes.h>
 
 #ifndef PI_DEFINED
 #define PI_DEFINED

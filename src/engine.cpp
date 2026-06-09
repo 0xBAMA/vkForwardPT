@@ -72,7 +72,7 @@ void PrometheusInstance::Init () {
 	initCommandStructures();
 	initSyncStructures();
 	initResources();
-	initBVH();
+	// initBVH();
 	initDescriptors();
 	initComputePasses();
 	initImgui();
@@ -141,9 +141,9 @@ void PrometheusInstance::Draw () {
 		globalData.framesSinceReset = 0;
 	}
 
-	// if ( geometryListDirty ) {
-		// bufferRebuildGPU();
-	// }
+	if ( geometryListDirty ) {
+		bufferRebuildGPU();
+	}
 
 	// start the command buffer recording
 	VK_CHECK( vkBeginCommandBuffer( cmd, &cmdBeginInfo ) );
@@ -168,7 +168,6 @@ void PrometheusInstance::Draw () {
 	vkutil::transition_image( cmd, PickISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 	vkutil::transition_image( cmd, SpectrumISImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL );
 
-	/*
 	{ // compute shader to do one update of the raytrace process
 		scopedTimer start( "Raytrace" );
 		Raytrace.invoke( cmd );
@@ -182,12 +181,6 @@ void PrometheusInstance::Draw () {
 	{ // accumulate the result into a buffer
 		scopedTimer start( "Accumulate" );
 		Accumulate.invoke( cmd );
-	}
-	*/
-
-	{ // placeholder test for building BLAS + TLAS + doing ray queries in a shader
-		scopedTimer start( "Hardware RT Test" );
-		HRTTest.invoke( cmd );
 	}
 
 	{ // compute shader to accumulate the raster result + put the resolved final image into the drawImage...
@@ -948,7 +941,6 @@ void PrometheusInstance::initResources () {
 	// addDebugDrawLine();
 	// addDebugDrawBox();
 
-	/*
 	// float sizeRamp = 1.5f;
 	for ( int xB = 300; xB < ImageBufferResolution.width - 300; xB += 400 ) {
 		for ( int yB = 300; yB < ImageBufferResolution.height - 300; yB += 300 ) {
@@ -966,7 +958,7 @@ void PrometheusInstance::initResources () {
 			}
 
 			addDebugDrawBox( vec2( xB, yB ), vec2( xB + 2.0f * 168.0f, yB + 200.0f ), vec3( 1.0f ), 0.5f );
-			addDebugString( vec2( xB + 168.0f, yB + 100.0f ), "Arc Test R=" + std::to_string( sizeRamp ), vec3( 0.618f ), 0 );
+			addDebugString( vec2( xB + 168.0f, yB + 170.0f ), "Arc Test R=" + fixedWidthNumberStringF( sizeRamp ), vec3( 0.618f ), 0 );
 
 			// sizeRamp *= 1.2f;
 		}
@@ -974,7 +966,6 @@ void PrometheusInstance::initResources () {
 	}
 
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
-	*/
 
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
@@ -1503,103 +1494,7 @@ static VkBufferMemoryBarrier2 makeBufferBarrier ( VkBuffer buf, VkPipelineStageF
 }
 
 void PrometheusInstance::initComputePasses () {
-	{ // testing hardware RT
-		{ // descriptor layout
-			DescriptorLayoutBuilder builder;
-			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
-			builder.add_binding( 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ); // the accumulator
-			builder.add_binding( 2, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR ); // handle for the hardware RT object
-
-			HRTTest.descriptorSetLayout = builder.build( device, VK_SHADER_STAGE_COMPUTE_BIT );
-			SetDebugName( VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ( uint64_t ) HRTTest.descriptorSetLayout, "Hardware Raytrace Descriptor Set Layout" );
-		}
-
-		{ // pipeline layout + compute pipeline
-			VkPushConstantRange pushConstant{};
-			pushConstant.offset = 0;
-			pushConstant.size = sizeof( PushConstants );
-			pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-			VkPipelineLayoutCreateInfo computeLayout{};
-			computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			computeLayout.pNext = nullptr;
-			computeLayout.pSetLayouts = &HRTTest.descriptorSetLayout;
-			computeLayout.setLayoutCount = 1;
-			computeLayout.pPushConstantRanges = &pushConstant;
-			computeLayout.pushConstantRangeCount = 1;
-
-			VK_CHECK( vkCreatePipelineLayout( device, &computeLayout, nullptr, &HRTTest.pipelineLayout ) );
-			SetDebugName( VK_OBJECT_TYPE_PIPELINE_LAYOUT, ( uint64_t ) HRTTest.pipelineLayout, "Hardware Raytrace Pipeline Layout" );
-
-			VkShaderModule RaytraceShader;
-			if ( !vkutil::load_shader_module("../shaders/HRTTest.comp.glsl.spv", device, &RaytraceShader ) ) {
-				fmt::print( "Error when building the Hardware Raytrace Compute Shader\n" );
-			}
-			SetDebugName( VK_OBJECT_TYPE_SHADER_MODULE, ( uint64_t ) RaytraceShader, "Hardware Raytrace Shader Module" );
-
-			VkPipelineShaderStageCreateInfo stageinfo{};
-			stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			stageinfo.pNext = nullptr;
-			stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-			stageinfo.module = RaytraceShader;
-			stageinfo.pName = "main";
-
-			VkComputePipelineCreateInfo computePipelineCreateInfo{};
-			computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-			computePipelineCreateInfo.pNext = nullptr;
-			computePipelineCreateInfo.layout = HRTTest.pipelineLayout;
-			computePipelineCreateInfo.stage = stageinfo;
-
-			VK_CHECK( vkCreateComputePipelines( device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &HRTTest.pipeline ) );
-			SetDebugName( VK_OBJECT_TYPE_PIPELINE, ( uint64_t ) HRTTest.pipeline, "Hardware Raytrace Compute Pipeline" );
-			vkDestroyShaderModule( device, RaytraceShader, nullptr );
-
-			// deletors for the pipeline layout + pipeline
-			mainDeletionQueue.push_function( [ & ] () {
-				vkDestroyDescriptorSetLayout( device, HRTTest.descriptorSetLayout, nullptr );
-				vkDestroyPipelineLayout( device, HRTTest.pipelineLayout, nullptr );
-				vkDestroyPipeline( device, HRTTest.pipeline, nullptr );
-			});
-		}
-
-		// invoke() lambda
-		HRTTest.invoke = [ & ] ( VkCommandBuffer cmd ){
-			// dynamic descriptor allocation, to bind a texture
-			HRTTest.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, HRTTest.descriptorSetLayout );
-			{
-				DescriptorWriter writer;
-				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
-				writer.write_image( 1, XYZImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
-				writer.write_acceleration_structure( 2, &mainTLAS.handle );
-				writer.update_set( device, HRTTest.descriptorSet );
-			}
-
-			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, HRTTest.pipeline );
-
-			// bind the descriptor set, as just recorded
-			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, HRTTest.pipelineLayout, 0, 1, &HRTTest.descriptorSet, 0, nullptr );
-
-			// get a new wang RNG seed
-			HRTTest.pushConstants.wangSeed = genWangSeed();
-
-			// send the current value of the push constants
-			vkCmdPushConstants( cmd, HRTTest.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &HRTTest.pushConstants );
-
-			// dispatch for all the pixels
-			vkCmdDispatch( cmd, ( drawExtent.width + 15 ) / 16, ( drawExtent.height + 15 ) / 16, 1 );
-
-			VkImageMemoryBarrier2 barrierC = makeImageBarrier( XYZImage.image, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT );
-			VkDependencyInfo barrierDependency {
-				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-				.imageMemoryBarrierCount = 1,
-				.pImageMemoryBarriers = &barrierC
-			};
-
-			vkCmdPipelineBarrier2( cmd, &barrierDependency );
-		};
-	}
-
-	if ( false ) { // Raytrace update
+	{ // Raytrace update
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
@@ -1706,7 +1601,7 @@ void PrometheusInstance::initComputePasses () {
 		};
 	}
 
-	if ( false ) { // Line Rasterization
+	{ // Line Rasterization
 		{ // descriptor layout
 			// we're eventually going to just want 32-bit uint IDs out of this process, but for now I think color makes sense...
 				// we of course also need depth for the z-testing.
@@ -1837,7 +1732,7 @@ void PrometheusInstance::initComputePasses () {
 		};
 	}
 
-	if ( false ) { // Accumulate
+	{ // Accumulate
 		{ // descriptor layout
 			DescriptorLayoutBuilder builder;
 			builder.add_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ); // global config UBO
