@@ -33,6 +33,18 @@ inline std::string fixedWidthTimeString () {
 	return ssA.str();
 }
 
+inline std::string fixedWidthNumberString ( int32_t value, int32_t width = 5, const char fill = '0' ) {
+	std::ostringstream oss;
+	oss << std::setw( width ) << std::setfill( fill ) << value;
+	return oss.str();
+}
+
+inline std::string fixedWidthNumberStringF ( float value, int32_t width = 5, const char fill = ' ' ) {
+	std::ostringstream oss;
+	oss << std::setw( width ) << std::setfill( fill ) << value;
+	return oss.str();
+}
+
 //=============================================================================
 //==== OpenGL Timer Query Wrapper =============================================
 //=============================================================================
