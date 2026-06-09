@@ -215,6 +215,8 @@ class PrometheusInstance {
 public:
 	// RT state
 	TLASRecord mainTLAS;
+	AllocatedBuffer IBObuffer;
+	AllocatedBuffer VBObuffer;
 
 	std::vector< BLASRecord > BLASRecords;
 	void addBLAS ( BLASCreateInfo createInfo, string name );

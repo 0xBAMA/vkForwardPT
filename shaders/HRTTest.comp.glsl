@@ -35,5 +35,19 @@ void main () {
 		10000.0f );            // Maximum t-value
 
 	// doing the traversal
+	while( rayQueryProceedEXT( rayQuery ) ) {}
 
+	vec3 color = vec3( 0.0f );
+
+	// and see what we got
+	// const float t = rayQueryGetIntersectionTEXT( rayQuery, true );
+
+	// Ray hit a triangle
+	if( rayQueryGetIntersectionTypeEXT( rayQuery, true ) == gl_RayQueryCommittedIntersectionTriangleEXT ) {
+		color = vec3( 0.0f, 1.0f, 0.0f );
+	} else { // otherwise the ray escapes
+		color = vec3( 0.0f, 0.0f, 0.5f );
+	}
+
+	imageStore( accumulator, ivec2( gl_GlobalInvocationID.xy ), vec4( color, 1.0f ) );
 }

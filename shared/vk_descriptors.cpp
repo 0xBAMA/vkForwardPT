@@ -125,7 +125,7 @@ void DescriptorWriter::write_buffer(int binding, VkBuffer buffer, size_t size, s
 	writes.push_back(write);
 }
 //< write_buffer
-void DescriptorWriter::write_acceleration_structure( int binding, VkAccelerationStructureKHR accel ) {
+void DescriptorWriter::write_acceleration_structure( int binding, VkAccelerationStructureKHR* accel ) {
 	// auto& storedAccel = accelerationStructures.emplace_back(accel);
 
 	auto& asInfo = accelerationStructureInfos.emplace_back(
@@ -133,7 +133,7 @@ void DescriptorWriter::write_acceleration_structure( int binding, VkAcceleration
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
 			.pNext = nullptr,
 			.accelerationStructureCount = 1,
-			.pAccelerationStructures = &accel
+			.pAccelerationStructures = accel
 		});
 
 	VkWriteDescriptorSet write{

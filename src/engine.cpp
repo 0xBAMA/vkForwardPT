@@ -628,6 +628,15 @@ void PrometheusInstance::initVulkan () {
 	features12.scalarBlockLayout = true;
 	features12.uniformAndStorageBuffer8BitAccess = true;
 
+	VkPhysicalDeviceAccelerationStructureFeaturesKHR accelFeatures{
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR
+	};
+	accelFeatures.accelerationStructure = VK_TRUE;
+
+	VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{};
+	rayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+	rayQueryFeatures.rayQuery = VK_TRUE;
+
 	//use vkbootstrap to select a gpu.
 	//We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct features
 	vkb::PhysicalDeviceSelector selector{ vkb_inst };
@@ -635,8 +644,16 @@ void PrometheusInstance::initVulkan () {
 		.set_minimum_version( 1, 3 )
 		.set_required_features_13( features13 )
 		.set_required_features_12( features12 )
+
 		.add_required_extension( "VK_KHR_maintenance9" ) // for VK_QUERY_POOL_CREATE_RESET_BIT_KHR
 		.add_required_extension( "VK_KHR_acceleration_structure" )
+		.add_required_extension_features( accelFeatures )
+
+		.add_required_extension( "VK_KHR_ray_query" )
+		.add_required_extension_features( rayQueryFeatures )
+
+		.add_required_extension( "VK_KHR_deferred_host_operations" )
+		.add_required_extension( "VK_KHR_ray_tracing_position_fetch" )
 		.set_surface( surface )
 		.select()
 		.value();
@@ -861,32 +878,6 @@ void PrometheusInstance::initResources () {
 		size_t uncompactedBufferSize = globalData.gridDims.x * globalData.gridDims.y * 16 * sizeof( int32_t );
 		UncompactedGridBuffer = createBuffer( uncompactedBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU );
 		SetDebugName( VK_OBJECT_TYPE_BUFFER, ( uint64_t ) UncompactedGridBuffer.buffer, "Uncompacted Grid Buffer" );
-
-		// right now this is dead weight - but if I want to support resizing, it should actually happen here, where everything gets resized
-		/*
-		{ // 1: resize the buffer if needed (uncompacted grid) -> this is triggered on screen resize
-			t.tick();
-
-			// grid scaling + resize logic
-			globalData.gridDims = glm::ivec2(
-				( std::floor( globalData.floatBufferResolution.x / globalData.gridScalar ) + 1 ),
-				( std::floor( globalData.floatBufferResolution.y / globalData.gridScalar ) + 1 ) );
-
-			size_t previousSize = UncompactedGridBuffer.allocation->GetSize();
-			size_t currentSize = globalData.gridDims.x * globalData.gridDims.y * 64; // 64 bytes per grid cell
-
-			// todo, adding delete/resize
-			if ( previousSize != currentSize ) {
-				// delete the buffer
-
-				// recreate at the new size
-
-			}
-
-			fmt::print( "buffer create stage took {}ms\n", std::chrono::duration_cast< std::chrono::microseconds >( t.c.tStop - t.c.tStart ).count() / 1000.0f );
-			t.tock();
-		}
-		*/
 	}
 
 	// buffer for the rays
@@ -957,6 +948,7 @@ void PrometheusInstance::initResources () {
 	// addDebugDrawLine();
 	// addDebugDrawBox();
 
+	/*
 	// float sizeRamp = 1.5f;
 	for ( int xB = 300; xB < ImageBufferResolution.width - 300; xB += 400 ) {
 		for ( int yB = 300; yB < ImageBufferResolution.height - 300; yB += 300 ) {
@@ -982,6 +974,7 @@ void PrometheusInstance::initResources () {
 	}
 
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
+	*/
 
 	// make sure to clean up at the end
 	mainDeletionQueue.push_function([ & ] () {
@@ -1058,7 +1051,7 @@ void PrometheusInstance::addBLAS ( BLASCreateInfo createInfo, string name ) {
 	};
 	vkGetAccelerationStructureBuildSizesKHR( device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildInfo, &primitiveCount, &buildSizeInfo);
 
-	AllocatedBuffer BLASBuffer = createBuffer( buildSizeInfo.accelerationStructureSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO, name + " BLAS Buffer" );
+	AllocatedBuffer BLASBuffer = createBuffer( buildSizeInfo.accelerationStructureSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VMA_MEMORY_USAGE_AUTO, name + " BLAS Buffer" );
 
 	const VkAccelerationStructureCreateInfoKHR blasInfo = {
 	  .sType  = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
@@ -1070,7 +1063,7 @@ void PrometheusInstance::addBLAS ( BLASCreateInfo createInfo, string name ) {
 	VkAccelerationStructureKHR blas;
 	VK_CHECK( vkCreateAccelerationStructureKHR( device, &blasInfo, nullptr, &blas ) );
 
-	AllocatedBuffer scratchBuildBuffer = createBuffer( buildSizeInfo.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO, name + " BLAS Scratch Buffer" );
+	AllocatedBuffer scratchBuildBuffer = createBuffer( buildSizeInfo.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VMA_MEMORY_USAGE_AUTO, name + " BLAS Scratch Buffer" );
 
 	immediateSubmit( [&] ( VkCommandBuffer commandBuffer ) {
 		buildInfo.dstAccelerationStructure = blas;
@@ -1220,18 +1213,19 @@ void PrometheusInstance::initBVH () {
 
 	// creating the initial mesh
 	{ // creating the heightmap
-		const uint32_t dim = 4096;
+		BLASCreateInfo createInfoBLAS;
+		const uint32_t dim = 1024;
 			long unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
 
 			std::default_random_engine engine{ seed };
 			std::uniform_real_distribution< float > distribution{ 0.0f, 1.0f };
 
 			// #define TILE
-#ifdef TILE
-			const auto size = dim;
-#else
-			const auto size = dim + 1; // for no_wrap
-#endif
+			#ifdef TILE
+				const auto size = dim;
+			#else
+				const auto size = dim + 1; // for no_wrap
+			#endif
 
 			const auto edge = size - 1;
 			std::vector< std::vector< float > > data;
@@ -1307,17 +1301,48 @@ void PrometheusInstance::initBVH () {
 		}
 
 		// index buffer is required -> create the trivial IBO needeed here
-		std::vector< uint32_t > indices( vboData.size() );
-		std::iota( indices.begin(), indices.end(), 0 );
+		std::vector< uint32_t > iboData( vboData.size() );
+		std::iota( iboData.begin(), iboData.end(), 0 );
 
 		// uploading instance buffer and vertex buffer data
-		// SetDebugName( VK_OBJECT_TYPE_IMAGE, ( uint64_t ) Heightmap.image, "Heightmap" );
+		IBObuffer = createBuffer( sizeof( uint32_t ) * iboData.size(), VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, VMA_MEMORY_USAGE_AUTO, "HWRT IBO" );
+		VBObuffer = createBuffer( sizeof( vec3 ) * iboData.size(), VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, VMA_MEMORY_USAGE_AUTO, "HWRT VBO" );
+
+		// copy the data into the buffers
+		vec3 * VBOPtr = ( vec3 * ) VBObuffer.allocation->GetMappedData();
+		memcpy( VBOPtr, &vboData[ 0 ], vboData.size() * sizeof( vec3 ) );
+		uint32_t * IBOPtr = ( uint32_t * ) IBObuffer.allocation->GetMappedData();
+		memcpy( IBOPtr, &iboData[ 0 ], iboData.size() * sizeof( uint32_t ) );
 
 		// filling out the create struct with the information about the mesh
+		createInfoBLAS.numVertices = createInfoBLAS.numIndices = iboData.size();
+		createInfoBLAS.vertexStride = sizeof( float ) * 3;
+		createInfoBLAS.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+		createInfoBLAS.indexBuffer = IBObuffer.deviceAddress;
+		createInfoBLAS.vertexBuffer = VBObuffer.deviceAddress;
+		createInfoBLAS.indexType = VK_INDEX_TYPE_UINT32;
 
+		// VkGeometryFlagsKHR geometryFlags = {};
+		// VkBuildAccelerationStructureFlagsKHR buildFlags = {};
+
+		// add to the list
+		addBLAS( createInfoBLAS, "Heightmap Mesh" );
 	}
 
 	// mesh should now be prepped for BVH build
+		// setting up a single instance...
+	createInfo.geometryFlags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+	createInfo.buildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DATA_ACCESS_KHR;
+	createInfo.instanceBuffer = createBuffer( sizeof( TLASInstance ), VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO );
+
+	// writing instance data to the buffer
+	TLASInstance * instances = ( TLASInstance * ) createInfo.instanceBuffer.allocation->GetMappedData();
+	instances[ 0 ].BLASAddress = BLASRecords[ 0 ].address_;
+	instances[ 0 ].transform = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f
+	};
 
 	const VkAccelerationStructureGeometryKHR geometryInfo = {
       .sType        = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
@@ -1346,7 +1371,7 @@ void PrometheusInstance::initBVH () {
       .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR,
     };
     vkGetAccelerationStructureBuildSizesKHR( device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildInfo, &instanceCount, &buildSizeInfo);
-	AllocatedBuffer tlasBuffer = createBuffer( buildSizeInfo.accelerationStructureSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO, name + " TLAS Buffer" );
+	AllocatedBuffer tlasBuffer = createBuffer( buildSizeInfo.accelerationStructureSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VMA_MEMORY_USAGE_AUTO, name + " TLAS Buffer" );
 
     VkAccelerationStructureCreateInfoKHR tlasInfo = {
       .sType  = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
@@ -1357,7 +1382,7 @@ void PrometheusInstance::initBVH () {
 
     VkAccelerationStructureKHR tlas;
     VK_CHECK(vkCreateAccelerationStructureKHR(device, &tlasInfo, nullptr, &tlas ) );
-	AllocatedBuffer scratchBuildBuffer = createBuffer( buildSizeInfo.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO, name + " TLAS Scratch Buffer" );
+	AllocatedBuffer scratchBuildBuffer = createBuffer( buildSizeInfo.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VMA_MEMORY_USAGE_AUTO, name + " TLAS Scratch Buffer" );
 
     immediateSubmit([&](VkCommandBuffer commandBuffer)
       {
@@ -1413,6 +1438,8 @@ void PrometheusInstance::initBVH () {
 	  };
     vkSetDebugUtilsObjectNameEXT(device, &m);
     mainTLAS.handle = tlas;
+
+	// fmt::print( "created tlas {}", ( int ) tlas );
 
     // descriptorInfo_ = Fvog::GetDevice().AllocateAccelerationStructureDescriptor(tlas);
 }
@@ -1543,7 +1570,7 @@ void PrometheusInstance::initComputePasses () {
 				DescriptorWriter writer;
 				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 				writer.write_image( 1, XYZImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE );
-				writer.write_acceleration_structure( 2, mainTLAS.handle );
+				writer.write_acceleration_structure( 2, &mainTLAS.handle );
 				writer.update_set( device, HRTTest.descriptorSet );
 			}
 
@@ -1559,13 +1586,13 @@ void PrometheusInstance::initComputePasses () {
 			vkCmdPushConstants( cmd, HRTTest.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &HRTTest.pushConstants );
 
 			// dispatch for all the pixels
-			vkCmdDispatch( cmd, ( globalData.floatBufferResolution.x + 15 ) / 16, ( globalData.floatBufferResolution.y + 15 ) / 16, 1 );
+			vkCmdDispatch( cmd, ( drawExtent.width + 15 ) / 16, ( drawExtent.height + 15 ) / 16, 1 );
 
-			VkBufferMemoryBarrier2 bufferBarrier = makeBufferBarrier( rayBuffer.buffer, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT );
+			VkImageMemoryBarrier2 barrierC = makeImageBarrier( XYZImage.image, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT );
 			VkDependencyInfo barrierDependency {
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-				.bufferMemoryBarrierCount = 1,
-				.pBufferMemoryBarriers = &bufferBarrier,
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrierC
 			};
 
 			vkCmdPipelineBarrier2( cmd, &barrierDependency );
