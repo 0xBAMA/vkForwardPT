@@ -2002,74 +2002,77 @@ void PrometheusInstance::initComputePasses () {
 		}
 
 		// invoke() lambda
-		DebugStringDraw.invoke = [ & ] ( VkCommandBuffer cmd ){
-			// dynamic descriptor allocation, to bind a texture
-			DebugStringDraw.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, DebugStringDraw.descriptorSetLayout );
-			{
-				DescriptorWriter writer;
-				writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
+		DebugStringDraw.invoke = [ & ] ( VkCommandBuffer cmd ) {
+			// skip if there are no strings to draw
+			if ( debugStrings.size() != 0 ) {
+				// dynamic descriptor allocation, to bind a texture
+				DebugStringDraw.descriptorSet = getCurrentFrame().frameDescriptors.allocate( device, DebugStringDraw.descriptorSetLayout );
+				{
+					DescriptorWriter writer;
+					writer.write_buffer( 0, GlobalUBO.buffer, sizeof( GlobalData ), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER );
 
-				// the config UBO
-				writer.write_buffer( 1, debugStringConfigBuffer.buffer, 1024 * sizeof( debugStringConfig ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
+					// the config UBO
+					writer.write_buffer( 1, debugStringConfigBuffer.buffer, 1024 * sizeof( debugStringConfig ), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER );
 
-				// the font LUTs
-				writer.write_image( 2, font_codepage437.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
-				writer.write_image( 3, font_fatfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
-				writer.write_image( 4, font_tinyfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+					// the font LUTs
+					writer.write_image( 2, font_codepage437.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+					writer.write_image( 3, font_fatfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
+					writer.write_image( 4, font_tinyfont.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER );
 
-				writer.update_set( device, DebugStringDraw.descriptorSet );
+					writer.update_set( device, DebugStringDraw.descriptorSet );
+				}
+
+				VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
+				VkRenderingAttachmentInfo depthAttachment = vkinit::attachment_info( depthImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
+				VkRenderingInfo renderInfo = vkinit::rendering_info( ImageBufferResolution, &colorAttachment, &depthAttachment );
+
+				vkCmdBeginRendering( cmd, &renderInfo );
+				vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, DebugStringDraw.pipeline );
+
+				//set dynamic viewport and scissor
+				VkViewport viewport = {};
+				viewport.x = 0;
+				viewport.y = 0;
+				viewport.width = float( ImageBufferResolution.width * renderScale );
+				viewport.height = float( ImageBufferResolution.height * renderScale );
+				viewport.minDepth = 0.0f;
+				viewport.maxDepth = 1.0f;
+				vkCmdSetViewport( cmd, 0, 1, &viewport );
+
+				VkRect2D scissor = {};
+				scissor.offset.x = 0;
+				scissor.offset.y = 0;
+				scissor.extent.width = ImageBufferResolution.width;
+				scissor.extent.height = ImageBufferResolution.height;
+				vkCmdSetScissor( cmd, 0, 1, &scissor );
+
+				// copy the string configs into the buffer
+				debugStringConfig * debugStringConfigGPU = ( debugStringConfig * ) debugStringConfigBuffer.allocation->GetMappedData();
+
+				// copy the data for the strings to the GPU
+				memcpy( debugStringConfigGPU, &debugStrings[ 0 ], debugStrings.size() * sizeof( debugStringConfig ) );
+
+				// draw line segments
+				vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,  DebugStringDraw.pipelineLayout, 0, 1, &DebugStringDraw.descriptorSet, 0, nullptr );
+				vkCmdPushConstants( cmd, DebugStringDraw.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &DebugStringDraw.pushConstants );
+
+				// launch a draw command to do the fullscreen triangle
+				vkCmdDraw( cmd, debugStrings.size() * 6, 1, 0, 0 );
+				vkCmdEndRendering( cmd );
+
+				VkImageMemoryBarrier2 barrierC[] = {
+					makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_READ_BIT ),
+					makeImageBarrierD( depthImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_READ_BIT )
+				};
+
+				VkDependencyInfo barrierDependency {
+					.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+					.imageMemoryBarrierCount = 2,
+					.pImageMemoryBarriers = barrierC
+				};
+
+				vkCmdPipelineBarrier2( cmd, &barrierDependency );
 			}
-
-			VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info( drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
-			VkRenderingAttachmentInfo depthAttachment = vkinit::attachment_info( depthImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL );
-			VkRenderingInfo renderInfo = vkinit::rendering_info( ImageBufferResolution, &colorAttachment, &depthAttachment );
-
-			vkCmdBeginRendering( cmd, &renderInfo );
-			vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, DebugStringDraw.pipeline );
-
-			//set dynamic viewport and scissor
-			VkViewport viewport = {};
-			viewport.x = 0;
-			viewport.y = 0;
-			viewport.width = float( ImageBufferResolution.width * renderScale );
-			viewport.height = float( ImageBufferResolution.height * renderScale );
-			viewport.minDepth = 0.0f;
-			viewport.maxDepth = 1.0f;
-			vkCmdSetViewport( cmd, 0, 1, &viewport );
-
-			VkRect2D scissor = {};
-			scissor.offset.x = 0;
-			scissor.offset.y = 0;
-			scissor.extent.width = ImageBufferResolution.width;
-			scissor.extent.height = ImageBufferResolution.height;
-			vkCmdSetScissor( cmd, 0, 1, &scissor );
-
-			// copy the string configs into the buffer
-			debugStringConfig * debugStringConfigGPU = ( debugStringConfig * ) debugStringConfigBuffer.allocation->GetMappedData();
-
-			// copy the data for the strings to the GPU
-			memcpy( debugStringConfigGPU, &debugStrings[ 0 ], debugStrings.size() * sizeof( debugStringConfig ) );
-
-			// draw line segments
-			vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,  DebugStringDraw.pipelineLayout, 0, 1, &DebugStringDraw.descriptorSet, 0, nullptr );
-			vkCmdPushConstants( cmd, DebugStringDraw.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( PushConstants ), &DebugStringDraw.pushConstants );
-
-			// launch a draw command to do the fullscreen triangle
-			vkCmdDraw( cmd, debugStrings.size() * 6, 1, 0, 0 );
-			vkCmdEndRendering( cmd );
-
-			VkImageMemoryBarrier2 barrierC[] = {
-				makeImageBarrier( drawImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_READ_BIT ),
-				makeImageBarrierD( depthImage.image, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_ACCESS_2_SHADER_READ_BIT )
-			};
-
-			VkDependencyInfo barrierDependency {
-				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-				.imageMemoryBarrierCount = 2,
-				.pImageMemoryBarriers = barrierC
-			};
-
-			vkCmdPipelineBarrier2( cmd, &barrierDependency );
 		};
 	}
 
