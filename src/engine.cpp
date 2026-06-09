@@ -941,6 +941,7 @@ void PrometheusInstance::initResources () {
 	// addDebugDrawLine();
 	// addDebugDrawBox();
 
+	/*
 	// float sizeRamp = 1.5f;
 	for ( int xB = 300; xB < ImageBufferResolution.width - 300; xB += 400 ) {
 		for ( int yB = 150; yB < ImageBufferResolution.height - 150; yB += 300 ) {
@@ -954,8 +955,8 @@ void PrometheusInstance::initResources () {
 			);
 
 			int m = 12;
-			float sizeRamp = std::uniform_real_distribution< float >( 5.0f, 15.0f )( seedRNG );
-			if ( std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) < 0.8f ) {
+			float sizeRamp = std::uniform_real_distribution< float >( 15.0f, 100.0f )( seedRNG );
+			if ( std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) < 0.5f ) {
 				m = 3;
 				sizeRamp = std::uniform_real_distribution< float >( 50.0f, 150.0f )( seedRNG );
 			} else if ( std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) < 0.5f ) {
@@ -985,6 +986,10 @@ void PrometheusInstance::initResources () {
 		}
 		// if ( sizeRamp > 100.0f ) break;
 	}
+	*/
+
+	addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 300.0f, 0.0f, 1.5f * pi, 3  );
+	addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 100.0f, 0.0f, 2.0f * pi, 12  );
 
 	// for ( int i = 0; i < 50; i++ ) {
 		// addArc( vec2( 200 + 20.0f * i, ImageBufferResolution.height / 2.0f ), 70.0f + 3.0f * i, 3.0f * pi / 2.0f, pi / 2.0f, 12 );
@@ -2565,8 +2570,8 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 
 		// float thetaMin = std::clamp( std::min( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
 		// float thetaMax = std::clamp( std::max( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
-		float thetaMin = std::min( std::fmod( thetaStart, 2.0f * pi ), std::fmod( thetaEnd, 2.0f * pi ) );
-		float thetaMax = std::max( std::fmod( thetaStart, 2.0f * pi ), std::fmod( thetaEnd, 2.0f * pi ) );
+		float thetaMin = std::min( std::fmod( thetaStart, 2.0f * pi + 0.0001f ), std::fmod( thetaEnd, 2.0f * pi + 0.0001f ) );
+		float thetaMax = std::max( std::fmod( thetaStart, 2.0f * pi + 0.0001f ), std::fmod( thetaEnd, 2.0f * pi + 0.0001f ) );
 		geoData[ globalData.numPrimitives ].values[ 3 ] = thetaMin;
 		geoData[ globalData.numPrimitives ].values[ 4 ] = thetaMax;
 
