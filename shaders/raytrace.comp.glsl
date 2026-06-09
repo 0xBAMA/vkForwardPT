@@ -295,7 +295,7 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 							vec2 hit = rayOrigin + rayDirection * t;
 							vec2 dNorm = normalize( hit - p );
 
-							float a = atan( dNorm.y, dNorm.x );
+							float a = atan( dNorm.y, dNorm.x ) + pi;
 							if ( a < 0.0f ) a += 6.28318530718;
 
 							bool inArc = ( lo <= hi ) ? ( a >= lo && a <= hi ) : ( a >= lo || a <= hi );

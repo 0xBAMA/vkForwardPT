@@ -72,23 +72,23 @@ vec4 getBBox ( geometryStruct g ) {
 
 		// skipping any trig
 		if ( aMin <= 0.0f && aMax >= 0.0f ) {
-			bMin = min( bMin, center + vec2( r, 0.0f ) );
-			bMax = max( bMax, center + vec2( r, 0.0f ) );
+			bMin = min( bMin, center - vec2( r, 0.0f ) );
+			bMax = max( bMax, center - vec2( r, 0.0f ) );
 		}
 
 		if ( aMin <= piHalf && aMax >= piHalf ) {
-			bMin = min( bMin, center + vec2( 0.0f, r ) );
-			bMax = max( bMax, center + vec2( 0.0f, r ) );
+			bMin = min( bMin, center - vec2( 0.0f, r ) );
+			bMax = max( bMax, center - vec2( 0.0f, r ) );
 		}
 
 		if ( aMin <= pi && aMax >= pi ) {
-			bMin = min( bMin, center + vec2( -r, 0.0f ) );
-			bMax = max( bMax, center + vec2( -r, 0.0f ) );
+			bMin = min( bMin, center - vec2( -r, 0.0f ) );
+			bMax = max( bMax, center - vec2( -r, 0.0f ) );
 		}
 
 		if ( aMin <= 3.0f * piHalf && aMax >= 3.0f * piHalf ) {
-			bMin = min( bMin, center + vec2( 0.0f, -r ) );
-			bMax = max( bMax, center + vec2( 0.0f, -r ) );
+			bMin = min( bMin, center - vec2( 0.0f, -r ) );
+			bMax = max( bMax, center - vec2( 0.0f, -r ) );
 		}
 
 		const float bias = 0.25f;

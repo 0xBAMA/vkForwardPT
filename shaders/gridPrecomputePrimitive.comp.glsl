@@ -22,7 +22,7 @@ float sdSegment ( in vec2 p, in vec2 a, in vec2 b ) {
 // https://www.shadertoy.com/view/3cXSRf
 float sdArc ( vec2 p, vec2 c, float r, float a0, float a1 ) {
 	vec2 d = p - c;
-	float ang = atan( d.y, d.x );// + 3.1415926535f;
+	float ang = atan( d.y, d.x ) + pi;
 
 	// Assumes a0 < a1 and no wraparound through ±π
 	if ( ang >= a0 && ang <= a1 || abs( a0 - a1 ) < 0.1f )

@@ -269,7 +269,8 @@ void PrometheusInstance::MainLoop () {
 				quit = true;
 			}
 
-			if ( e.type == SDL_EVENT_KEY_UP && e.key.scancode == SDL_SCANCODE_ESCAPE ) {
+			const bool shift = SDL_GetModState() & SDL_KMOD_LSHIFT;
+			if ( e.type == SDL_EVENT_KEY_UP && e.key.scancode == SDL_SCANCODE_ESCAPE && shift ) {
 				quit = true;
 			}
 
@@ -282,7 +283,6 @@ void PrometheusInstance::MainLoop () {
 				globalData.reset = 1;
 			}
 
-			const bool shift = SDL_GetModState() & SDL_KMOD_LSHIFT;
 			const float amount = shift ? 0.1f : 0.01f;
 
 			if ( e.type == SDL_EVENT_KEY_DOWN && e.key.scancode == SDL_SCANCODE_EQUALS ) {
@@ -946,19 +946,30 @@ void PrometheusInstance::initResources () {
 		for ( int yB = 300; yB < ImageBufferResolution.height - 300; yB += 300 ) {
 
 			const float sizeRamp = std::uniform_real_distribution< float >( 5.0f, 150.0f )( seedRNG );
+			float thetaLow = std::uniform_real_distribution< float >( 0.0f, 2.0f * pi )( seedRNG );
+			float thetaRange = std::uniform_real_distribution< float >( pi / 2.0f, pi )( seedRNG );
+
+			vec2 t = vec2(
+				std::min( std::fmod( thetaLow + thetaRange, 2.0f * pi ), std::fmod( thetaLow, 2.0f * pi ) ),
+				std::max( std::fmod( thetaLow + thetaRange, 2.0f * pi ), std::fmod( thetaLow, 2.0f * pi ) )
+			);
+
 			vec2 basePoint = vec2( xB, yB );
-			for ( float xO = 0.0f; xO < 2.0f * 168.0f; xO += sizeRamp ) {
-				for ( float yO = 0.0f; yO < 200.0f; yO += sizeRamp ) {
+
+			for ( float xO = sizeRamp / 2.0f; xO < 2.0f * 168.0f - ( sizeRamp / 2.0f ); xO += sizeRamp ) {
+				for ( float yO = sizeRamp / 2.0f; yO < 200.0f - ( sizeRamp / 2.0f ); yO += sizeRamp ) {
 					vec2 offset = vec2( xO, yO );
 
 					const int m = std::uniform_int_distribution< int >( 12, 14 )( seedRNG );
 					// addArc( basePoint + offset, sizeRamp * 0.45, pi / 2.0f,  pi + pi / 2.0f, m );
-					addArc( basePoint + offset, sizeRamp * 0.45, 0.0f,  pi * 2.0f, 12 );
+					// addArc( basePoint + offset, sizeRamp * 0.45, pi, 2.0f * pi, 12 );
+					addArc( basePoint + offset, sizeRamp * 0.45, t.x, t.y, 12 );
 				}
 			}
 
 			addDebugDrawBox( vec2( xB, yB ), vec2( xB + 2.0f * 168.0f, yB + 200.0f ), vec3( 1.0f ), 0.5f );
-			addDebugString( vec2( xB + 168.0f, yB + 170.0f ), "Arc Test R=" + fixedWidthNumberStringF( sizeRamp ), vec3( 0.618f ), 0 );
+			addDebugString( vec2( xB + 90.0f, yB + 152.0f ), "Arc R=" + fixedWidthNumberStringF( sizeRamp ), vec3( 0.618f ), 0 );
+			addDebugString( vec2( xB + 90.0f, yB + 170.0f ), " Theta=" + fixedWidthNumberStringF( t.x, 3, 2 ) + " to " + fixedWidthNumberStringF( t.y, 3, 2 ), vec3( 0.618f ), 0 );
 
 			// sizeRamp *= 1.2f;
 		}
@@ -2538,8 +2549,10 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 		geoData[ globalData.numPrimitives ].values[ 1 ] = center.y;
 		geoData[ globalData.numPrimitives ].values[ 2 ] = radius;
 
-		float thetaMin = std::clamp( std::min( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
-		float thetaMax = std::clamp( std::max( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
+		// float thetaMin = std::clamp( std::min( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
+		// float thetaMax = std::clamp( std::max( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
+		float thetaMin = std::min( thetaStart, thetaEnd );
+		float thetaMax = std::max( thetaStart, thetaEnd );
 		geoData[ globalData.numPrimitives ].values[ 3 ] = thetaMin;
 		geoData[ globalData.numPrimitives ].values[ 4 ] = thetaMax;
 
