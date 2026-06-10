@@ -303,8 +303,8 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 
 							if ( t < dClosest ) {
 								result.dist = dClosest = t;
-								result.frontFacing = invertFace ? ( dot( rayDirection, dNorm ) > 0.0f ) : ( dot( rayDirection, dNorm ) < 0.0f );
-								result.normal = ( invertFace ? -1.0f : 1.0f ) * dNorm;
+								result.frontFacing = invertFace ? ( dot( rayDirection, dNorm ) >= 0.0f ) : ( dot( rayDirection, dNorm ) <= 0.0f );
+								result.normal = dNorm;
 
 								// we still need a good shading normal
 								if ( dot( rayDirection, result.normal ) > 0.0f ) {
@@ -313,7 +313,7 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 
 								// todo material handling
 								result.materialType = int( geometryParameters[ primitiveBaseIdx + 13 ] );
-								result.IoR = getIORForMaterial( result.materialType );
+								result.IoR = result.frontFacing ? ( getIORForMaterial( result.materialType ) ) : ( 1.0f / getIORForMaterial( result.materialType ) );
 								result.roughness = 0.0f;
 								result.albedo = 0.99f;
 							}
