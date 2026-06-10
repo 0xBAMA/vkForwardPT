@@ -992,10 +992,33 @@ void PrometheusInstance::initResources () {
 	// addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 100.0f, 0.0f, 2.0f * pi, 12  );
 
 	// Martin Shenker F/1.5 Catadioptric Telephoto #2 from Modern Lens Design
-	vec2 p0 = vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f );
 
-	// first element - convex-convex front surface element
-	addArc( p0 - vec2( 212.834f ), 212.834f, -pi / 2.0f, pi / 2.0f, 12, false );
+	// first element - convex-convex front surface element - angles need fine tuning
+	float scalar = 3.0f;
+	float radius = 212.834f;
+	vec2 p0 = vec2( ImageBufferResolution.width / 2.0f - 500, ImageBufferResolution.height / 2.0f );
+	vec2 offset = vec2( 0.0f );
+	addArc( p0 + offset + vec2( radius, 0.0f ), radius, -pi / 2.0f, pi / 2.0f, 1.0f, 12, false );
+
+	offset.x += 4.463f * scalar;
+	radius = 390.476f * scalar;
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - pi / 4.0f, pi + pi / 4.0f, 1.0f, 12, true );
+
+	offset.x += 9.174f * scalar;
+	radius = 125.482f * scalar;
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - pi / 2.0f, pi + pi / 2.0f, 1.0f, 12, false );
+
+	offset.x += 2.480f * scalar;
+	radius = 231.298f * scalar;
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - pi / 4.0f, pi + pi / 4.0f, 1.0f, 12, true );
+
+	offset.x += 3.967f * scalar;
+	radius = 91.834f * scalar;
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - pi / 4.0f, pi + pi / 4.0f, 1.0f, 12, false );
+
+	offset.x += 2.480f * scalar;
+	radius = 133.883f * scalar;
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - pi / 4.0f, pi + pi / 4.0f, 1.0f, 12, true );
 
 	// for ( int i = 0; i < 50; i++ ) {
 		// addArc( vec2( 200 + 20.0f * i, ImageBufferResolution.height / 2.0f ), 70.0f + 3.0f * i, 3.0f * pi / 2.0f, pi / 2.0f, 12 );
