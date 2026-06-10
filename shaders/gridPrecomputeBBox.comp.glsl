@@ -19,6 +19,12 @@ layout( set = 0, binding = 2, std430 ) buffer bboxBuffer {
 	vec4 bboxes[];
 };
 
+bool angleInArc ( float a, float lo, float hi ) {
+	return ( lo <= hi )
+		? ( a >= lo && a <= hi )
+		: ( a >= lo || a <= hi );
+}
+
 vec4 getBBox ( geometryStruct g ) {
 	vec4 bbox = vec4( 0.0f );
 	switch ( int( g.data[ 15 ] ) ) {
@@ -63,30 +69,30 @@ vec4 getBBox ( geometryStruct g ) {
 		float aMax = g.data[ 4 ]; // maximum angle
 
 		// need to locate the two initial points
-		vec2 p0 = center + r * vec2( cos( aMin ), sin( aMin ) );
-		vec2 p1 = center + r * vec2( cos( aMax ), sin( aMax ) );
+		vec2 p0 = center - r * vec2( cos( aMin ), sin( aMin ) );
+		vec2 p1 = center - r * vec2( cos( aMax ), sin( aMax ) );
 
 		// initial values for a bounding box, since we know the endpoints are contained
 		vec2 bMin = min( p0, p1 );
 		vec2 bMax = max( p0, p1 );
 
 		// skipping any trig
-		if ( aMin <= 0.0f && aMax >= 0.0f ) {
+		if ( angleInArc( 0.0f, aMin, aMax ) ) {
 			bMin = min( bMin, center - vec2( r, 0.0f ) );
 			bMax = max( bMax, center - vec2( r, 0.0f ) );
 		}
 
-		if ( aMin <= piHalf && aMax >= piHalf ) {
+		if ( angleInArc( piHalf, aMin, aMax ) ) {
 			bMin = min( bMin, center - vec2( 0.0f, r ) );
 			bMax = max( bMax, center - vec2( 0.0f, r ) );
 		}
 
-		if ( aMin <= pi && aMax >= pi ) {
+		if ( angleInArc( pi, aMin, aMax ) ) {
 			bMin = min( bMin, center - vec2( -r, 0.0f ) );
 			bMax = max( bMax, center - vec2( -r, 0.0f ) );
 		}
 
-		if ( aMin <= 3.0f * piHalf && aMax >= 3.0f * piHalf ) {
+		if ( angleInArc( 3.0f * piHalf, aMin, aMax ) ) {
 			bMin = min( bMin, center - vec2( 0.0f, -r ) );
 			bMax = max( bMax, center - vec2( 0.0f, -r ) );
 		}

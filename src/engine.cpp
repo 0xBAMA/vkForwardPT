@@ -988,8 +988,14 @@ void PrometheusInstance::initResources () {
 	}
 	*/
 
-	addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 300.0f, 0.0f, 1.5f * pi, 3  );
-	addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 100.0f, 0.0f, 2.0f * pi, 12  );
+	// addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 300.0f, 0.0f, 1.5f * pi, 3  );
+	// addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 100.0f, 0.0f, 2.0f * pi, 12  );
+
+	// Martin Shenker F/1.5 Catadioptric Telephoto #2 from Modern Lens Design
+	vec2 p0 = vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f );
+
+	// first element - convex-convex front surface element
+	addArc( p0 - vec2( 212.834f ), 212.834f, -pi / 2.0f, pi / 2.0f, 12, false );
 
 	// for ( int i = 0; i < 50; i++ ) {
 		// addArc( vec2( 200 + 20.0f * i, ImageBufferResolution.height / 2.0f ), 70.0f + 3.0f * i, 3.0f * pi / 2.0f, pi / 2.0f, 12 );
@@ -2570,8 +2576,21 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 
 		// float thetaMin = std::clamp( std::min( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
 		// float thetaMax = std::clamp( std::max( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
-		float thetaMin = std::min( std::fmod( thetaStart, 2.0f * pi + 0.0001f ), std::fmod( thetaEnd, 2.0f * pi + 0.0001f ) );
-		float thetaMax = std::max( std::fmod( thetaStart, 2.0f * pi + 0.0001f ), std::fmod( thetaEnd, 2.0f * pi + 0.0001f ) );
+
+		// float thetaMin = std::min( std::fmod( thetaStart, 2.0f * pi + 0.0001f ), std::fmod( thetaEnd, 2.0f * pi + 0.0001f ) );
+		// float thetaMax = std::max( std::fmod( thetaStart, 2.0f * pi + 0.0001f ), std::fmod( thetaEnd, 2.0f * pi + 0.0001f ) );
+
+		// float thetaMin = std::min( thetaStart, thetaEnd );
+		// float thetaMax = std::max( thetaStart, thetaEnd );
+		// thetaMin = std::fmod( thetaMin + tau, tau + 0.0001f );
+		// thetaMax = std::fmod( thetaMax + tau, tau + 0.0001f );
+
+		float thetaMin = std::fmod( thetaStart + tau, tau + 0.0001f );
+		float thetaMax = std::fmod( thetaEnd + tau, tau + 0.0001f );
+
+		// float thetaMin = thetaStart;
+		// float thetaMax = thetaEnd;
+
 		geoData[ globalData.numPrimitives ].values[ 3 ] = thetaMin;
 		geoData[ globalData.numPrimitives ].values[ 4 ] = thetaMax;
 

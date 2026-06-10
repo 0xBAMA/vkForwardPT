@@ -25,8 +25,14 @@ float sdArc ( vec2 p, vec2 c, float r, float a0, float a1 ) {
 	float ang = atan( d.y, d.x ) + pi;
 
 	// Assumes a0 < a1 and no wraparound through ±π
-	if ( ang >= a0 && ang <= a1 || abs( a0 - a1 ) < 0.1f )
+//	if ( ang >= a0 && ang <= a1 || abs( a0 - a1 ) < 0.1f )
+//		return abs( length( d ) - r );
+
+	float arcLen = mod( a1 - a0 + tau, tau );
+	float rel = mod( ang - a0 + tau, tau );
+	if ( rel <= arcLen ) {
 		return abs( length( d ) - r );
+	}
 
 	vec2 e0 = c + r * vec2( cos( a0 ), sin( a0 ) );
 	vec2 e1 = c + r * vec2( cos( a1 ), sin( a1 ) );
