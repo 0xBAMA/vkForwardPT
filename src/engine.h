@@ -297,8 +297,8 @@ public:
 	AllocatedImage depthImageCache; // the raster depth is copied here for the text to use
 
 	// eventually these also need a material
-	void addSegment ( vec2 a, vec2 b, int material, bool invert = false );
-	void addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, int material, bool invert = false );
+	void addSegment ( vec2 a, vec2 b, float albedo, int material, bool invert = false );
+	void addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, float albedo, int material, bool invert = false );
 	// void addParabola ( vec2 center, );
 
 	// there is really only one function associated with this, which manages the buffer rebuild

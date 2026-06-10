@@ -2529,14 +2529,14 @@ void PrometheusInstance::bufferRebuildGPU () {
 	geometryListDirty = false;
 }
 
-// adding primitives to the geometry list
-void PrometheusInstance::addSegment ( vec2 a, vec2 b, int material, bool invert ) {
+void PrometheusInstance::addSegment ( vec2 a, vec2 b, float albedo, int material, bool invert ) {
 // segment mapping:
 	// 0: a.x
 	// 1: a.y
 	// 2: b.x
 	// 3: b.y
-	// 4-12: unused
+	// 4-11: unused
+	// 12: albedo
 	// 13: material ID
 	// 14: invert flag
 	// 15: 0 -> line segment
@@ -2548,6 +2548,7 @@ void PrometheusInstance::addSegment ( vec2 a, vec2 b, int material, bool invert 
 		geoData[ globalData.numPrimitives ].values[ 2 ] = b.x;
 		geoData[ globalData.numPrimitives ].values[ 3 ] = b.y;
 
+		geoData[ globalData.numPrimitives ].values[ 12 ] = albedo;
 		geoData[ globalData.numPrimitives ].values[ 13 ] = material;
 		geoData[ globalData.numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;
 		geoData[ globalData.numPrimitives ].values[ 15 ] = 0; // line segment identifier
@@ -2556,14 +2557,15 @@ void PrometheusInstance::addSegment ( vec2 a, vec2 b, int material, bool invert 
 	}
 }
 
-void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, int material, bool invert ) {
+void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, float albedo, int material, bool invert ) {
 // arc mapping:
 	// 0: center.x
 	// 1: center.y
 	// 2: radius
 	// 3: thetaMin
 	// 4: thetaMax
-	// 5-12: unused
+	// 5-11: unused
+	// 12: albedo
 	// 13: material ID
 	// 14: invert flag
 	// 15: 1 -> circular arc
@@ -2574,26 +2576,13 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 		geoData[ globalData.numPrimitives ].values[ 1 ] = center.y;
 		geoData[ globalData.numPrimitives ].values[ 2 ] = radius;
 
-		// float thetaMin = std::clamp( std::min( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
-		// float thetaMax = std::clamp( std::max( thetaStart, thetaEnd ), 0.0f, pi * 2.0f );
-
-		// float thetaMin = std::min( std::fmod( thetaStart, 2.0f * pi + 0.0001f ), std::fmod( thetaEnd, 2.0f * pi + 0.0001f ) );
-		// float thetaMax = std::max( std::fmod( thetaStart, 2.0f * pi + 0.0001f ), std::fmod( thetaEnd, 2.0f * pi + 0.0001f ) );
-
-		// float thetaMin = std::min( thetaStart, thetaEnd );
-		// float thetaMax = std::max( thetaStart, thetaEnd );
-		// thetaMin = std::fmod( thetaMin + tau, tau + 0.0001f );
-		// thetaMax = std::fmod( thetaMax + tau, tau + 0.0001f );
-
 		float thetaMin = std::fmod( thetaStart + tau, tau + 0.0001f );
 		float thetaMax = std::fmod( thetaEnd + tau, tau + 0.0001f );
-
-		// float thetaMin = thetaStart;
-		// float thetaMax = thetaEnd;
 
 		geoData[ globalData.numPrimitives ].values[ 3 ] = thetaMin;
 		geoData[ globalData.numPrimitives ].values[ 4 ] = thetaMax;
 
+		geoData[ globalData.numPrimitives ].values[ 12 ] = albedo;
 		geoData[ globalData.numPrimitives ].values[ 13 ] = material;
 		geoData[ globalData.numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;
 		geoData[ globalData.numPrimitives ].values[ 15 ] = 1; // ARC identifier
