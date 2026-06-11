@@ -933,45 +933,45 @@ void PrometheusInstance::initResources () {
 	vec2 p0 = vec2( ImageBufferResolution.width / 2.0f - 500, ImageBufferResolution.height / 2.0f );
 	vec2 offset = vec2( 0.0f );
 	float halfAngle = asin( 33.3f / ( radius / scalar ) );
-	addArc( p0 + offset + vec2( radius, 0.0f ), radius, -halfAngle, halfAngle, 0.99f, 12, false );
+	addArc( p0 + offset + vec2( radius, 0.0f ), radius, pi, halfAngle, 0.99f, glassType, false );
 
 	offset.x += 4.463f * scalar;
 	radius = 390.476f * scalar;
 	halfAngle = asin( 33.3f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 12, true );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, glassType, true );
 
 	offset.x += 9.174f * scalar;
 	radius = 125.482f * scalar;
 	halfAngle = asin( 32.5f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 12, false );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, glassType, true );
 
 	offset.x += 2.480f * scalar;
 	radius = 231.298f * scalar;
 	halfAngle = asin( 32.5f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 12, true );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, glassType, false );
 
 	offset.x += 3.967f * scalar;
 	radius = 91.834f * scalar;
 	halfAngle = asin( 32.5f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 12, false );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, glassType, false );
 
 	offset.x += 2.480f * scalar;
 	radius = 133.883f * scalar;
 	halfAngle = asin( 32.9f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 12, true );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, glassType, true );
 
 	offset.x += 20.400f * scalar;
 	radius = 111.690f * scalar;
 	halfAngle = asin( 15.0f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 3, true );
-	// addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 3, true );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, 3, true );
+	addArc( p0 + offset - vec2( radius + 1.0f, 0.0f ), radius, 0.0f, halfAngle, 0.01f, 1, true ); // mirror backing
 
 	offset.x += 32.047f * scalar;
 	radius = 111.690f * scalar;
 	float startAngle = halfAngle;
 	halfAngle = asin( 33.2f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi - startAngle, 0.99f, 3, false );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi + startAngle, pi + halfAngle, 0.99f, 3, false );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, ( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, false );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, -( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, false );
 
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
 
@@ -2548,17 +2548,13 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, 
 		geoData[ globalData.numPrimitives ].values[ 1 ] = center.y;
 		geoData[ globalData.numPrimitives ].values[ 2 ] = radius;
 
-		float thetaMin = std::fmod( thetaStart + tau, tau + 0.0001f );
-		float thetaMax = std::fmod( thetaEnd + tau, tau + 0.0001f );
+		// trig can all be precomputed for the arcs...
+		vec2 pCenter = vec2( cos( thetaCenter ), sin( thetaCenter ) );
+		float rangeThresh = cos( thetaRange );
 
-		// float thetaMin = thetaStart;
-		// float thetaMax = thetaEnd;
-
-		if ( thetaMin < 0.0f ) thetaMin += tau;
-		if ( thetaMax < 0.0f ) thetaMax += tau;
-
-		geoData[ globalData.numPrimitives ].values[ 3 ] = thetaMin;
-		geoData[ globalData.numPrimitives ].values[ 4 ] = thetaMax;
+		geoData[ globalData.numPrimitives ].values[ 3 ] = pCenter.x;
+		geoData[ globalData.numPrimitives ].values[ 4 ] = pCenter.y;
+		geoData[ globalData.numPrimitives ].values[ 5 ] = rangeThresh;
 
 		geoData[ globalData.numPrimitives ].values[ 12 ] = albedo;
 		geoData[ globalData.numPrimitives ].values[ 13 ] = material;
