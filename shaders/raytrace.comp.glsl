@@ -397,7 +397,7 @@ void main () {
 		rayOrigin = subpixelJitter + params.position + offset + params.width * rot * vec2( NormalizedRandomFloat() - 0.5f, 0.0f );
 	}
 	// direction is the same either way
-	rayDirection = normalize( Rotate2D( params.rotation + params.angleScalar * ( NormalizedRandomFloat() - 0.5f ) + params.cauchyMix * rnd_disc_cauchy().x ) * vec2( 0.0f, 1.0f ) );
+	rayDirection = normalize( Rotate2D( params.rotation + params.angleScalar * ( int( 360 * ( NormalizedRandomFloat() - 0.5f ) ) / 360.0f ) + params.cauchyMix * rnd_disc_cauchy().x ) * vec2( 0.0f, 1.0f ) );
 
 	// picking a wavelength...
 		// importance sampled from the light
@@ -458,7 +458,11 @@ void main () {
 				break;
 
 			case MIRROR:
-				rayDirection = reflect( rayDirection, result.normal );
+				// belt and suspenders
+				if ( dot( rayDirection, result.normal ) > 0.0f ) {
+					result.normal *= -1.0f;
+				}
+				rayDirection = normalize( reflect( rayDirection, result.normal ) );
 				break;
 
 				// below this point, we have to consider the IoR for the specific form of glass... because we precomputed all the
