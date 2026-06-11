@@ -184,38 +184,38 @@ float cross2( vec2 a, vec2 b ) { return a.x * b.y - a.y * b.x; }
 intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 	intersectionResult result = getDefaultIntersection();
 
-	result.dist = maxDistance;
-	result.materialType = NOHIT;
-	result.albedo = 0.0f;
-
 	// DDA traversal
 	// from https://www.shadertoy.com/view/7sdSzH
 
-	vec3 hitLocation = vec3( rayOrigin / GlobalData.gridScalar, 0.0f );
-	vec3 forwards = normalize( vec3( rayDirection, 0.0f ) );
-	vec3 deltaDist = 1.0f / abs( forwards );
-	ivec3 rayStep = ivec3( sign( forwards ) );
-	bvec3 mask0 = bvec3( false );
-	ivec3 mapPos0 = ivec3( floor( hitLocation + 0.0f ) );
-	vec3 sideDist0 = ( sign( forwards ) * ( vec3( mapPos0 ) - hitLocation ) + ( sign( forwards ) * 0.5f ) + 0.5f ) * deltaDist;
+//	vec3 hitLocation = vec3( rayOrigin / GlobalData.gridScalar, 0.0f );
+//	vec3 forwards = normalize( vec3( rayDirection, 0.0f ) );
+//	vec3 deltaDist = 1.0f / abs( forwards );
+//	ivec3 rayStep = ivec3( sign( forwards ) );
+//	bvec3 mask0 = bvec3( false );
+//	ivec3 mapPos0 = ivec3( floor( hitLocation + 0.0f ) );
+//	vec3 sideDist0 = ( sign( forwards ) * ( vec3( mapPos0 ) - hitLocation ) + ( sign( forwards ) * 0.5f ) + 0.5f ) * deltaDist;
 
-	#define MAX_RAY_STEPS 10000
-	for ( int i = 0; i < MAX_RAY_STEPS && gridBoundsCheck( mapPos0 ); i++ ) {
-		// Core of https://www.shadertoy.com/view/4dX3zl Branchless Voxel Raycasting
-		bvec3 mask1 = lessThanEqual( sideDist0.xyz, min( sideDist0.yzx, sideDist0.zxy ) );
-		vec3 sideDist1 = sideDist0 + vec3( mask1 ) * deltaDist;
-		ivec3 mapPos1 = mapPos0 + ivec3( vec3( mask1 ) ) * rayStep;
+//	#define MAX_RAY_STEPS 10000
+//	for ( int i = 0; i < MAX_RAY_STEPS && gridBoundsCheck( mapPos0 ); i++ ) {
+//		 Core of https://www.shadertoy.com/view/4dX3zl Branchless Voxel Raycasting
+//		bvec3 mask1 = lessThanEqual( sideDist0.xyz, min( sideDist0.yzx, sideDist0.zxy ) );
+//		vec3 sideDist1 = sideDist0 + vec3( mask1 ) * deltaDist;
+//		ivec3 mapPos1 = mapPos0 + ivec3( vec3( mask1 ) ) * rayStep;
 
 		// consider using distance to hit
-		const int linearIndex = 2 * ( mapPos0.x + GlobalData.gridDims.x * mapPos0.y );
-		ivec2 prefixValue = ivec2( prefixBufferValues[ linearIndex ], prefixBufferValues[ linearIndex + 1 ] );
-		if ( prefixValue.y != 0 ) { // there is a nonzero count for this grid cell
+//		const int linearIndex = 2 * ( mapPos0.x + GlobalData.gridDims.x * mapPos0.y );
+//		ivec2 prefixValue = ivec2( prefixBufferValues[ linearIndex ], prefixBufferValues[ linearIndex + 1 ] );
+//		if ( prefixValue.y != 0 ) { // there is a nonzero count for this grid cell
 
-			// iterate over the contents... rare that this will be more than 1, but possible
+//			 iterate over the contents... rare that this will be more than 1, but possible
+//			float dClosest = maxDistance;
+//			for ( int i = 0; i < prefixValue.y; i++ ) {
+//				 we are looking at primitives starting at location 16 * prefixValue.x
+//				uint primitiveBaseIdx = 16u * ( gridBufferValues[ prefixValue.x + i ] );
 			float dClosest = maxDistance;
-			for ( int i = 0; i < prefixValue.y; i++ ) {
+			for ( int prim = 0; prim < GlobalData.numPrimitives; prim++ ) {
 				// we are looking at primitives starting at location 16 * prefixValue.x
-				uint primitiveBaseIdx = 16u * ( gridBufferValues[ prefixValue.x + i ] );
+				uint primitiveBaseIdx = 16u * ( prim );
 
 				// we want to test against the primitive... ( + do not accept if the hit point is outside the grid cell? )
 					// math is now operating in pixel space entirely (rayOrigin, rayDirection, and intersection)
@@ -326,7 +326,7 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 				default:
 					break;
 				}
-			}
+//			}
 
 			// if we got a good hit in this grid cell, we're going to break
 			if ( result.materialType != NOHIT ) {
@@ -334,9 +334,9 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 			}
 		}
 
-		sideDist0 = sideDist1;
-		mapPos0 = mapPos1;
-	}
+//		sideDist0 = sideDist1;
+//		mapPos0 = mapPos1;
+//	}
 
 	// can dereference material to get surfaceType, albedo, IoR
 
@@ -458,7 +458,7 @@ void main () {
 			}
 		} else {
 			// if the ray has finished tracing, we need to zero out the rest of the segment memory, so the raster process doesn't draw anything
-//			rays[ baseIdx + i ] = getDefaultSegment(); -> replaced with VkCmdFillBuffer
+			// rays[ baseIdx + i ] = getDefaultSegment(); -> replaced with VkCmdFillBuffer
 			break;
 		}
 	}
