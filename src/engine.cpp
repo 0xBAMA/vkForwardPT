@@ -122,7 +122,7 @@ void PrometheusInstance::Draw () {
 	static float mouseX, mouseY;
 	auto ret = SDL_GetMouseState( &mouseX, &mouseY );
 	globalData.mouseLoc.x = mouseX;
-	globalData.mouseLoc.y = mouseY;
+	globalData.mouseLoc.y = ImageBufferResolution.height - mouseY;
 	globalData.mouseLoc.z = ( ret & SDL_BUTTON_LEFT && !ImGui::GetIO().WantCaptureMouse ) ? 1.0f : 0.0f;
 	globalData.mouseLoc.w = ( ret & SDL_BUTTON_RIGHT && !ImGui::GetIO().WantCaptureMouse ) ? 1.0f : 0.0f;
 	globalData.floatBufferResolution = glm::uvec2( ImageBufferResolution.width, ImageBufferResolution.height );
@@ -2106,15 +2106,15 @@ void PrometheusInstance::initComputePasses () {
 			{ // mouse position crosshair
 				const int sO = 7;
 				const int bO = 15;
-				linePointData[ 0 ].position = vec4( globalData.mouseLoc.x + bO, globalData.mouseLoc.y, 0.5f, 1.0f );
-				linePointData[ 1 ].position = vec4( globalData.mouseLoc.x + sO, globalData.mouseLoc.y, 0.5f, 1.0f );
-				linePointData[ 2 ].position = vec4( globalData.mouseLoc.x - bO, globalData.mouseLoc.y, 0.5f, 1.0f );
-				linePointData[ 3 ].position = vec4( globalData.mouseLoc.x - sO, globalData.mouseLoc.y, 0.5f, 1.0f );
+				linePointData[ 0 ].position = vec4( globalData.mouseLoc.x + bO, ImageBufferResolution.height - globalData.mouseLoc.y, 0.5f, 1.0f );
+				linePointData[ 1 ].position = vec4( globalData.mouseLoc.x + sO, ImageBufferResolution.height - globalData.mouseLoc.y, 0.5f, 1.0f );
+				linePointData[ 2 ].position = vec4( globalData.mouseLoc.x - bO, ImageBufferResolution.height - globalData.mouseLoc.y, 0.5f, 1.0f );
+				linePointData[ 3 ].position = vec4( globalData.mouseLoc.x - sO, ImageBufferResolution.height - globalData.mouseLoc.y, 0.5f, 1.0f );
 
-				linePointData[ 4 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + bO, 0.5f, 1.0f );
-				linePointData[ 5 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y + sO, 0.5f, 1.0f );
-				linePointData[ 6 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - bO, 0.5f, 1.0f );
-				linePointData[ 7 ].position = vec4( globalData.mouseLoc.x, globalData.mouseLoc.y - sO, 0.5f, 1.0f );
+				linePointData[ 4 ].position = vec4( globalData.mouseLoc.x, ImageBufferResolution.height - globalData.mouseLoc.y + bO, 0.5f, 1.0f );
+				linePointData[ 5 ].position = vec4( globalData.mouseLoc.x, ImageBufferResolution.height - globalData.mouseLoc.y + sO, 0.5f, 1.0f );
+				linePointData[ 6 ].position = vec4( globalData.mouseLoc.x, ImageBufferResolution.height - globalData.mouseLoc.y - bO, 0.5f, 1.0f );
+				linePointData[ 7 ].position = vec4( globalData.mouseLoc.x, ImageBufferResolution.height - globalData.mouseLoc.y - sO, 0.5f, 1.0f );
 
 				for ( int i = 0; i < 8; ++i ) {
 					linePointData[ i ].color = vec4( 1.0f );

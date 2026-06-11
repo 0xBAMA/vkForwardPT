@@ -28,6 +28,7 @@ void main () {
 		gl_Position = vec4( -10000.0f );
 	} else {
 		gl_Position = vec4( ( gl_VertexIndex % 2 == 0 ) ? r.a : r.b, 0.5f, 1.0f );
+		 gl_Position.y = -gl_Position.y;
 	}
 	colorRGB = wl_rgb( r.wavelength ) * r.brightness;
 }
