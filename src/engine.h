@@ -132,7 +132,7 @@ struct GlobalData {
 
 	glm::vec4 mouseLoc;
 
-	int numRays{ 64 * 100 };
+	int numRays{ 64 * 200 };
 	int numBounces{ 256 };
 
 	int frameNumber{ 0 };

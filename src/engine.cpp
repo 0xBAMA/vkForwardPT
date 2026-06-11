@@ -141,9 +141,9 @@ void PrometheusInstance::Draw () {
 		globalData.framesSinceReset = 0;
 	}
 
-	if ( geometryListDirty ) {
-		bufferRebuildGPU();
-	}
+	// if ( geometryListDirty ) {
+		// bufferRebuildGPU();
+	// }
 
 	// start the command buffer recording
 	VK_CHECK( vkBeginCommandBuffer( cmd, &cmdBeginInfo ) );
@@ -927,102 +927,51 @@ void PrometheusInstance::initResources () {
 		return std::mt19937( seq );
 	} () );
 
-	// it would be great to be able to add a line + text renderer
-		// with state, so I can call reset when I want (or never)
-
-	// in particular here, I want to draw boxes around the grids here, and randomize them
-		// including the labels for the different diameters and the range of theta covered
-
-	// it would also be nice to have a Z component, because then I've got a way to order things
-		// this is something that could be shared between the two passes (text + lines) and would
-		// actually enable full 3D rendering of lines if you really wanted to do that... neat
-
-	// addDebugString();
-	// addDebugDrawLine();
-	// addDebugDrawBox();
-
-	/*
-	// float sizeRamp = 1.5f;
-	for ( int xB = 300; xB < ImageBufferResolution.width - 300; xB += 400 ) {
-		for ( int yB = 150; yB < ImageBufferResolution.height - 150; yB += 300 ) {
-
-			float thetaLow = std::uniform_real_distribution< float >( 0.0f, 2.0f * pi )( seedRNG );
-			float thetaRange = std::uniform_real_distribution< float >( pi / 2.0f, pi )( seedRNG );
-
-			vec2 t = vec2(
-				std::min( std::fmod( thetaLow + thetaRange, 2.0f * pi ), std::fmod( thetaLow, 2.0f * pi ) ),
-				std::max( std::fmod( thetaLow + thetaRange, 2.0f * pi ), std::fmod( thetaLow, 2.0f * pi ) )
-			);
-
-			int m = 12;
-			float sizeRamp = std::uniform_real_distribution< float >( 15.0f, 100.0f )( seedRNG );
-			if ( std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) < 0.5f ) {
-				m = 3;
-				sizeRamp = std::uniform_real_distribution< float >( 50.0f, 150.0f )( seedRNG );
-			} else if ( std::uniform_real_distribution< float >( 0.0f, 1.0f )( seedRNG ) < 0.5f ) {
-				m = 1;
-				sizeRamp = std::uniform_real_distribution< float >( 25.0f, 75.0f )( seedRNG );
-			}
-
-			vec2 basePoint = vec2( xB, yB );
-
-			for ( float xO = sizeRamp / 2.0f; xO < 2.0f * 168.0f - ( sizeRamp / 2.0f ); xO += sizeRamp ) {
-				for ( float yO = sizeRamp / 2.0f; yO < 200.0f - ( sizeRamp / 2.0f ); yO += sizeRamp ) {
-					vec2 offset = vec2( xO, yO );
-
-					// const int m = std::uniform_int_distribution< int >( 12, 14 )( seedRNG );
-					// addArc( basePoint + offset, sizeRamp * 0.45, pi / 2.0f,  pi + pi / 2.0f, m );
-					// addArc( basePoint + offset, sizeRamp * 0.45, pi, 2.0f * pi, 12 );
-					addArc( basePoint + offset, sizeRamp * 0.45, t.x, t.y, m );
-				}
-			}
-
-			addDebugDrawBox( vec2( xB, yB ), vec2( xB + 2.0f * 168.0f, yB + 200.0f ), vec3( 1.0f ), 0.5f );
-			addDebugString( vec2( xB + 90.0f, yB + 142.0f ), "Arc R=" + fixedWidthNumberStringF( sizeRamp ), vec3( 0.618f ), 0 );
-			addDebugString( vec2( xB + 90.0f, yB + 160.0f ), " Theta=" + fixedWidthNumberStringF( t.x, 3, 2 ) + " to " + fixedWidthNumberStringF( t.y, 3, 2 ), vec3( 0.618f ), 0 );
-			addDebugString( vec2( xB + 90.0f, yB + 178.0f ), "Mat: " + string( m == 12 ? "BK7 Glass" : ( m == 1 ? "Diffuse" : "Mirror" ) ), vec3( 0.618f ), 0 );
-
-			// sizeRamp *= 1.2f;
-		}
-		// if ( sizeRamp > 100.0f ) break;
-	}
-	*/
-
-	// addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 300.0f, 0.0f, 1.5f * pi, 3  );
-	// addArc( vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), 100.0f, 0.0f, 2.0f * pi, 12  );
-
 	// Martin Shenker F/1.5 Catadioptric Telephoto #2 from Modern Lens Design
-
-	// first element - convex-convex front surface element - angles need fine tuning
-	float scalar = 3.0f;
-	float radius = 212.834f;
+	float scalar = 10.0f;
+	float radius = 212.834f * scalar;
 	vec2 p0 = vec2( ImageBufferResolution.width / 2.0f - 500, ImageBufferResolution.height / 2.0f );
 	vec2 offset = vec2( 0.0f );
-	addArc( p0 + offset + vec2( radius, 0.0f ), radius, -pi / 2.0f, pi / 2.0f, 1.0f, 12, false );
+	float halfAngle = asin( 33.3f / ( radius / scalar ) );
+	addArc( p0 + offset + vec2( radius, 0.0f ), radius, -halfAngle, halfAngle, 0.99f, 12, false );
 
 	offset.x += 4.463f * scalar;
 	radius = 390.476f * scalar;
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - pi / 4.0f, pi + pi / 4.0f, 1.0f, 12, true );
+	halfAngle = asin( 33.3f / ( radius / scalar ) );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 12, true );
 
 	offset.x += 9.174f * scalar;
 	radius = 125.482f * scalar;
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - pi / 2.0f, pi + pi / 2.0f, 1.0f, 12, false );
+	halfAngle = asin( 32.5f / ( radius / scalar ) );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 12, false );
 
 	offset.x += 2.480f * scalar;
 	radius = 231.298f * scalar;
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - pi / 4.0f, pi + pi / 4.0f, 1.0f, 12, true );
+	halfAngle = asin( 32.5f / ( radius / scalar ) );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 12, true );
 
 	offset.x += 3.967f * scalar;
 	radius = 91.834f * scalar;
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - pi / 4.0f, pi + pi / 4.0f, 1.0f, 12, false );
+	halfAngle = asin( 32.5f / ( radius / scalar ) );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 12, false );
 
 	offset.x += 2.480f * scalar;
 	radius = 133.883f * scalar;
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - pi / 4.0f, pi + pi / 4.0f, 1.0f, 12, true );
+	halfAngle = asin( 32.9f / ( radius / scalar ) );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 12, true );
 
-	// for ( int i = 0; i < 50; i++ ) {
-		// addArc( vec2( 200 + 20.0f * i, ImageBufferResolution.height / 2.0f ), 70.0f + 3.0f * i, 3.0f * pi / 2.0f, pi / 2.0f, 12 );
-	// }
+	offset.x += 20.400f * scalar;
+	radius = 111.690f * scalar;
+	halfAngle = asin( 15.0f / ( radius / scalar ) );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 3, true );
+	// addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi + halfAngle, 0.99f, 3, true );
+
+	offset.x += 32.047f * scalar;
+	radius = 111.690f * scalar;
+	float startAngle = halfAngle;
+	halfAngle = asin( 33.2f / ( radius / scalar ) );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi - halfAngle, pi - startAngle, 0.99f, 3, false );
+	addArc( p0 + offset - vec2( radius, 0.0f ), radius, pi + startAngle, pi + halfAngle, 0.99f, 3, false );
 
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
 
@@ -1039,7 +988,6 @@ void PrometheusInstance::initResources () {
 		destroyBuffer( GridBuffer );
 		destroyBuffer( BBoxBuffer );
 		destroyBuffer( UncompactedGridBuffer );
-
 
 		// destroying images
 		destroyImage( XYZImage );
@@ -2601,6 +2549,12 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, f
 
 		float thetaMin = std::fmod( thetaStart + tau, tau + 0.0001f );
 		float thetaMax = std::fmod( thetaEnd + tau, tau + 0.0001f );
+
+		// float thetaMin = thetaStart;
+		// float thetaMax = thetaEnd;
+
+		if ( thetaMin < 0.0f ) thetaMin += tau;
+		if ( thetaMax < 0.0f ) thetaMax += tau;
 
 		geoData[ globalData.numPrimitives ].values[ 3 ] = thetaMin;
 		geoData[ globalData.numPrimitives ].values[ 4 ] = thetaMax;
