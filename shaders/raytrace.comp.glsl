@@ -339,9 +339,9 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 //			}
 
 			// if we got a good hit in this grid cell, we're going to break
-			if ( result.materialType != NOHIT ) {
-				break;
-			}
+//			if ( result.materialType != NOHIT ) {
+//				break;
+//			}
 		}
 
 //		sideDist0 = sideDist1;
