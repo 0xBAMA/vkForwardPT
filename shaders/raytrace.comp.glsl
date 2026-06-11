@@ -181,8 +181,8 @@ bool gridBoundsCheck ( vec3 p ) {
 
 float cross2( vec2 a, vec2 b ) { return a.x * b.y - a.y * b.x; }
 
-//float rayArc ( vec2 rO, vec2 rD, vec2 center, float radius, float aCenter, float aRange ) {
-float rayArc ( vec2 rO, vec2 rD, vec2 center, float radius, float aMin, float aMax ) {
+// moving to a symmetric, monotonic no-trig solution using the dot product
+float rayArc ( vec2 rO, vec2 rD, vec2 center, float radius, vec2 pTest, float aThresh ) {
 	vec2 oc = rO - center;
 	float b = dot( oc, rD );
 	float c = dot( oc, oc ) - radius * radius;
@@ -198,20 +198,10 @@ float rayArc ( vec2 rO, vec2 rD, vec2 center, float radius, float aMin, float aM
 		vec2 hit = rO + rD * t;
 		vec2 dNorm = normalize( hit - center );
 
-		float a = atan( dNorm.y, dNorm.x ) + pi;
-//		float a = atan( dNorm.y, dNorm.x );
-//		if ( a < 0.0f ) a += tau;
-
-		bool inArc = ( aMin <= aMax ) ?
-			( a >= aMin && a <= aMax ) :
-			( a <= aMin || a >= aMax );
-
-//		vec2 pTest = vec2( sin( aCenter ), cos( aCenter ) );
 		// the test is now  based on:
 			// dot( a,b ) == mag( a ) * mag( b ) * cos( theta ) -> vectors normalized, threshold is cos( theta )
 		// and then looking to see if the dot product you calculate is greater than the threshold value
-//		float thresh = cos( aRange );
-
+		bool inArc = ( dot( dNorm, pTest ) > aThresh );
 		if ( inArc && t > 0.0f && t < tClosest ) {
 			tClosest = t;
 		}
@@ -312,11 +302,11 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 						float r = geometryParameters[ primitiveBaseIdx + 2 ];
 
 						// theta range
-						float center = geometryParameters[ primitiveBaseIdx + 3 ];
-						float range = geometryParameters[ primitiveBaseIdx + 4 ];
+						vec2 centerPt = vec2( geometryParameters[ primitiveBaseIdx + 3 ], geometryParameters[ primitiveBaseIdx + 4 ] );
+						float range = geometryParameters[ primitiveBaseIdx + 5 ];
 
-						float t = rayArc( rayOrigin, rayDirection, p, r, center, range );
-						if ( t > 0.0f && t < dClosest && t < maxDistance ) {
+						float t = rayArc( rayOrigin, rayDirection, p, r, centerPt, range );
+						if ( t > 0.0f && t < dClosest ) {
 							result.dist = dClosest = t;
 							vec2 pHit = rayOrigin + rayDirection * t;
 							vec2 dNorm = normalize( pHit - p );

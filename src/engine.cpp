@@ -2528,14 +2528,15 @@ void PrometheusInstance::addSegment ( vec2 a, vec2 b, float albedo, int material
 	}
 }
 
-void PrometheusInstance::addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, float albedo, int material, bool invert ) {
+void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, float thetaRange, float albedo, int material, bool invert ) {
 // arc mapping:
 	// 0: center.x
 	// 1: center.y
 	// 2: radius
-	// 3: thetaMin
-	// 4: thetaMax
-	// 5-11: unused
+	// 3: precomputed arc test center unit vector x component
+	// 4: precomputed arc test center unit vector y component
+	// 5: angle range threshold -> precomputed cos(theta range)
+	// 6-11: unused
 	// 12: albedo
 	// 13: material ID
 	// 14: invert flag
