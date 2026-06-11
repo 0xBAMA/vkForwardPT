@@ -101,9 +101,13 @@ struct intersectionResult {
 	int materialType;
 };
 
+// RT Parameters
+const float epsilon = 0.03f;
+const float maxDistance = 6000.0f;
+
 intersectionResult getDefaultIntersection () {
 	intersectionResult result;
-	result.dist = 0.0f;
+	result.dist = maxDistance;
 	result.albedo = 0.0f;
 	result.IoR = 0.0f;
 	result.roughness = 0.0f;
@@ -115,10 +119,6 @@ intersectionResult getDefaultIntersection () {
 
 // for the values below that depend on access to the wavelength
 float wavelength;
-
-// raymarch parameters
-const float epsilon = 0.03f;
-const float maxDistance = 6000.0f;
 
 // getting the wavelength-dependent IoR for materials
 float evaluateCauchy ( float A, float B, float wms ) {
@@ -180,6 +180,44 @@ bool gridBoundsCheck ( vec3 p ) {
 }
 
 float cross2( vec2 a, vec2 b ) { return a.x * b.y - a.y * b.x; }
+
+//float rayArc ( vec2 rO, vec2 rD, vec2 center, float radius, float aCenter, float aRange ) {
+float rayArc ( vec2 rO, vec2 rD, vec2 center, float radius, float aMin, float aMax ) {
+	vec2 oc = rO - center;
+	float b = dot( oc, rD );
+	float c = dot( oc, oc ) - radius * radius;
+	float h = b * b - c;
+
+	if ( h < 0.0f ) return -1.0f;
+	h = sqrt( h );
+
+	float tClosest = maxDistance;
+	for ( int i = 0; i < 2; ++i ) {
+		float t = ( i == 0 ) ? ( -b - h ) : ( -b + h );
+
+		vec2 hit = rO + rD * t;
+		vec2 dNorm = normalize( hit - center );
+
+		float a = atan( dNorm.y, dNorm.x ) + pi;
+//		float a = atan( dNorm.y, dNorm.x );
+//		if ( a < 0.0f ) a += tau;
+
+		bool inArc = ( aMin <= aMax ) ?
+			( a >= aMin && a <= aMax ) :
+			( a <= aMin || a >= aMax );
+
+//		vec2 pTest = vec2( sin( aCenter ), cos( aCenter ) );
+		// the test is now  based on:
+			// dot( a,b ) == mag( a ) * mag( b ) * cos( theta ) -> vectors normalized, threshold is cos( theta )
+		// and then looking to see if the dot product you calculate is greater than the threshold value
+//		float thresh = cos( aRange );
+
+		if ( inArc && t > 0.0f && t < tClosest ) {
+			tClosest = t;
+		}
+	}
+	return tClosest;
+}
 
 intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 	intersectionResult result = getDefaultIntersection();
@@ -270,53 +308,35 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 				case 1: // circular arc, centered at p, radius r, and covering a range of theta
 					{
 						// the basic circle
-						vec2 p = vec2( geometryParameters[ primitiveBaseIdx + 0 ], geometryParameters[ primitiveBaseIdx + 1 ] );
+						vec2 p = vec2( geometryParameters[primitiveBaseIdx + 0 ], geometryParameters[ primitiveBaseIdx + 1 ] );
 						float r = geometryParameters[ primitiveBaseIdx + 2 ];
 
 						// theta range
-						float lo = geometryParameters[ primitiveBaseIdx + 3 ];
-						float hi = geometryParameters[ primitiveBaseIdx + 4 ];
+						float center = geometryParameters[ primitiveBaseIdx + 3 ];
+						float range = geometryParameters[ primitiveBaseIdx + 4 ];
 
-						bool invertFace = ( geometryParameters[ primitiveBaseIdx + 14 ] != 0.0f );
+						float t = rayArc( rayOrigin, rayDirection, p, r, center, range );
+						if ( t > 0.0f && t < dClosest && t < maxDistance ) {
+							result.dist = dClosest = t;
+							vec2 pHit = rayOrigin + rayDirection * t;
+							vec2 dNorm = normalize( pHit - p );
 
-						vec2 oc = rayOrigin - p;
-						float b = dot( oc, rayDirection );
-						float c = dot( oc, oc ) - r * r;
-						float h = b * b - c;
-
-						if ( h < 0.0f ) continue;
-						h = sqrt( h );
-
-						// Test nearer then farther root
-						for ( int i = 0; i < 2; ++i ) {
-							float t = ( i == 0 ) ? ( -b - h ) : ( -b + h );
-							if ( t < 0.0f ) continue;
-
-							vec2 hit = rayOrigin + rayDirection * t;
-							vec2 dNorm = normalize( hit - p );
-
-							float a = atan( dNorm.y, dNorm.x ) + pi;
-							if ( a < 0.0f ) a += 6.28318530718;
-
-							bool inArc = ( lo <= hi ) ? ( a >= lo && a <= hi ) : ( a >= lo || a <= hi );
-							if ( !inArc ) continue;
-
-							if ( t < dClosest ) {
-								result.dist = dClosest = t;
-								result.frontFacing = invertFace ? ( dot( rayDirection, dNorm ) >= 0.0f ) : ( dot( rayDirection, dNorm ) <= 0.0f );
-								result.normal = dNorm;
-
-								// we still need a good shading normal
-								if ( dot( rayDirection, result.normal ) > 0.0f ) {
-									result.normal = -result.normal;
-								}
-
-								// todo material handling
-								result.materialType = int( geometryParameters[ primitiveBaseIdx + 13 ] );
-								result.IoR = result.frontFacing ? ( getIORForMaterial( result.materialType ) ) : ( 1.0f / getIORForMaterial( result.materialType ) );
-								result.roughness = 0.0f;
-								result.albedo = 0.99f;
+							// we still need a good shading normal
+							result.frontFacing = true;
+							if ( dot( rayDirection, dNorm ) > 0.0f ) {
+								dNorm = -dNorm;
+								result.frontFacing = false;
 							}
+
+							bool invert = ( geometryParameters[ primitiveBaseIdx + 14 ] != 0.0f );
+							result.frontFacing = invert ? !result.frontFacing : result.frontFacing;
+							result.normal = dNorm;
+
+							// todo material handling
+							result.albedo = geometryParameters[ primitiveBaseIdx + 12 ];
+							result.materialType = int( geometryParameters[ primitiveBaseIdx + 13 ] );
+							result.roughness = 0.0f;
+							result.IoR = getIORForMaterial( result.materialType );
 						}
 					}
 					break;
