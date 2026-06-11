@@ -928,6 +928,7 @@ void PrometheusInstance::initResources () {
 	} () );
 
 	// Martin Shenker F/1.5 Catadioptric Telephoto #2 from Modern Lens Design
+	int glassType = 7;
 	float scalar = 10.0f;
 	float radius = 212.834f * scalar;
 	vec2 p0 = vec2( ImageBufferResolution.width / 2.0f - 500, ImageBufferResolution.height / 2.0f );
@@ -2620,6 +2621,8 @@ void PrometheusInstance::lightManagerMaintenance () {
 
 	static int lastSeenNumLights = 0;
 	uint8_t numLights = lightManager.lights.size() + 1;
+
+	lightManager.drawRes = &ImageBufferResolution;
 
 	// if we see a change in the light list, we need to rebuild
 	if ( lastSeenNumLights != numLights ) {

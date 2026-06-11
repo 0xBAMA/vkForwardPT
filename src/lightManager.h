@@ -449,9 +449,6 @@ public:
 
 		// need to call this to prepare
 		MouseLight = std::make_unique<Light>();
-
-		// and add one placeholder user light
-		// lights.emplace_back();
 	}
 
 	// get rid of all lights
@@ -534,6 +531,7 @@ public:
 		*brightnessScalar = *brightnessScalar * ( ( prevSumPower + brightness ) / prevSumPower );
 	}
 
+	VkExtent2D* drawRes = nullptr;
 	void MouseLightToUserLight () {
 
 		// add a new light, at the mouse brightness
@@ -546,7 +544,7 @@ public:
 		static float mouseX, mouseY;
 		SDL_GetMouseState( &mouseX, &mouseY );
 		lights.back().parameters.position.x = mouseX;
-		lights.back().parameters.position.y = mouseY;
+		lights.back().parameters.position.y = ( *drawRes ).height - mouseY;
 
 		// light distribution comes from the mouse distribution
 		lights.back().PDFPick = MouseLight->PDFPick;
