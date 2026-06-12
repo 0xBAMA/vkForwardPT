@@ -301,6 +301,8 @@ public:
 	void addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, float albedo, int material, bool invert = false );
 	// void addParabola ( vec2 center, );
 
+	void AddShenkerCatadioptric ( float scale, vec2 basePoint );
+
 	// there is really only one function associated with this, which manages the buffer rebuild
 	void bufferRebuildGPU (); // gotta go fast
 
