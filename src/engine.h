@@ -179,6 +179,15 @@ struct debugStringConfig {
 	uint8_t debugStringData[ 1024 ];
 };
 
+struct lensElement {
+	float radius;
+	float thickness;
+	float semiAperture;
+	float index;
+	float abbeN;
+	// material...
+};
+
 constexpr unsigned int FRAME_OVERLAP = 2;
 constexpr bool useValidationLayers = true;
 
@@ -302,6 +311,7 @@ public:
 	// void addParabola ( vec2 center, );
 
 	void AddShenkerCatadioptric ( float scale, vec2 basePoint );
+	void AddElementList( float scalar, vec2 p0, std::vector< lensElement > elements );
 
 	// there is really only one function associated with this, which manages the buffer rebuild
 	void bufferRebuildGPU (); // gotta go fast

@@ -921,7 +921,7 @@ void PrometheusInstance::initResources () {
 	}
 
 	// placeholder init
-	AddShenkerCatadioptric( 10.0f, vec2( ImageBufferResolution.width / 2.0f - 500, ImageBufferResolution.height / 2.0f ) );
+	AddShenkerCatadioptric( 10.0f, vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ) );
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
 
 	// make sure to clean up at the end
@@ -2514,6 +2514,10 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, 
 	}
 }
 
+void PrometheusInstance::AddElementList( float scalar, vec2 p0, std::vector< lensElement > elements ) {
+
+}
+
 void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	std::mt19937 seedRNG( [] {
 		std::random_device rd;
@@ -2522,49 +2526,112 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	} () );
 
 	// Martin Shenker F/1.5 Catadioptric Telephoto #2 from Modern Lens Design
+	// int glassType = 12;
 	int glassType = 7;
 	float radius = 212.834f * scalar;
 	vec2 offset = vec2( 0.0f );
+	vec2 center = p0 + offset + vec2( radius, 0.0f );
 	float halfAngle = asin( 33.3f / ( radius / scalar ) );
-	addArc( p0 + offset + vec2( radius, 0.0f ), radius, pi, halfAngle, 0.99f, glassType, false );
+	addArc( center, radius, pi, halfAngle, 0.99f, glassType, false );
+
+	vec2 aTop = center + radius * vec2( cos( pi - halfAngle ), sin( pi - halfAngle ) );
+	vec2 aBottom = center + radius * vec2( cos( pi + halfAngle ), sin( pi + halfAngle ) );
 
 	offset.x += 4.463f * scalar;
 	radius = 390.476f * scalar;
 	halfAngle = asin( 33.3f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, glassType, true );
+	center = p0 + offset - vec2( radius, 0.0f );
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, true );
+
+	vec2 bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
+	vec2 bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
+
+	addSegment( aTop, bTop, 0.01f, 1 );
+	addSegment( aBottom, bBottom, 0.01f, 1 );
+
+	aTop = bTop;
+	aBottom = bBottom;
 
 	offset.x += 9.174f * scalar;
 	radius = 125.482f * scalar;
 	halfAngle = asin( 32.5f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, glassType, true );
+	center = p0 + offset - vec2( radius, 0.0f );
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, true );
+
+	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
+	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
+
+	addSegment( aTop, bTop, 0.01f, 1 );
+	addSegment( aBottom, bBottom, 0.01f, 1 );
+
+	aTop = bTop;
+	aBottom = bBottom;
 
 	offset.x += 2.480f * scalar;
 	radius = 231.298f * scalar;
 	halfAngle = asin( 32.5f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, glassType, false );
+	center = p0 + offset - vec2( radius, 0.0f );
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, false );
+
+	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
+	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
+
+	addSegment( aTop, bTop, 0.01f, 1 );
+	addSegment( aBottom, bBottom, 0.01f, 1 );
+
+	aTop = bTop;
+	aBottom = bBottom;
 
 	offset.x += 3.967f * scalar;
 	radius = 91.834f * scalar;
 	halfAngle = asin( 32.5f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, glassType, false );
+	center = p0 + offset - vec2( radius, 0.0f );
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, false );
+
+	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
+	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
+
+	addSegment( aTop, bTop, 0.01f, 1 );
+	addSegment( aBottom, bBottom, 0.01f, 1 );
+
+	aTop = bTop;
+	aBottom = bBottom;
 
 	offset.x += 2.480f * scalar;
 	radius = 133.883f * scalar;
 	halfAngle = asin( 32.9f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, glassType, true );
+	center = p0 + offset - vec2( radius, 0.0f );
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, true );
+
+	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
+	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
+
+	addSegment( aTop, bTop, 0.01f, 1 );
+	addSegment( aBottom, bBottom, 0.01f, 1 );
+
+	aTop = bTop;
+	aBottom = bBottom;
 
 	offset.x += 20.400f * scalar;
 	radius = 111.690f * scalar;
 	halfAngle = asin( 15.0f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, 0.0f, halfAngle, 0.99f, 3, true );
-	addArc( p0 + offset - vec2( radius + 1.0f, 0.0f ), radius, 0.0f, halfAngle, 0.01f, 1, true ); // mirror backing
+	center = p0 + offset - vec2( radius, 0.0f );
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, 3, true );
+	addArc( center - vec2( 1.0f, 0.0f ), radius, 0.0f, halfAngle, 0.01f, 1, true ); // mirror backing
 
 	offset.x += 32.047f * scalar;
 	radius = 111.690f * scalar;
 	float startAngle = halfAngle;
 	halfAngle = asin( 33.2f / ( radius / scalar ) );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, ( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, false );
-	addArc( p0 + offset - vec2( radius, 0.0f ), radius, -( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, false );
+	center = p0 + offset - vec2( radius, 0.0f );
+	addArc( center, radius, ( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, false );
+	addArc( center, radius, -( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, false );
+
+	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
+	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
+
+	addSegment( aTop, bTop, 0.01f, 1 );
+	addSegment( aBottom, bBottom, 0.01f, 1 );
 }
 
 // text rendering, with pixel location + select from the list of available font LUTs (tinyfont, fatfont, code page 437)
