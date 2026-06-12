@@ -2528,6 +2528,7 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	// Martin Shenker F/1.5 Catadioptric Telephoto #2 from Modern Lens Design
 	// int glassType = 12;
 	int glassType = 7;
+	float flockingAlbedo = 0.0f;
 	float radius = 212.834f * scalar;
 	vec2 offset = vec2( 0.0f );
 	vec2 center = p0 + offset + vec2( radius, 0.0f );
@@ -2546,8 +2547,8 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	vec2 bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	vec2 bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, 0.01f, 1 );
-	addSegment( aBottom, bBottom, 0.01f, 1 );
+	addSegment( aTop, bTop, flockingAlbedo, 1 );
+	addSegment( aBottom, bBottom, flockingAlbedo, 1 );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2561,8 +2562,8 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, 0.01f, 1 );
-	addSegment( aBottom, bBottom, 0.01f, 1 );
+	addSegment( aTop, bTop, flockingAlbedo, 1 );
+	addSegment( aBottom, bBottom, flockingAlbedo, 1 );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2576,8 +2577,8 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, 0.01f, 1 );
-	addSegment( aBottom, bBottom, 0.01f, 1 );
+	addSegment( aTop, bTop, flockingAlbedo, 1 );
+	addSegment( aBottom, bBottom, flockingAlbedo, 1 );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2606,8 +2607,8 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, 0.01f, 1 );
-	addSegment( aBottom, bBottom, 0.01f, 1 );
+	addSegment( aTop, bTop, flockingAlbedo, 1 );
+	addSegment( aBottom, bBottom, flockingAlbedo, 1 );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2617,7 +2618,7 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	halfAngle = asin( 15.0f / ( radius / scalar ) );
 	center = p0 + offset - vec2( radius, 0.0f );
 	addArc( center, radius, 0.0f, halfAngle, 0.99f, 3, true );
-	addArc( center - vec2( 1.0f, 0.0f ), radius, 0.0f, halfAngle, 0.01f, 1, true ); // mirror backing
+	addArc( center - vec2( 1.0f, 0.0f ), radius, 0.0f, halfAngle, flockingAlbedo, 1, true ); // mirror backing
 
 	offset.x += 32.047f * scalar;
 	radius = 111.690f * scalar;
@@ -2630,8 +2631,8 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, 0.01f, 1 );
-	addSegment( aBottom, bBottom, 0.01f, 1 );
+	addSegment( aTop, bTop, flockingAlbedo, 1 );
+	addSegment( aBottom, bBottom, flockingAlbedo, 1 );
 }
 
 // text rendering, with pixel location + select from the list of available font LUTs (tinyfont, fatfont, code page 437)
