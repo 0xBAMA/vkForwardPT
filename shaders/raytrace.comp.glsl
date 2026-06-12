@@ -408,12 +408,12 @@ void main () {
 			// add the line to the system
 			raySegment r = getDefaultSegment();
 			r.a = rayOrigin;
-			r.a.x = remap( r.a.x, 0.0f, GlobalData.floatBufferResolution.x, -1.0f, 1.0f );
-			r.a.y = remap( r.a.y, 0.0f, GlobalData.floatBufferResolution.y, -1.0f, 1.0f );
+			r.a.x = remap( r.a.x + NormalizedRandomFloat()- 0.5f, 0.0f, GlobalData.floatBufferResolution.x, -1.0f, 1.0f );
+			r.a.y = remap( r.a.y + NormalizedRandomFloat() - 0.5f, 0.0f, GlobalData.floatBufferResolution.y, -1.0f, 1.0f );
 
 			r.b = rayOrigin + result.dist * rayDirection;
-			r.b.x = remap( r.b.x, 0.0f, GlobalData.floatBufferResolution.x, -1.0f, 1.0f );
-			r.b.y = remap( r.b.y, 0.0f, GlobalData.floatBufferResolution.y, -1.0f, 1.0f );
+			r.b.x = remap( r.b.x + NormalizedRandomFloat(), 0.0f, GlobalData.floatBufferResolution.x, -1.0f, 1.0f );
+			r.b.y = remap( r.b.y + NormalizedRandomFloat(), 0.0f, GlobalData.floatBufferResolution.y, -1.0f, 1.0f );
 
 			r.brightness = energy;
 			r.wavelength = wavelength;
