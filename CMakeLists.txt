@@ -31,10 +31,10 @@ foreach( GLSL ${GLSL_SOURCE_FILES} )
 	get_filename_component( FILE_NAME ${GLSL} NAME )
 	set( SPIRV "${PROJECT_SOURCE_DIR}/shaders/${FILE_NAME}.spv" )
 	message( STATUS ${GLSL} )
-	message( STATUS COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV} )
+	message( STATUS COMMAND ${GLSL_VALIDATOR} -gVS -V ${GLSL} -o ${SPIRV} )
 	add_custom_command(
 		OUTPUT ${SPIRV}
-		COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}
+		COMMAND ${GLSL_VALIDATOR} -gVS -V ${GLSL} -o ${SPIRV}
 		DEPENDS ${GLSL})
 	list( APPEND SPIRV_BINARY_FILES ${SPIRV} )
 endforeach( GLSL )
