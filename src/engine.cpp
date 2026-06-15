@@ -2003,18 +2003,42 @@ void PrometheusInstance::initComputePasses () {
 			{ // mouse position crosshair
 				const int sO = 7;
 				const int bO = 15;
-				linePointData[ 0 ].position = vec4( globalData.mouseLoc.x + bO, ImageBufferResolution.height - globalData.mouseLoc.y, 0.5f, 1.0f );
-				linePointData[ 1 ].position = vec4( globalData.mouseLoc.x + sO, ImageBufferResolution.height - globalData.mouseLoc.y, 0.5f, 1.0f );
-				linePointData[ 2 ].position = vec4( globalData.mouseLoc.x - bO, ImageBufferResolution.height - globalData.mouseLoc.y, 0.5f, 1.0f );
-				linePointData[ 3 ].position = vec4( globalData.mouseLoc.x - sO, ImageBufferResolution.height - globalData.mouseLoc.y, 0.5f, 1.0f );
 
-				linePointData[ 4 ].position = vec4( globalData.mouseLoc.x, ImageBufferResolution.height - globalData.mouseLoc.y + bO, 0.5f, 1.0f );
-				linePointData[ 5 ].position = vec4( globalData.mouseLoc.x, ImageBufferResolution.height - globalData.mouseLoc.y + sO, 0.5f, 1.0f );
-				linePointData[ 6 ].position = vec4( globalData.mouseLoc.x, ImageBufferResolution.height - globalData.mouseLoc.y - bO, 0.5f, 1.0f );
-				linePointData[ 7 ].position = vec4( globalData.mouseLoc.x, ImageBufferResolution.height - globalData.mouseLoc.y - sO, 0.5f, 1.0f );
+				float mX = globalData.mouseLoc.x;
+				float mY = ImageBufferResolution.height - globalData.mouseLoc.y;
+
+				linePointData[ 0 ].position = vec4( mX + bO, mY, 0.5f, 1.0f );
+				linePointData[ 1 ].position = vec4( mX + sO, mY, 0.5f, 1.0f );
+				linePointData[ 2 ].position = vec4( mX - bO, mY, 0.5f, 1.0f );
+				linePointData[ 3 ].position = vec4( mX - sO, mY, 0.5f, 1.0f );
+
+				linePointData[ 4 ].position = vec4( mX, mY + bO, 0.5f, 1.0f );
+				linePointData[ 5 ].position = vec4( mX, mY + sO, 0.5f, 1.0f );
+				linePointData[ 6 ].position = vec4( mX, mY - bO, 0.5f, 1.0f );
+				linePointData[ 7 ].position = vec4( mX, mY - sO, 0.5f, 1.0f );
 
 				for ( int i = 0; i < 8; ++i ) {
 					linePointData[ i ].color = vec4( 1.0f );
+				}
+
+				// and adding a label for the position
+				static bool firstTime = true;
+				static int xIdx = 0, yIdx = 0;
+				string xString = string( "x:" ) + std::to_string( int( mX ) );
+				string yString = string( "y:" ) + std::to_string( int( mY ) );
+
+				if ( firstTime ) {
+					firstTime = false;
+					xIdx = addDebugString( vec2( mX, mY ), xString, vec3( 0.618f ), 1 );
+					yIdx = addDebugString( vec2( mX, mY ), yString, vec3( 0.618f ), 1 );
+				} else {
+					debugStrings[ xIdx ].debugStringWriteLocation = vec2( mX + 4, mY + 4 );
+					sprintf( ( char * ) debugStrings[ xIdx ].debugStringData, "%s", xString.c_str() );
+					debugStrings[ xIdx ].debugStringLength = xString.length();
+
+					debugStrings[ yIdx ].debugStringWriteLocation = vec2( mX + 4, mY + 16 );
+					sprintf( ( char * ) debugStrings[ yIdx ].debugStringData, "%s", yString.c_str() );
+					debugStrings[ yIdx ].debugStringLength = yString.length();
 				}
 			}
 
