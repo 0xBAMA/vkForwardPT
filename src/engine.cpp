@@ -260,6 +260,27 @@ void PrometheusInstance::MainLoop () {
 
 	bool quit = false;
 
+	static bool firstTime = true;
+	if ( firstTime ) {
+		firstTime = false;
+		std::vector< string > list = {{
+			"SHIFT + ESC: Quit",
+			"A/D: Rotate Mouse Light (+SHIFT)",
+			"R: Reset Renderer Accumulation",
+			"M: Show/Hide Menu",
+			"N: Add Mouse Light To List",
+			"K: Kill Light List",
+			"SHIFT+T: Screenshot",
+			"[+/-]: Brightness Adjust (+SHIFT)",
+		}};
+
+		vec2 baseLocation = vec2( 10, ImageBufferResolution.height - 20 * list.size() );
+		for ( auto& s : list ) {
+			addDebugString( baseLocation, s, vec3( 0.618f ), 0 );
+			baseLocation.y += 20;
+		}
+	}
+
 	while ( !quit ) {
 		// event handling loop
 		while ( SDL_PollEvent( &e ) ) {
@@ -2539,6 +2560,14 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, 
 }
 
 void PrometheusInstance::AddElementList( float scalar, vec2 p0, std::vector< lensElement > elements ) {
+	// iterating through the list of elements and determining the arcs to add...
+
+// since c++20, views::drop() skips first element, will make it easier to manage prev/current element
+	// std::vector<int> colourPos { 1, 2, 3 };
+	// for (int p : colourPos | std::views::drop(1)) {
+		// std::cout << "Pos = " << p << std::endl;
+	// }
+
 
 }
 
