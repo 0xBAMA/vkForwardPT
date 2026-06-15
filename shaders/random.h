@@ -13,6 +13,14 @@ float NormalizedRandomFloat () {
 	return float( wangHash() ) / 4294967296.0f;
 }
 
+float NormalDistributionRand () {
+	// using the Box-Muller transform
+	// https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
+	float U1 = NormalizedRandomFloat();
+	float U2 = NormalizedRandomFloat();
+	return sqrt( -2.0f * log( U1 ) ) * cos( tau * U2 );
+}
+
 #define rFloat() NormalizedRandomFloat()
 #define rFloat2() vec2(NormalizedRandomFloat(),NormalizedRandomFloat())
 
