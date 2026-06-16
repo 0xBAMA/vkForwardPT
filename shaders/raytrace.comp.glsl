@@ -252,7 +252,6 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 					{
 						vec2 a = vec2( geometryParameters[ primitiveBaseIdx + 0 ], geometryParameters[ primitiveBaseIdx + 1 ] );
 						vec2 b = vec2( geometryParameters[ primitiveBaseIdx + 2 ], geometryParameters[ primitiveBaseIdx + 3 ] );
-						bool invertFace = ( geometryParameters[ primitiveBaseIdx + 14 ] != 0.0f );
 
 						// edge
 						vec2 edge = b - a;
@@ -285,12 +284,27 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 
 							// determining the normal vector for the surface
 							result.normal = normalize( vec2( -edge.y, edge.x ) );
-							if ( dot( rayDirection, result.normal ) > 0.0f ) {
+//							 if ( dot( rayDirection, result.normal ) > 0.0f ) {
+							 if ( ( det < 0.0f ) ) {
+								// this is a backface hit - we have to invert the normal
 								result.normal = -result.normal;
-							}
+
+								// IOR is representative of A into B
+								result.IoR = getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 14 ] ) )
+									/ getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 13 ] ) );
+
+								result.materialType = int( geometryParameters[ primitiveBaseIdx + 14 ] );
+							 } else {
+								// this is a frontface hit - normal vector is fine
+								// IOR is representative of B into A
+								result.IoR = getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 13 ] ) )
+									/ getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 14 ] ) );
+
+								result.materialType = int( geometryParameters[ primitiveBaseIdx + 13 ] );
+							 }
 
 							// CW edge winding defines front side, or opposite if invert flag is set
-							result.frontFacing = invertFace ? ( det < 0.0f ) : ( det > 0.0f );
+//							result.frontFacing = invertFace ? ( det < 0.0f ) : ( det > 0.0f );
 						}
 					}
 					break;
@@ -309,24 +323,29 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 						if ( t > 0.0f && t < dClosest ) {
 							result.dist = dClosest = t;
 							vec2 pHit = rayOrigin + rayDirection * t;
-							vec2 dNorm = normalize( pHit - p );
+							result.normal = normalize( pHit - p );
 
 							// we still need a good shading normal
-							result.frontFacing = true;
-							if ( dot( rayDirection, dNorm ) > 0.0f ) {
-								dNorm = -dNorm;
-								result.frontFacing = false;
+							if ( dot( rayDirection, result.normal ) > 0.0f ) {
+							// this is a backface hit - we have to invert the normal
+								result.normal = -result.normal;
+
+								// IOR is representative of A into B
+								result.IoR = getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 14 ] ) )
+								/ getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 13 ] ) );
+
+								result.materialType = int( geometryParameters[ primitiveBaseIdx + 14 ] );
+							} else {
+							// this is a frontface hit - normal vector is fine
+								// IOR is representative of B into A
+								result.IoR = getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 13 ] ) )
+									/ getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 14 ] ) );
+
+								result.materialType = int( geometryParameters[ primitiveBaseIdx + 13 ] );
 							}
 
-							bool invert = ( geometryParameters[ primitiveBaseIdx + 14 ] != 0.0f );
-							result.frontFacing = invert ? !result.frontFacing : result.frontFacing;
-							result.normal = dNorm;
-
-							// todo material handling
 							result.albedo = geometryParameters[ primitiveBaseIdx + 12 ];
-							result.materialType = int( geometryParameters[ primitiveBaseIdx + 13 ] );
 							result.roughness = 0.0f;
-							result.IoR = getIORForMaterial( result.materialType );
 						}
 					}
 					break;
@@ -459,7 +478,8 @@ void main () {
 				// varying behavior already, we can just treat it uniformly, only need to consider frontface/backface for inversion
 			default:
 				rayOrigin -= result.normal * epsilon * 5;
-				result.IoR = result.frontFacing ? ( 1.0f / result.IoR ) : ( result.IoR ); // "reverse" back to physical properties for IoR
+				// this is now handled by the front/rear face logic in the intersector
+//				result.IoR = result.frontFacing ? ( 1.0f / result.IoR ) : ( result.IoR ); // "reverse" back to physical properties for IoR
 				float cosTheta = min( dot( -normalize( rayDirection ), result.normal ), 1.0f );
 				float sinTheta = sqrt( 1.0f - cosTheta * cosTheta );
 				bool cannotRefract = ( result.IoR * sinTheta ) > 1.0f; // accounting for TIR effects
