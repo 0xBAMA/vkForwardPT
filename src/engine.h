@@ -305,9 +305,9 @@ public:
 	AllocatedImage font_tinyfont;
 	AllocatedImage depthImageCache; // the raster depth is copied here for the text to use
 
-	// eventually these also need a material
-	void addSegment ( vec2 a, vec2 b, float albedo, int material, bool invert = false );
-	void addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, float albedo, int material, bool invert = false );
+	// RT primitives
+	void addSegment ( vec2 a, vec2 b, float albedo, int materialA, int materialB );
+	void addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, float albedo, int materialA, int materialB );
 	// void addParabola ( vec2 center, );
 
 	void AddShenkerCatadioptric ( float scale, vec2 basePoint );

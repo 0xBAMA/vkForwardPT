@@ -2494,7 +2494,7 @@ void PrometheusInstance::bufferRebuildGPU () {
 	geometryListDirty = false;
 }
 
-void PrometheusInstance::addSegment ( vec2 a, vec2 b, float albedo, int material, bool invert ) {
+void PrometheusInstance::addSegment ( vec2 a, vec2 b, float albedo, int materialA, int materialB ) {
 // segment mapping:
 	// 0: a.x
 	// 1: a.y
@@ -2514,15 +2514,15 @@ void PrometheusInstance::addSegment ( vec2 a, vec2 b, float albedo, int material
 		geoData[ globalData.numPrimitives ].values[ 3 ] = b.y;
 
 		geoData[ globalData.numPrimitives ].values[ 12 ] = albedo;
-		geoData[ globalData.numPrimitives ].values[ 13 ] = material;
-		geoData[ globalData.numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;
+		geoData[ globalData.numPrimitives ].values[ 13 ] = materialA;
+		geoData[ globalData.numPrimitives ].values[ 14 ] = materialB;
 		geoData[ globalData.numPrimitives ].values[ 15 ] = 0; // line segment identifier
 
 		globalData.numPrimitives++;
 	}
 }
 
-void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, float thetaRange, float albedo, int material, bool invert ) {
+void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, float thetaRange, float albedo, int materialA, int materialB ) {
 // arc mapping:
 	// 0: center.x
 	// 1: center.y
@@ -2551,8 +2551,8 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, 
 		geoData[ globalData.numPrimitives ].values[ 5 ] = rangeThresh;
 
 		geoData[ globalData.numPrimitives ].values[ 12 ] = albedo;
-		geoData[ globalData.numPrimitives ].values[ 13 ] = material;
-		geoData[ globalData.numPrimitives ].values[ 14 ] = invert ? 1.0f : 0.0f;
+		geoData[ globalData.numPrimitives ].values[ 13 ] = materialA;
+		geoData[ globalData.numPrimitives ].values[ 14 ] = materialB;
 		geoData[ globalData.numPrimitives ].values[ 15 ] = 1; // ARC identifier
 
 		globalData.numPrimitives++;
