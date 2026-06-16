@@ -2581,12 +2581,13 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	// Martin Shenker F/1.5 Catadioptric Telephoto #2 from Modern Lens Design
 	// int glassType = 12;
 	int glassType = 7;
+	int airType = 5;
 	float flockingAlbedo = 0.0f;
 	float radius = 212.834f * scalar;
 	vec2 offset = vec2( 0.0f );
 	vec2 center = p0 + offset + vec2( radius, 0.0f );
 	float halfAngle = asin( 33.3f / ( radius / scalar ) );
-	addArc( center, radius, pi, halfAngle, 0.99f, glassType, false );
+	addArc( center, radius, pi, halfAngle, 0.99f, airType, glassType );
 
 	vec2 aTop = center + radius * vec2( cos( pi - halfAngle ), sin( pi - halfAngle ) );
 	vec2 aBottom = center + radius * vec2( cos( pi + halfAngle ), sin( pi + halfAngle ) );
@@ -2595,13 +2596,13 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	radius = 390.476f * scalar;
 	halfAngle = asin( 33.3f / ( radius / scalar ) );
 	center = p0 + offset - vec2( radius, 0.0f );
-	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, true );
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, airType, glassType );
 
 	vec2 bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	vec2 bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, flockingAlbedo, 1 );
-	addSegment( aBottom, bBottom, flockingAlbedo, 1 );
+	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
+	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2610,13 +2611,13 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	radius = 125.482f * scalar;
 	halfAngle = asin( 32.5f / ( radius / scalar ) );
 	center = p0 + offset - vec2( radius, 0.0f );
-	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, true );
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, airType );
 
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, flockingAlbedo, 1 );
-	addSegment( aBottom, bBottom, flockingAlbedo, 1 );
+	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
+	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2625,13 +2626,13 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	radius = 231.298f * scalar;
 	halfAngle = asin( 32.5f / ( radius / scalar ) );
 	center = p0 + offset - vec2( radius, 0.0f );
-	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, false );
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, airType, glassType );
 
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, flockingAlbedo, 1 );
-	addSegment( aBottom, bBottom, flockingAlbedo, 1 );
+	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
+	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2640,13 +2641,13 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	radius = 91.834f * scalar;
 	halfAngle = asin( 32.5f / ( radius / scalar ) );
 	center = p0 + offset - vec2( radius, 0.0f );
-	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, false );
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, airType );
 
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, 0.01f, 1 );
-	addSegment( aBottom, bBottom, 0.01f, 1 );
+	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
+	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2655,13 +2656,13 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	radius = 133.883f * scalar;
 	halfAngle = asin( 32.9f / ( radius / scalar ) );
 	center = p0 + offset - vec2( radius, 0.0f );
-	addArc( center, radius, 0.0f, halfAngle, 0.99f, glassType, true );
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, airType, glassType );
 
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, flockingAlbedo, 1 );
-	addSegment( aBottom, bBottom, flockingAlbedo, 1 );
+	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
+	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2670,22 +2671,22 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	radius = 111.690f * scalar;
 	halfAngle = asin( 15.0f / ( radius / scalar ) );
 	center = p0 + offset - vec2( radius, 0.0f );
-	addArc( center, radius, 0.0f, halfAngle, 0.99f, 3, true );
-	addArc( center - vec2( 1.0f, 0.0f ), radius, 0.0f, halfAngle, flockingAlbedo, 1, true ); // mirror backing
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, 3, 3 );
+	addArc( center - vec2( 1.0f, 0.0f ), radius, 0.0f, halfAngle, flockingAlbedo, 1, 1 ); // mirror backing
 
 	offset.x += 32.047f * scalar;
 	radius = 111.690f * scalar;
 	float startAngle = halfAngle;
 	halfAngle = asin( 33.2f / ( radius / scalar ) );
 	center = p0 + offset - vec2( radius, 0.0f );
-	addArc( center, radius, ( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, false );
-	addArc( center, radius, -( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, false );
+	addArc( center, radius, ( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, 3 );
+	addArc( center, radius, -( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, 3 );
 
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, flockingAlbedo, 1 );
-	addSegment( aBottom, bBottom, flockingAlbedo, 1 );
+	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
+	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
 }
 
 // text rendering, with pixel location + select from the list of available font LUTs (tinyfont, fatfont, code page 437)
