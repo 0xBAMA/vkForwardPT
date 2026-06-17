@@ -40,9 +40,9 @@ using namespace std::chrono_literals;
 // heightmap gen
 #include <third_party/diamondSquare/diamondSquare.h>
 
-float packHalf2ToFloat ( float x, float y ) {
+float packHalf2ToFloat ( glm::vec2 val ) {
 	// Pack two half-floats into a 32-bit unsigned integer, reinterpret the bits as a float
-	uint32_t packed = glm::packHalf2x16( glm::vec2( x, y ) );
+	uint32_t packed = glm::packHalf2x16( val );
 	return std::bit_cast< float >( packed );
 
 	// corresponding unpack on the GPU:
@@ -2503,7 +2503,7 @@ void PrometheusInstance::bufferRebuildGPU () {
 	geometryListDirty = false;
 }
 
-void PrometheusInstance::addSegment ( vec2 a, vec2 b, float albedo, int materialA, int materialB ) {
+void PrometheusInstance::addSegment ( vec2 a, vec2 b, float albedo, float materialA, float materialB ) {
 // segment mapping:
 	// 0: a.x
 	// 1: a.y
@@ -2512,7 +2512,7 @@ void PrometheusInstance::addSegment ( vec2 a, vec2 b, float albedo, int material
 	// 4-11: unused
 	// 12: albedo
 	// 13: material ID
-	// 14: invert flag
+	// 14: second material ID
 	// 15: 0 -> line segment
 
 	geometryStruct * geoData = ( geometryStruct * ) GeometryBuffer.allocation->GetMappedData();
@@ -2531,7 +2531,7 @@ void PrometheusInstance::addSegment ( vec2 a, vec2 b, float albedo, int material
 	}
 }
 
-void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, float thetaRange, float albedo, int materialA, int materialB ) {
+void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, float thetaRange, float albedo, float materialA, float materialB ) {
 // arc mapping:
 	// 0: center.x
 	// 1: center.y
@@ -2542,7 +2542,7 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, 
 	// 6-11: unused
 	// 12: albedo
 	// 13: material ID
-	// 14: invert flag
+	// 14: second material ID
 	// 15: 1 -> circular arc
 
 	geometryStruct * geoData = ( geometryStruct * ) GeometryBuffer.allocation->GetMappedData();
@@ -2568,6 +2568,13 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, 
 	}
 }
 
+vec2 IndexAbbeToCauchyAB ( float index, float abbe ) {
+	// can calculate the A and B Cauchy parameters from the two values
+	vec2 CauchyAB;
+	CauchyAB.y = ( index - 1.0f ) / abbe; // B parameter is (Nd-1)/(Vd)
+	CauchyAB.x = index - CauchyAB.y * 2.897f; // A parameter is Nd-B*2.897
+	return CauchyAB;
+}
 void PrometheusInstance::AddElementList( float scalar, vec2 p0, std::vector< lensElement > elements ) {
 	// iterating through the list of elements and determining the arcs to add...
 
@@ -2589,8 +2596,10 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 
 	// Martin Shenker F/1.5 Catadioptric Telephoto #2 from Modern Lens Design
 	// int glassType = 12;
-	int glassType = 7;
-	int airType = 5;
+	float glassType = packHalf2ToFloat( vec2( 1.5046f, 0.00420f ) ); // these are cauchy parameters for Borosilicate BK7
+	float airType = packHalf2ToFloat( IndexAbbeToCauchyAB( 1.0f, 89.3f ) ); // need to calculate cauchy parameters for air
+	float diffuseMat = packHalf2ToFloat( vec2( -1.0f, 0.0f ) );
+	float mirrorMat = packHalf2ToFloat( vec2( -3.0f, 0.0f ) );
 	float flockingAlbedo = 0.0f;
 	float radius = 212.834f * scalar;
 	vec2 offset = vec2( 0.0f );
@@ -2610,8 +2619,8 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	vec2 bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	vec2 bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
-	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
+	addSegment( aTop, bTop, flockingAlbedo, mirrorMat, diffuseMat );
+	addSegment( aBottom, bBottom, flockingAlbedo, diffuseMat, mirrorMat );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2625,8 +2634,8 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
-	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
+	addSegment( aTop, bTop, flockingAlbedo, mirrorMat, diffuseMat );
+	addSegment( aBottom, bBottom, flockingAlbedo, diffuseMat, mirrorMat );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2640,8 +2649,8 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
-	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
+	addSegment( aTop, bTop, flockingAlbedo, mirrorMat, diffuseMat );
+	addSegment( aBottom, bBottom, flockingAlbedo, diffuseMat, mirrorMat );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2655,8 +2664,8 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
-	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
+	addSegment( aTop, bTop, flockingAlbedo, mirrorMat, diffuseMat );
+	addSegment( aBottom, bBottom, flockingAlbedo, diffuseMat, mirrorMat );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2670,8 +2679,8 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
-	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
+	addSegment( aTop, bTop, flockingAlbedo, mirrorMat, diffuseMat );
+	addSegment( aBottom, bBottom, flockingAlbedo, diffuseMat, mirrorMat );
 
 	aTop = bTop;
 	aBottom = bBottom;
@@ -2680,22 +2689,22 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 	radius = 111.690f * scalar;
 	halfAngle = asin( 15.0f / ( radius / scalar ) );
 	center = p0 + offset - vec2( radius, 0.0f );
-	addArc( center, radius, 0.0f, halfAngle, 0.99f, 3, 3 );
-	addArc( center - vec2( 1.0f, 0.0f ), radius, 0.0f, halfAngle, flockingAlbedo, 1, 1 ); // mirror backing
+	addArc( center, radius, 0.0f, halfAngle, 0.99f, mirrorMat, mirrorMat );
+	addArc( center - vec2( 1.0f, 0.0f ), radius, 0.0f, halfAngle, flockingAlbedo, diffuseMat, diffuseMat ); // mirror backing
 
 	offset.x += 32.047f * scalar;
 	radius = 111.690f * scalar;
 	float startAngle = halfAngle;
 	halfAngle = asin( 33.2f / ( radius / scalar ) );
 	center = p0 + offset - vec2( radius, 0.0f );
-	addArc( center, radius, ( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, 3 );
-	addArc( center, radius, -( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, 3, 3 );
+	addArc( center, radius, ( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, mirrorMat, mirrorMat );
+	addArc( center, radius, -( startAngle + halfAngle ) / 2.0f, ( halfAngle - startAngle ) / 2.0f, 0.99f, mirrorMat, mirrorMat );
 
 	bTop = center + radius * vec2( cos( halfAngle ), sin( halfAngle ) );
 	bBottom = center + radius * vec2( cos( halfAngle ), -sin( halfAngle ) );
 
-	addSegment( aTop, bTop, flockingAlbedo, 1, 1 );
-	addSegment( aBottom, bBottom, flockingAlbedo, 1, 3 );
+	addSegment( aTop, bTop, flockingAlbedo, mirrorMat, diffuseMat );
+	addSegment( aBottom, bBottom, flockingAlbedo, diffuseMat, mirrorMat );
 }
 
 // text rendering, with pixel location + select from the list of available font LUTs (tinyfont, fatfont, code page 437)

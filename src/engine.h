@@ -4,6 +4,7 @@
 #include <chrono>
 #include <thread>
 #include <random>
+#include <cstdint>
 
 #include <vk_types.h>
 #include <vk_descriptors.h>
@@ -180,12 +181,15 @@ struct debugStringConfig {
 };
 
 struct lensElement {
+	// geometry needs to be set for every element
 	float radius;
 	float thickness;
 	float semiAperture;
-	float index;
-	float abbeN;
-	// material...
+
+	// material can default to air
+	bool isAir = true;
+	float index = 1.0f;
+	float abbeN = 89.3f;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -306,8 +310,8 @@ public:
 	AllocatedImage depthImageCache; // the raster depth is copied here for the text to use
 
 	// RT primitives
-	void addSegment ( vec2 a, vec2 b, float albedo, int materialA, int materialB );
-	void addArc ( vec2 center, float radius, float thetaStart, float thetaEnd, float albedo, int materialA, int materialB );
+	void addSegment ( vec2 a, vec2 b, float albedo, float materialA, float materialB );
+	void addArc ( vec2 center, float radius, float thetaCenter, float thetaRange, float albedo, float materialA, float materialB );
 	// void addParabola ( vec2 center, );
 
 	void AddShenkerCatadioptric ( float scale, vec2 basePoint );

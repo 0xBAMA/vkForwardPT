@@ -70,25 +70,11 @@ layout ( set = 0, binding = 7 ) buffer gridBuffer {
 	uint gridBufferValues[]; // variable stride, requires prefix buffer or it is soup
 };
 
-#define NOHIT						0
-#define DIFFUSE						1
-#define METALLIC					2
-#define MIRROR						3
-
-// air reserve value
-#define AIR							5
-// below this point, we have specific forms of glass
-#define CAUCHY_FUSEDSILICA			6
-#define CAUCHY_BOROSILICATE_BK7		7
-#define CAUCHY_HARDCROWN_K5			8
-#define CAUCHY_BARIUMCROWN_BaK4		9
-#define CAUCHY_BARIUMFLINT_BaF10	10
-#define CAUCHY_DENSEFLINT_SF10		11
-// more coefficients available at https://web.archive.org/web/20151011033820/http://www.lacroixoptical.com/sites/default/files/content/LaCroix%20Dynamic%20Material%20Selection%20Data%20Tool%20vJanuary%202015.xlsm
-#define SELLMEIER_BOROSILICATE_BK7	12
-#define SELLMEIER_SAPPHIRE			13
-#define SELLMEIER_FUSEDSILICA		14
-#define SELLMEIER_MAGNESIUMFLOURIDE	15
+#define NOHIT		0
+#define DIFFUSE		1
+#define METALLIC	2
+#define MIRROR		3
+#define DIELECTRIC	4
 
 struct intersectionResult {
 // scene intersection representation etc loosely based on Daedalus
@@ -131,48 +117,53 @@ float evaluateSellmeier ( vec3 B, vec3 C, float wms ) {
 
 // support for glass behavior
 float Reflectance ( const float cosTheta, const float IoR ) {
-	#if 1
+#if 0
 	// Use Schlick's approximation for reflectance
 	float r0 = ( 1.0f - IoR ) / ( 1.0f + IoR );
 	r0 = r0 * r0;
 	return r0 + ( 1.0f - r0 ) * pow( ( 1.0f - cosTheta ), 5.0f );
-	#else
-	// "Full Fresnel", from https://www.shadertoy.com/view/csfSz7
+#elif 0
+	// "Full Fresnel", from https://www.shadertoy.com/view/csfSz - this has visible discontinuities
 	float g = sqrt( IoR * IoR + cosTheta * cosTheta - 1.0f );
 	float a = ( g - cosTheta ) / ( g + cosTheta );
 	float b = ( ( g + cosTheta ) * cosTheta - 1.0f ) / ( ( g - cosTheta ) * cosTheta + 1.0f );
 	return 0.5f * a * a * ( 1.0f + b * b );
-	#endif
+#elif 1
+	// https://www.photometric.io/blog/improving-schlicks-approximation/
+	float r0 = ( 1.0f - IoR ) / ( 1.0f + IoR );
+	r0 = r0 * r0;
+	return r0 + ( 1.0f - cosTheta - r0 ) * pow( ( 1.0f - cosTheta ), 4.0f ); // moved cosine term
+#endif
 	//	another expression used here... https://www.shadertoy.com/view/wlyXzt - what's going on there?
 }
 
-float getIORForMaterial ( int material ) {
+float getIORForMaterial ( float packedMaterial ) {
 	// There are a couple ways to get IoR from wavelength
 	float wavelengthMicrons = wavelength / 1000.0f;
 	const float wms = wavelengthMicrons * wavelengthMicrons;
 
 	float IoR = 0.0f;
-	switch ( material ) {
-		// Cauchy second order approx
-		case CAUCHY_FUSEDSILICA:			IoR = evaluateCauchy( 1.4580f, 0.00354f, wms ); break;
-		case CAUCHY_BOROSILICATE_BK7:		IoR = evaluateCauchy( 1.5046f, 0.00420f, wms ); break;
-		case CAUCHY_HARDCROWN_K5:			IoR = evaluateCauchy( 1.5220f, 0.00459f, wms ); break;
-		case CAUCHY_BARIUMCROWN_BaK4:		IoR = evaluateCauchy( 1.5690f, 0.00531f, wms ); break;
-		case CAUCHY_BARIUMFLINT_BaF10:		IoR = evaluateCauchy( 1.6700f, 0.00743f, wms ); break;
-		case CAUCHY_DENSEFLINT_SF10:		IoR = evaluateCauchy( 1.7280f, 0.01342f, wms ); break;
-		// Sellmeier third order approx
-		case SELLMEIER_BOROSILICATE_BK7:	IoR = evaluateSellmeier( vec3( 1.03961212f, 0.231792344f, 1.01046945f ), vec3( 1.01046945f, 6.00069867e-3f, 2.00179144e-2f ), wms ); break;
-		case SELLMEIER_SAPPHIRE:			IoR = evaluateSellmeier( vec3( 1.43134930f, 0.650547130f, 5.34140210f ), vec3( 5.34140210f, 5.27992610e-3f, 1.42382647e-2f ), wms ); break;
-		case SELLMEIER_FUSEDSILICA:			IoR = evaluateSellmeier( vec3( 0.69616630f, 0.407942600f, 0.89747940f ), vec3( 0.89747940f, 0.00467914800f, 0.01351206000f ), wms ); break;
-		case SELLMEIER_MAGNESIUMFLOURIDE:	IoR = evaluateSellmeier( vec3( 0.48755108f, 0.398750310f, 2.31203530f ), vec3( 2.31203530f, 0.00188217800f, 0.00895188800f ), wms ); break;
-		default: IoR = 1.0f;
+	vec2 parameters = unpackHalf2x16( floatBitsToUint( packedMaterial ) );
+	if ( parameters.x < 0.1f ) {
+		// this is one of the default materials
+			// that has to be handled separately
+	} else {
+		// this is a material which needs to evaluate the packed cauchy parameters
+		IoR = evaluateCauchy( parameters.x, parameters.y, wms );
 	}
 
 	return IoR;
 }
 
-bool isRefractive ( int id ) {
-	return id >= CAUCHY_FUSEDSILICA;
+int getMaterial ( float packedMaterial ) {
+	int mat = 0;
+	vec2 parameters = unpackHalf2x16( floatBitsToUint( packedMaterial ) );
+	if ( parameters.x < 0.1f ) {
+		mat = int( abs( parameters.x ) );
+	} else {
+		mat = DIELECTRIC;
+	}
+	return mat;
 }
 
 bool gridBoundsCheck ( vec3 p ) {
@@ -201,9 +192,14 @@ float rayArc ( vec2 rO, vec2 rD, vec2 center, float radius, vec2 pTest, float aT
 		// the test is now  based on:
 			// dot( a,b ) == mag( a ) * mag( b ) * cos( theta ) -> vectors normalized, threshold is cos( theta )
 		// and then looking to see if the dot product you calculate is greater than the threshold value
-		bool inArc = ( dot( dNorm, pTest ) > aThresh );
+		bool inArc = ( dot( dNorm, pTest ) >= aThresh );
 		if ( inArc && t > 0.0f && t < tClosest ) {
 			tClosest = t;
+		}
+
+		// we have a duplicate root for tangent rays
+		if ( h == 0.0f ) { // no reason to evaluate twice
+			break;
 		}
 	}
 	return tClosest;
@@ -284,24 +280,24 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 
 							// determining the normal vector for the surface
 							result.normal = normalize( vec2( -edge.y, edge.x ) );
-//							 if ( dot( rayDirection, result.normal ) > 0.0f ) {
-							 if ( ( det < 0.0f ) ) {
+//							if ( dot( rayDirection, result.normal ) > 0.0f ) {
+							if ( ( det < 0.0f ) ) {
 								// this is a backface hit - we have to invert the normal
 								result.normal = -result.normal;
 
 								// IOR is representative of A into B
-								result.IoR = getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 14 ] ) )
-									/ getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 13 ] ) );
+								result.IoR = getIORForMaterial( geometryParameters[ primitiveBaseIdx + 14 ] )
+									/ getIORForMaterial( geometryParameters[ primitiveBaseIdx + 13 ] );
 
-								result.materialType = int( geometryParameters[ primitiveBaseIdx + 14 ] );
-							 } else {
+								result.materialType = getMaterial( geometryParameters[ primitiveBaseIdx + 14 ] );
+							} else {
 								// this is a frontface hit - normal vector is fine
 								// IOR is representative of B into A
-								result.IoR = getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 13 ] ) )
-									/ getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 14 ] ) );
+								result.IoR = getIORForMaterial( geometryParameters[ primitiveBaseIdx + 13 ] )
+									/ getIORForMaterial( geometryParameters[ primitiveBaseIdx + 14 ] );
 
-								result.materialType = int( geometryParameters[ primitiveBaseIdx + 13 ] );
-							 }
+								result.materialType = getMaterial( geometryParameters[ primitiveBaseIdx + 13 ] );
+							}
 
 							// CW edge winding defines front side, or opposite if invert flag is set
 //							result.frontFacing = invertFace ? ( det < 0.0f ) : ( det > 0.0f );
@@ -331,17 +327,17 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 								result.normal = -result.normal;
 
 								// IOR is representative of A into B
-								result.IoR = getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 14 ] ) )
-								/ getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 13 ] ) );
+								result.IoR = getIORForMaterial( geometryParameters[ primitiveBaseIdx + 14 ] )
+									/ getIORForMaterial( geometryParameters[ primitiveBaseIdx + 13 ] );
 
-								result.materialType = int( geometryParameters[ primitiveBaseIdx + 14 ] );
+								result.materialType = getMaterial( geometryParameters[ primitiveBaseIdx + 14 ] );
 							} else {
-							// this is a frontface hit - normal vector is fine
+								// this is a frontface hit - normal vector is fine
 								// IOR is representative of B into A
-								result.IoR = getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 13 ] ) )
-									/ getIORForMaterial( int( geometryParameters[ primitiveBaseIdx + 14 ] ) );
+								result.IoR = getIORForMaterial( geometryParameters[ primitiveBaseIdx + 13 ] )
+									/ getIORForMaterial( geometryParameters[ primitiveBaseIdx + 14 ] );
 
-								result.materialType = int( geometryParameters[ primitiveBaseIdx + 13 ] );
+								result.materialType = getMaterial( geometryParameters[ primitiveBaseIdx + 13 ] );
 							}
 
 							result.albedo = geometryParameters[ primitiveBaseIdx + 12 ];
@@ -467,19 +463,13 @@ void main () {
 				break;
 
 			case MIRROR:
-				// belt and suspenders
-				if ( dot( rayDirection, result.normal ) > 0.0f ) {
-					result.normal *= -1.0f;
-				}
 				rayDirection = normalize( reflect( rayDirection, result.normal ) );
 				break;
 
-				// below this point, we have to consider the IoR for the specific form of glass... because we precomputed all the
-				// varying behavior already, we can just treat it uniformly, only need to consider frontface/backface for inversion
-			default:
+			// below this point, we have to consider the IoR for the specific form of glass or air...
+				// because we precomputed all the varying behavior already, we can just treat it uniformly
+			case DIELECTRIC:
 				rayOrigin -= result.normal * epsilon * 5;
-				// this is now handled by the front/rear face logic in the intersector
-//				result.IoR = result.frontFacing ? ( 1.0f / result.IoR ) : ( result.IoR ); // "reverse" back to physical properties for IoR
 				float cosTheta = min( dot( -normalize( rayDirection ), result.normal ), 1.0f );
 				float sinTheta = sqrt( 1.0f - cosTheta * cosTheta );
 				bool cannotRefract = ( result.IoR * sinTheta ) > 1.0f; // accounting for TIR effects
@@ -488,6 +478,9 @@ void main () {
 				} else {
 					rayDirection = normalize( mix( refract( normalize( rayDirection ), result.normal, result.IoR ), CircleOffset(), result.roughness ).xy );
 				}
+				break;
+
+			default:
 				break;
 			}
 		} else {
