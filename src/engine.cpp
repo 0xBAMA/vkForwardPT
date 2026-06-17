@@ -40,6 +40,15 @@ using namespace std::chrono_literals;
 // heightmap gen
 #include <third_party/diamondSquare/diamondSquare.h>
 
+float packHalf2ToFloat ( float x, float y ) {
+	// Pack two half-floats into a 32-bit unsigned integer, reinterpret the bits as a float
+	uint32_t packed = glm::packHalf2x16( glm::vec2( x, y ) );
+	return std::bit_cast< float >( packed );
+
+	// corresponding unpack on the GPU:
+	// vec2 uv = unpackHalf2x16( floatBitsToUint( packedUV ) );
+}
+
 //============================================================================================================================
 //============================================================================================================================
 // Initialization
