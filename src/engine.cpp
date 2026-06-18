@@ -950,8 +950,32 @@ void PrometheusInstance::initResources () {
 		stbi_image_free( data );
 	}
 
-	// placeholder init
-	AddShenkerCatadioptric( 10.0f, vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ) );
+	// catadioptric requires some special handling (in particular, the mirrors)
+	// AddShenkerCatadioptric( 10.0f, vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ) );
+
+	/*
+	struct lensElement {
+		// geometry needs to be set for every element
+		float radius;
+		float thickness;
+		float semiAperture;
+
+		// material can default to air
+		bool isAir = true;
+		float index = 1.0f;
+		float abbeN = 89.3f;
+	};
+	*/
+
+	float inf = std::numeric_limits< float >::max();
+	std::vector< lensElement > elements = {
+		{ .radius = 200.0f, .thickness = 20.0f, .semiAperture = 50.0f, .isAir = false, .index = 1.7f, .abbeN = 30.0f },
+		// { .radius = -200.0f, .thickness = 20.0f, .semiAperture = 50.0f, .isAir = true },
+		{ .radius = inf, .thickness = 20.0f, .semiAperture = 70.0f, .isAir = false, .index = 1.5f, .abbeN = 50.0f },
+		// { .radius = 200.0f, .thickness = 20.0f, .semiAperture = 70.0f, .isAir = true },
+	};
+	AddElementList( 5.0f, vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), elements );
+
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
 
 	// make sure to clean up at the end
@@ -2575,15 +2599,101 @@ vec2 IndexAbbeToCauchyAB ( float index, float abbe ) {
 	CauchyAB.x = index - CauchyAB.y * 2.897f; // A parameter is Nd-B*2.897
 	return CauchyAB;
 }
+
 void PrometheusInstance::AddElementList( float scalar, vec2 p0, std::vector< lensElement > elements ) {
+
 	// iterating through the list of elements and determining the arcs to add...
+	float airType = packHalf2ToFloat( IndexAbbeToCauchyAB( 1.0f, 89.3f ) ); // need to calculate cauchy parameters for air
+	float diffuseMat = packHalf2ToFloat( vec2( -1.0f, 0.0f ) );
+	float mirrorMat = packHalf2ToFloat( vec2( -3.0f, 0.0f ) );
 
-// since c++20, views::drop() skips first element, will make it easier to manage prev/current element
-	// std::vector<int> colourPos { 1, 2, 3 };
-	// for (int p : colourPos | std::views::drop(1)) {
-		// std::cout << "Pos = " << p << std::endl;
-	// }
+	// flocking points
+	vec2 Atop, Abot, Btop, Bbot;
+	float radius;
+	float semiAperture;
+	float currentMaterial;
+	float prevMaterial = airType;
+	bool firstIteration = true;
 
+	// so we are placing the first element...
+	for ( const auto& element : elements | std::views::drop( 1 ) ) {
+		radius = element.radius;
+		semiAperture = element.semiAperture;
+		currentMaterial = ( element.isAir ) ? airType : packHalf2ToFloat( IndexAbbeToCauchyAB( element.index, element.abbeN ) );
+
+		// need to handle plano-xxx and xxx-plano elements
+		bool planar = ( radius == std::numeric_limits< float >::max() );
+
+		if ( currentMaterial == airType && prevMaterial == airType ) {
+
+			// this pattern matches an aperture - we add no element, just update B points for the flocking
+			Btop = p0 + scalar * vec2( 0.0f, semiAperture );
+			Bbot = p0 + scalar * vec2( 0.0f, -semiAperture );
+
+		} else if ( planar ) { // it needs to be a segment, not an arc
+
+			// place the segment - segment endpoints will also populate the B points
+			Btop = p0 + scalar * vec2( 0.0f, semiAperture );
+			Bbot = p0 + scalar * vec2( 0.0f, -semiAperture );
+			addSegment( Btop, Bbot, 0.99f, prevMaterial, currentMaterial ); // may have to swap order, tbd
+
+		} else { // need to add the arc for this first element
+
+			// place the arc - using radius like this works both positive and negative
+			vec2 center = p0 + vec2( scalar * radius, 0.0f );
+			float halfAngle = asin( semiAperture / abs( radius ) );
+
+			if ( radius < 0.0f ) {
+				// negative radius of curvature
+				addArc( center, scalar * abs( radius ), 0.0f, halfAngle, 0.99f, currentMaterial, prevMaterial );
+			} else {
+				// positive radius of curvature
+				addArc( center, scalar * abs( radius ), pi, halfAngle, 0.99f, prevMaterial, currentMaterial );
+			}
+
+			// populate the B points from the arc endpoints
+			Btop = center + scalar * radius * vec2( cos( pi - halfAngle ), sin( pi - halfAngle ) );
+			Bbot = center + scalar * radius * vec2( cos( pi + halfAngle ), sin( pi + halfAngle ) );
+		}
+
+		// incrementing the axis position with the element thickness
+		p0.x += scalar * element.thickness;
+
+		if ( !firstIteration ) {
+
+			// add the flocking segments
+			addSegment( Atop, Btop, 0.01f, mirrorMat, diffuseMat );
+			addSegment( Abot, Bbot, 0.01f, diffuseMat, mirrorMat );
+
+		} else {
+
+			// unset first iteration - flocking segments don't make sense for first element
+			firstIteration = false;
+
+		}
+
+		// flocking segment points state pump
+		prevMaterial = currentMaterial;
+		Atop = Btop;
+		Abot = Bbot;
+	}
+
+	/*
+	for ( const auto& element : elements | std::views::drop( 1 ) ) {
+		// if this element is air and the previous element is air...
+			// there is nothing to do
+		// else, we need to place either a concave, planar, or convex element
+			// radius is needed (positive, negative, or "infinity")
+			// current position on axis is needed
+			// semiaperture is needed to calculate the degress of arc
+			// the refractive index of the materials in front and behind the interface are needed (w/ any special handling)
+
+			// if the radius is "infinity"
+				// we are going to add a segment...
+			// otherwise
+				// we need to add an appropriate arc
+	}
+	*/
 
 }
 
@@ -2593,6 +2703,8 @@ void PrometheusInstance::AddShenkerCatadioptric ( float scalar, vec2 p0 ) {
 		std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
 		return std::mt19937( seq );
 	} () );
+
+	// addArc( p0 - vec2( 100.0f, 0.0f ), 50.0f, 0.0f, pi, 0.99f, packHalf2ToFloat( IndexAbbeToCauchyAB( 1.0f, 89.3f ) ), packHalf2ToFloat( vec2( 1.5046f, 0.00420f ) ) );
 
 	// Martin Shenker F/1.5 Catadioptric Telephoto #2 from Modern Lens Design
 	// int glassType = 12;
