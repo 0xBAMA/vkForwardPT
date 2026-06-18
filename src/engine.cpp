@@ -970,9 +970,9 @@ void PrometheusInstance::initResources () {
 	float inf = std::numeric_limits< float >::max();
 	std::vector< lensElement > elements = {
 		{ .radius = 200.0f, .thickness = 20.0f, .semiAperture = 50.0f, .isAir = false, .index = 1.7f, .abbeN = 30.0f },
-		// { .radius = -200.0f, .thickness = 20.0f, .semiAperture = 50.0f, .isAir = true },
+		{ .radius = -200.0f, .thickness = 20.0f, .semiAperture = 50.0f, .isAir = true },
 		{ .radius = inf, .thickness = 20.0f, .semiAperture = 70.0f, .isAir = false, .index = 1.5f, .abbeN = 50.0f },
-		// { .radius = 200.0f, .thickness = 20.0f, .semiAperture = 70.0f, .isAir = true },
+		{ .radius = 200.0f, .thickness = 20.0f, .semiAperture = 70.0f, .isAir = true },
 	};
 	AddElementList( 5.0f, vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), elements );
 
@@ -2616,7 +2616,7 @@ void PrometheusInstance::AddElementList( float scalar, vec2 p0, std::vector< len
 	bool firstIteration = true;
 
 	// so we are placing the first element...
-	for ( const auto& element : elements | std::views::drop( 1 ) ) {
+	for ( const auto& element : elements ) {
 		radius = element.radius;
 		semiAperture = element.semiAperture;
 		currentMaterial = ( element.isAir ) ? airType : packHalf2ToFloat( IndexAbbeToCauchyAB( element.index, element.abbeN ) );
@@ -2635,7 +2635,7 @@ void PrometheusInstance::AddElementList( float scalar, vec2 p0, std::vector< len
 			// place the segment - segment endpoints will also populate the B points
 			Btop = p0 + scalar * vec2( 0.0f, semiAperture );
 			Bbot = p0 + scalar * vec2( 0.0f, -semiAperture );
-			addSegment( Btop, Bbot, 0.99f, prevMaterial, currentMaterial ); // may have to swap order, tbd
+			addSegment( Bbot, Btop, 0.99f, prevMaterial, currentMaterial ); // may have to swap order, tbd
 
 		} else { // need to add the arc for this first element
 
@@ -2652,8 +2652,15 @@ void PrometheusInstance::AddElementList( float scalar, vec2 p0, std::vector< len
 			}
 
 			// populate the B points from the arc endpoints
-			Btop = center + scalar * radius * vec2( cos( pi - halfAngle ), sin( pi - halfAngle ) );
-			Bbot = center + scalar * radius * vec2( cos( pi + halfAngle ), sin( pi + halfAngle ) );
+			const bool positiveRadius = ( radius > 0.0f );
+			vec2 offset = scalar * abs( radius ) * vec2( cos( positiveRadius ? pi + halfAngle : halfAngle ), sin( positiveRadius ? pi + halfAngle : halfAngle ) );
+			if ( offset.y > 0.0f ) {
+				Btop = center + offset;
+				Bbot = center + offset * vec2( 1.0f, -1.0f );
+			} else {
+				Btop = center + offset * vec2( 1.0f, -1.0f );
+				Bbot = center + offset;
+			}
 		}
 
 		// incrementing the axis position with the element thickness
