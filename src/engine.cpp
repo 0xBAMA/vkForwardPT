@@ -49,6 +49,14 @@ float packHalf2ToFloat ( glm::vec2 val ) {
 	// vec2 uv = unpackHalf2x16( floatBitsToUint( packedUV ) );
 }
 
+vec2 IndexAbbeToCauchyAB ( float index, float abbe ) {
+	// can calculate the A and B Cauchy parameters from the two values
+	vec2 CauchyAB;
+	CauchyAB.y = ( index - 1.0f ) / abbe; // B parameter is (Nd-1)/(Vd)
+	CauchyAB.x = index - CauchyAB.y * 2.897f; // A parameter is Nd-B*2.897
+	return CauchyAB;
+}
+
 //============================================================================================================================
 //============================================================================================================================
 // Initialization
@@ -969,12 +977,26 @@ void PrometheusInstance::initResources () {
 
 	float inf = std::numeric_limits< float >::max();
 	std::vector< lensElement > elements = {
-		{ .radius = 200.0f, .thickness = 20.0f, .semiAperture = 50.0f, .isAir = false, .index = 1.7f, .abbeN = 30.0f },
-		{ .radius = -200.0f, .thickness = 20.0f, .semiAperture = 50.0f, .isAir = true },
-		{ .radius = inf, .thickness = 20.0f, .semiAperture = 70.0f, .isAir = false, .index = 1.5f, .abbeN = 50.0f },
-		{ .radius = 200.0f, .thickness = 20.0f, .semiAperture = 70.0f, .isAir = true },
+		{ .radius = 599.383f, .thickness = 35.030f, .semiAperture = 448.4f, .isAir = false, .index = 1.517f, .abbeN = 64.2f },
+		{ .radius = 235.825f, .thickness = 190.161f, .semiAperture = 234.0f, .isAir = true },
+		{ .radius = 605.513f, .thickness = 30.025f, .semiAperture = 251.8f, .isAir = false, .index = 1.487f, .abbeN = 70.4f },
+		{ .radius = 111.094f, .thickness = 120.102f, .semiAperture = 110.1f, .isAir = true },
+		{ .radius = -452.384f, .thickness = 10.008f, .semiAperture = 93.5f, .isAir = false, .index = 1.487f, .abbeN = 70.4f },
+		{ .radius = 127.733f, .thickness = 45.038f, .semiAperture = 93.5f, .isAir = false, .index = 1.785f, .abbeN = 26.1f },
+		{ .radius = 462.892f, .thickness = 25.021f, .semiAperture = 93.5f, .isAir = true },
+		{ .radius = inf, .thickness = 15.013f, .semiAperture = 65.4f, .isAir = false, .index = 1.518f, .abbeN = 59.0f },
+		{ .radius = inf, .thickness = 36.281f, .semiAperture = 65.5f, .isAir = true },
+		{ .radius = inf, .thickness = 13.762f, .semiAperture = 15.8f, .isAir = true },
+		{ .radius = 38507.649f, .thickness = 10.008f, .semiAperture = 84.1f, .isAir = false, .index = 1.785f, .abbeN = 26.1f },
+		{ .radius = 95.081f, .thickness = 110.093f, .semiAperture = 84.1f, .isAir = false, .index = 1.744f, .abbeN = 44.7f },
+		{ .radius = -162.638f, .thickness = 130.110f, .semiAperture = 84.1f, .isAir = true },
+		{ .radius = 1376.167f, .thickness = 20.017f, .semiAperture = 84.1f, .isAir = false, .index = 1.785f, .abbeN = 26.1f },
+		{ .radius = 177.275f, .thickness = 150.127f, .semiAperture = 139.0f, .isAir = false, .index = 1.702f, .abbeN = 41.0f },
+		{ .radius = -400.339f, .thickness = 18.766f, .semiAperture = 139.0f, .isAir = false, .index = 1.668f, .abbeN = 41.9f },
+		{ .radius = -337.536f, .thickness = 150.110f, .semiAperture = 139.0f, .isAir = true },
 	};
-	AddElementList( 5.0f, vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ), elements );
+	// AddElementList( 1.0f, vec2( ImageBufferResolution.width / 2.0f - 400.0f, ImageBufferResolution.height / 2.0f ), elements );
+
 
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
 
@@ -2592,13 +2614,7 @@ void PrometheusInstance::addArc ( vec2 center, float radius, float thetaCenter, 
 	}
 }
 
-vec2 IndexAbbeToCauchyAB ( float index, float abbe ) {
-	// can calculate the A and B Cauchy parameters from the two values
-	vec2 CauchyAB;
-	CauchyAB.y = ( index - 1.0f ) / abbe; // B parameter is (Nd-1)/(Vd)
-	CauchyAB.x = index - CauchyAB.y * 2.897f; // A parameter is Nd-B*2.897
-	return CauchyAB;
-}
+
 
 void PrometheusInstance::AddElementList( float scalar, vec2 p0, std::vector< lensElement > elements ) {
 
