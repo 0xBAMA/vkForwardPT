@@ -2625,6 +2625,7 @@ void PrometheusInstance::AddElementList( float scalar, vec2 p0, std::vector< len
 
 	// flocking points
 	vec2 Atop, Abot, Btop, Bbot;
+	const float flockingAlbedo = 0.0001f;
 	float radius;
 	float semiAperture;
 	float currentMaterial;
@@ -2685,8 +2686,28 @@ void PrometheusInstance::AddElementList( float scalar, vec2 p0, std::vector< len
 		if ( !firstIteration ) {
 
 			// add the flocking segments
-			addSegment( Atop, Btop, 0.01f, mirrorMat, diffuseMat );
-			addSegment( Abot, Bbot, 0.01f, diffuseMat, mirrorMat );
+			// addSegment( Abot, Bbot, 0.01f, diffuseMat, mirrorMat );
+
+			// I want to handle the horizontal and vertical components individually...
+			vec2 topOffset = Btop - Atop;
+			vec2 botOffset = Bbot - Abot;
+
+			if ( topOffset.y < 0.01f ) {
+				// split into horizontal and vertical components
+				addSegment( Atop, Atop + vec2( topOffset.x, 0.0f ), flockingAlbedo, diffuseMat, diffuseMat );
+				addSegment( Atop + vec2( topOffset.x, 0.0f ), Btop, flockingAlbedo, diffuseMat, diffuseMat );
+			} else {
+				// just do the segment
+				addSegment( Atop, Btop, flockingAlbedo, diffuseMat, diffuseMat );
+			}
+
+			// same for bottom
+			if ( botOffset.y > -0.01f ) {
+				addSegment( Abot, Abot + vec2( botOffset.x, 0.0f ), flockingAlbedo, diffuseMat, diffuseMat );
+				addSegment( Abot + vec2( botOffset.x, 0.0f ), Bbot, flockingAlbedo, diffuseMat, diffuseMat );
+			} else {
+				addSegment( Abot, Bbot, flockingAlbedo, diffuseMat, diffuseMat );
+			}
 
 		} else {
 
