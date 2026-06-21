@@ -268,20 +268,14 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 							oobReject = true;
 
 						// cantidate intersection distance is now in t
-						 if ( t < dClosest && t > 0.0f && !parallel && !oobReject ) {
+						 if ( t < dClosest && t > 0.0f && !parallel && !oobReject && !parallel ) {
 							// update the hit for the traversal
 							result.dist = dClosest = t;
 
-							// todo material properties
-							result.materialType = int( geometryParameters[ primitiveBaseIdx + 13 ] );
-							result.IoR = getIORForMaterial( result.materialType );
-							result.roughness = 0.0f;
-							result.albedo = 0.99f;
-
 							// determining the normal vector for the surface
 							result.normal = normalize( vec2( -edge.y, edge.x ) );
-//							if ( dot( rayDirection, result.normal ) > 0.0f ) {
-							if ( ( det < 0.0f ) ) {
+							if ( dot( rayDirection, result.normal ) > 0.0f ) {
+//							if ( ( det < 0.0f ) ) {
 								// this is a backface hit - we have to invert the normal
 								result.normal = -result.normal;
 
@@ -298,6 +292,9 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 
 								result.materialType = getMaterial( geometryParameters[ primitiveBaseIdx + 13 ] );
 							}
+
+							result.albedo = geometryParameters[ primitiveBaseIdx + 12 ];
+							result.roughness = 0.0f;
 
 							// CW edge winding defines front side, or opposite if invert flag is set
 //							result.frontFacing = invertFace ? ( det < 0.0f ) : ( det > 0.0f );
