@@ -871,7 +871,6 @@ void PrometheusInstance::initDescriptors  () {
 }
 
 void PrometheusInstance::initResources () {
-
 	// API resource allocation:
 	// create the buffer for the UBO
 	{
@@ -976,7 +975,7 @@ void PrometheusInstance::initResources () {
 	*/
 
 	float inf = std::numeric_limits< float >::max();
-	std::vector< lensElement > elements = {
+	std::vector< lensElement > elementsFisheye = {
 		{ .radius = 599.383f, .thickness = 35.030f, .semiAperture = 448.4f, .isAir = false, .index = 1.517f, .abbeN = 64.2f },
 		{ .radius = 235.825f, .thickness = 190.161f, .semiAperture = 234.0f, .isAir = true },
 		{ .radius = 605.513f, .thickness = 30.025f, .semiAperture = 251.8f, .isAir = false, .index = 1.487f, .abbeN = 70.4f },
@@ -995,8 +994,52 @@ void PrometheusInstance::initResources () {
 		{ .radius = -400.339f, .thickness = 18.766f, .semiAperture = 139.0f, .isAir = false, .index = 1.668f, .abbeN = 41.9f },
 		{ .radius = -337.536f, .thickness = 150.110f, .semiAperture = 139.0f, .isAir = true },
 	};
-	// AddElementList( 1.0f, vec2( ImageBufferResolution.width / 2.0f - 400.0f, ImageBufferResolution.height / 2.0f ), elements );
 
+
+	std::vector< lensElement > elementsHypergon = {
+		{ .radius = 8.570f, .thickness = 2.200f, .semiAperture = 8.5f, .isAir = false, .index = 1.510f, .abbeN = 63.5f },
+		{ .radius = 8.630f, .thickness = 6.900f, .semiAperture = 8.5f, .isAir = true },
+		{ .radius = 8.630f, .thickness = 6.900f, .semiAperture = 2.2f, .isAir = true },
+		{ .radius = -8.630f, .thickness = 2.200f, .semiAperture = 8.5f, .isAir = false, .index = 1.510f, .abbeN = 63.5f },
+		{ .radius = -8.570f, .thickness = 92.925f, .semiAperture = 8.5f, .isAir = true },
+	};
+
+	std::vector< lensElement > elementsPetzval = {
+		{ .radius = 53.000f, .thickness = 19.500f, .semiAperture = 30.0f, .isAir = false, .index = 1.517f, .abbeN = 64.2f },
+		{ .radius = -460.000f, .thickness = 2.565f, .semiAperture = 30.0f, .isAir = true },
+		{ .radius = -139.700f, .thickness = 5.000f, .semiAperture = 30.0f, .isAir = false, .index = 1.620f, .abbeN = 36.4f },
+		{ .radius = 240.00f, .thickness = 37.050f, .semiAperture = 26.3f, .isAir = true },
+		{ .radius = 59.50f, .thickness = 17.000f, .semiAperture = 21.5f, .isAir = false, .index = 1.517f, .abbeN = 64.2f },
+		{ .radius = -42.2f, .thickness = 0.9400f, .semiAperture = 21.5f, .isAir = true },
+		{ .radius = -38.00f, .thickness = 5.000f, .semiAperture = 21.5f, .isAir = false, .index = 1.620f, .abbeN = 36.4f },
+		{ .radius = -161.0f, .thickness = 46.646f, .semiAperture = 21.5f, .isAir = true },
+	};
+
+	std::vector< lensElement > elementsSonnar = {
+		{ .radius = 121.480f, .thickness = 8.810f, .semiAperture = 45.0f, .isAir = false, .index = 1.613f, .abbeN = 58.6f },
+		{ .radius = 310.660f, .thickness = 0.5f, .semiAperture = 45.0f, .isAir = true },
+
+		{ .radius = 73.270f, .thickness = 8.380f, .semiAperture = 40.0f, .isAir = false, .index = 1.613f, .abbeN = 58.6f },
+		{ .radius = 118.550f, .thickness = 0.5f, .semiAperture = 40.0f, .isAir = true },
+
+		{ .radius = 50.420f, .thickness = 33.700f, .semiAperture = 36.1f, .isAir = false, .index = 1.607f, .abbeN = 59.5f },
+		{ .radius = -105.1600f, .thickness = 3.390f, .semiAperture = 28.2f, .isAir = false, .index = 1.689f, .abbeN = 30.6f },
+		{ .radius = 29.030f, .thickness = 10.94f, .semiAperture = 20.6f, .isAir = true },
+		{ .radius = inf, .thickness = 12.0f, .semiAperture = 20.1f, .isAir = true },
+
+		{ .radius = 59.390f, .thickness = 13.72f, .semiAperture = 23.0f, .isAir = false, .index = 1.613f, .abbeN = 58.6f },
+		{ .radius = -190.620f, .thickness = 31.406f, .semiAperture = 23.0f, .isAir = true },
+	};
+
+	AddElementList( 1.0f, vec2( ImageBufferResolution.width / 2.0f - 400.0f, ImageBufferResolution.height / 2.0f ), elementsFisheye );
+
+	float airType = packHalf2ToFloat( IndexAbbeToCauchyAB( 1.0f, 89.3f ) );
+	float glassType = packHalf2ToFloat( vec2( 1.7046f, 0.00420f ) );
+	vec2 centerpoint = vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f );
+	// addSegment( centerpoint + vec2( -200, 100 ), centerpoint + vec2( 200, 100 ), 0.99f, airType, glassType );
+	// addSegment( centerpoint + vec2( 200, 100 ), centerpoint + vec2( 300, 0 ), 0.99f, airType, glassType );
+	// addSegment( centerpoint + vec2( 300, 0 ), centerpoint + vec2( -300, 0 ), 0.99f, airType, glassType );
+	// addSegment( centerpoint + vec2( -300, 0 ), centerpoint + vec2( -200, 100 ), 0.99f, airType, glassType );
 
 	fmt::print( "Created {} primitives\n", globalData.numPrimitives );
 
