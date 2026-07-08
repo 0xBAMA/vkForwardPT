@@ -995,7 +995,6 @@ void PrometheusInstance::initResources () {
 		{ .radius = -337.536f, .thickness = 150.110f, .semiAperture = 139.0f, .isAir = true },
 	};
 
-
 	std::vector< lensElement > elementsHypergon = {
 		{ .radius = 8.570f, .thickness = 2.200f, .semiAperture = 8.5f, .isAir = false, .index = 1.510f, .abbeN = 63.5f },
 		{ .radius = 8.630f, .thickness = 6.900f, .semiAperture = 8.5f, .isAir = true },
@@ -1018,20 +1017,33 @@ void PrometheusInstance::initResources () {
 	std::vector< lensElement > elementsSonnar = {
 		{ .radius = 121.480f, .thickness = 8.810f, .semiAperture = 45.0f, .isAir = false, .index = 1.613f, .abbeN = 58.6f },
 		{ .radius = 310.660f, .thickness = 0.5f, .semiAperture = 45.0f, .isAir = true },
-
 		{ .radius = 73.270f, .thickness = 8.380f, .semiAperture = 40.0f, .isAir = false, .index = 1.613f, .abbeN = 58.6f },
 		{ .radius = 118.550f, .thickness = 0.5f, .semiAperture = 40.0f, .isAir = true },
-
 		{ .radius = 50.420f, .thickness = 33.700f, .semiAperture = 36.1f, .isAir = false, .index = 1.607f, .abbeN = 59.5f },
 		{ .radius = -105.1600f, .thickness = 3.390f, .semiAperture = 28.2f, .isAir = false, .index = 1.689f, .abbeN = 30.6f },
 		{ .radius = 29.030f, .thickness = 10.94f, .semiAperture = 20.6f, .isAir = true },
 		{ .radius = inf, .thickness = 12.0f, .semiAperture = 20.1f, .isAir = true },
-
 		{ .radius = 59.390f, .thickness = 13.72f, .semiAperture = 23.0f, .isAir = false, .index = 1.613f, .abbeN = 58.6f },
 		{ .radius = -190.620f, .thickness = 31.406f, .semiAperture = 23.0f, .isAir = true },
 	};
 
-	AddElementList( 1.0f, vec2( ImageBufferResolution.width / 2.0f - 400.0f, ImageBufferResolution.height / 2.0f ), elementsFisheye );
+	std::vector< lensElement > elementsIkuoMoriMacro = {
+		{ .radius = 66.185f, .thickness = 5.530f, .semiAperture = 29.1f, .isAir = false, .index = 1.755f, .abbeN = 52.3f },
+		{ .radius = 166.926f, .thickness = 0.120f, .semiAperture = 28.6f, .isAir = true },
+		{ .radius = 37.47f, .thickness = 12.530f, .semiAperture = 25.0f, .isAir = false, .index = 1.670f, .abbeN = 57.3f },
+		{ .radius = 463.86f, .thickness = 7.25f, .semiAperture = 22.6f, .isAir = false, .index = 1.620f, .abbeN = 36.3f },
+		{ .radius = 23.59f, .thickness = 9.0f, .semiAperture = 14.7f, .isAir = true },
+		{ .radius = inf, .thickness = 11.1760f, .semiAperture = 12.3f, .isAir = true },
+
+		{ .radius = -28.6f, .thickness = 1.840f, .semiAperture = 12.4f, .isAir = false, .index = 1.757f, .abbeN = 31.8f },
+		{ .radius = 479.12f, .thickness = 7.62f, .semiAperture = 14.4f, .isAir = false, .index = 1.744f, .abbeN = 44.9f },
+		{ .radius = -38.908f, .thickness = 4.205f, .semiAperture = 16.1f, .isAir = true },
+
+		{ .radius = 228.492, .thickness = 5.530f, .semiAperture = 21.9f, .isAir = false, .index = 1.794f, .abbeN = 45.4f },
+		{ .radius = -82.104f, .thickness = 62.819f, .semiAperture = 22.1f, .isAir = true },
+	};
+
+	AddElementList( 10.0f, vec2( ImageBufferResolution.width / 2.0f - 400.0f, ImageBufferResolution.height / 2.0f ), elementsHypergon );
 
 	float airType = packHalf2ToFloat( IndexAbbeToCauchyAB( 1.0f, 89.3f ) );
 	float glassType = packHalf2ToFloat( vec2( 1.7046f, 0.00420f ) );
@@ -2735,21 +2747,23 @@ void PrometheusInstance::AddElementList( float scalar, vec2 p0, std::vector< len
 			vec2 topOffset = Btop - Atop;
 			vec2 botOffset = Bbot - Abot;
 
-			if ( topOffset.y < 0.01f ) {
+			if ( ( topOffset.y / topOffset.x ) < 0.0f ) {
 				// split into horizontal and vertical components
 				addSegment( Atop, Atop + vec2( topOffset.x, 0.0f ), flockingAlbedo, diffuseMat, diffuseMat );
 				addSegment( Atop + vec2( topOffset.x, 0.0f ), Btop, flockingAlbedo, diffuseMat, diffuseMat );
 			} else {
-				// just do the segment
-				addSegment( Atop, Btop, flockingAlbedo, diffuseMat, diffuseMat );
+				// switch and do the vertical component first
+				addSegment( Atop, Atop + vec2( 0.0f, topOffset.y ), flockingAlbedo, diffuseMat, diffuseMat );
+				addSegment( Atop + vec2( 0.0f, topOffset.y ), Btop, flockingAlbedo, diffuseMat, diffuseMat );
 			}
 
 			// same for bottom
-			if ( botOffset.y > -0.01f ) {
+			if ( ( botOffset.y / botOffset.x ) > 0.0f ) {
 				addSegment( Abot, Abot + vec2( botOffset.x, 0.0f ), flockingAlbedo, diffuseMat, diffuseMat );
 				addSegment( Abot + vec2( botOffset.x, 0.0f ), Bbot, flockingAlbedo, diffuseMat, diffuseMat );
 			} else {
-				addSegment( Abot, Bbot, flockingAlbedo, diffuseMat, diffuseMat );
+				addSegment( Abot, Abot + vec2( 0.0f, botOffset.y ), flockingAlbedo, diffuseMat, diffuseMat );
+				addSegment( Abot + vec2( 0.0f, botOffset.y ), Bbot, flockingAlbedo, diffuseMat, diffuseMat );
 			}
 
 		} else {
