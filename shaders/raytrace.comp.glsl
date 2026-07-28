@@ -208,43 +208,51 @@ float rayArc ( vec2 rO, vec2 rD, vec2 center, float radius, vec2 pTest, float aT
 intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 	intersectionResult result = getDefaultIntersection();
 
+	float dClosest = maxDistance;
+
+//#define DDAGRID
+#ifdef DDAGRID
 	// DDA traversal
 	// from https://www.shadertoy.com/view/7sdSzH
 
-//	vec3 hitLocation = vec3( rayOrigin / GlobalData.gridScalar, 0.0f );
-//	vec3 forwards = normalize( vec3( rayDirection, 0.0f ) );
-//	vec3 deltaDist = 1.0f / abs( forwards );
-//	ivec3 rayStep = ivec3( sign( forwards ) );
-//	bvec3 mask0 = bvec3( false );
-//	ivec3 mapPos0 = ivec3( floor( hitLocation + 0.0f ) );
-//	vec3 sideDist0 = ( sign( forwards ) * ( vec3( mapPos0 ) - hitLocation ) + ( sign( forwards ) * 0.5f ) + 0.5f ) * deltaDist;
 
-//	#define MAX_RAY_STEPS 10000
-//	for ( int i = 0; i < MAX_RAY_STEPS && gridBoundsCheck( mapPos0 ); i++ ) {
-//		 Core of https://www.shadertoy.com/view/4dX3zl Branchless Voxel Raycasting
-//		bvec3 mask1 = lessThanEqual( sideDist0.xyz, min( sideDist0.yzx, sideDist0.zxy ) );
-//		vec3 sideDist1 = sideDist0 + vec3( mask1 ) * deltaDist;
-//		ivec3 mapPos1 = mapPos0 + ivec3( vec3( mask1 ) ) * rayStep;
+	vec3 hitLocation = vec3( rayOrigin / GlobalData.gridScalar, 0.0f );
+	vec3 forwards = normalize( vec3( rayDirection, 0.0f ) );
+	vec3 deltaDist = 1.0f / abs( forwards );
+	ivec3 rayStep = ivec3( sign( forwards ) );
+	bvec3 mask0 = bvec3( false );
+	ivec3 mapPos0 = ivec3( floor( hitLocation + 0.0f ) );
+	vec3 sideDist0 = ( sign( forwards ) * ( vec3( mapPos0 ) - hitLocation ) + ( sign( forwards ) * 0.5f ) + 0.5f ) * deltaDist;
+
+	#define MAX_RAY_STEPS 10000
+	for ( int i = 0; i < MAX_RAY_STEPS && gridBoundsCheck( mapPos0 ); i++ ) {
+		// Core of https://www.shadertoy.com/view/4dX3zl Branchless Voxel Raycasting
+		bvec3 mask1 = lessThanEqual( sideDist0.xyz, min( sideDist0.yzx, sideDist0.zxy ) );
+		vec3 sideDist1 = sideDist0 + vec3( mask1 ) * deltaDist;
+		ivec3 mapPos1 = mapPos0 + ivec3( vec3( mask1 ) ) * rayStep;
 
 		// consider using distance to hit
-//		const int linearIndex = 2 * ( mapPos0.x + GlobalData.gridDims.x * mapPos0.y );
-//		ivec2 prefixValue = ivec2( prefixBufferValues[ linearIndex ], prefixBufferValues[ linearIndex + 1 ] );
-//		if ( prefixValue.y != 0 ) { // there is a nonzero count for this grid cell
+		const int linearIndex = 2 * ( mapPos0.x + GlobalData.gridDims.x * mapPos0.y );
+		ivec2 prefixValue = ivec2( prefixBufferValues[ linearIndex ], prefixBufferValues[ linearIndex + 1 ] );
+		if ( prefixValue.y != 0 ) { // there is a nonzero count for this grid cell
 
-//			 iterate over the contents... rare that this will be more than 1, but possible
-//			float dClosest = maxDistance;
-//			for ( int i = 0; i < prefixValue.y; i++ ) {
-//				 we are looking at primitives starting at location 16 * prefixValue.x
-//				uint primitiveBaseIdx = 16u * ( gridBufferValues[ prefixValue.x + i ] );
+			// iterate over the contents... rare that this will be more than 1, but possible
 			float dClosest = maxDistance;
+			for ( int i = 0; i < prefixValue.y; i++ ) {
+				// we are looking at primitives starting at location 16 * prefixValue.x
+				uint primitiveBaseIdx = 16u * ( gridBufferValues[ prefixValue.x + i ] );
+
+#else
+
 			for ( int prim = 0; prim < GlobalData.numPrimitives; prim++ ) {
 				// we are looking at primitives starting at location 16 * prefixValue.x
 				uint primitiveBaseIdx = 16u * ( prim );
 
+#endif
 				// we want to test against the primitive... ( + do not accept if the hit point is outside the grid cell? )
-					// math is now operating in pixel space entirely (rayOrigin, rayDirection, and intersection)
+				// math is now operating in pixel space entirely (rayOrigin, rayDirection, and intersection)
 				switch ( int( geometryParameters[ primitiveBaseIdx + 15 ] ) ) {
-				case 0: // line segment between a and b
+					case 0: // line segment between a and b
 					{
 						vec2 a = vec2( geometryParameters[ primitiveBaseIdx + 0 ], geometryParameters[ primitiveBaseIdx + 1 ] );
 						vec2 b = vec2( geometryParameters[ primitiveBaseIdx + 2 ], geometryParameters[ primitiveBaseIdx + 3 ] );
@@ -304,6 +312,7 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 
 				case 1: // circular arc, centered at p, radius r, and covering a range of theta
 					{
+
 						// the basic circle
 						vec2 p = vec2( geometryParameters[primitiveBaseIdx + 0 ], geometryParameters[ primitiveBaseIdx + 1 ] );
 						float r = geometryParameters[ primitiveBaseIdx + 2 ];
@@ -348,17 +357,20 @@ intersectionResult sceneTraceBVH ( vec2 rayOrigin, vec2 rayDirection ) {
 				default:
 					break;
 				}
-//			}
-
+#ifdef DDAGRID
+			}
+#endif
 			// if we got a good hit in this grid cell, we're going to break
 //			if ( result.materialType != NOHIT ) {
 //				break;
 //			}
 		}
 
-//		sideDist0 = sideDist1;
-//		mapPos0 = mapPos1;
-//	}
+#ifdef DDAGRID
+		sideDist0 = sideDist1;
+		mapPos0 = mapPos1;
+	}
+#endif
 
 	// can dereference material to get surfaceType, albedo, IoR
 

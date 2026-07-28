@@ -158,9 +158,9 @@ void PrometheusInstance::Draw () {
 		globalData.framesSinceReset = 0;
 	}
 
-	// if ( geometryListDirty ) {
-		// bufferRebuildGPU();
-	// }
+	if ( geometryListDirty ) {
+		bufferRebuildGPU();
+	}
 
 	// start the command buffer recording
 	VK_CHECK( vkBeginCommandBuffer( cmd, &cmdBeginInfo ) );
@@ -960,20 +960,6 @@ void PrometheusInstance::initResources () {
 	// catadioptric requires some special handling (in particular, the mirrors)
 	// AddShenkerCatadioptric( 10.0f, vec2( ImageBufferResolution.width / 2.0f, ImageBufferResolution.height / 2.0f ) );
 
-	/*
-	struct lensElement {
-		// geometry needs to be set for every element
-		float radius;
-		float thickness;
-		float semiAperture;
-
-		// material can default to air
-		bool isAir = true;
-		float index = 1.0f;
-		float abbeN = 89.3f;
-	};
-	*/
-
 	float inf = std::numeric_limits< float >::max();
 	std::vector< lensElement > elementsFisheye = {
 		{ .radius = 599.383f, .thickness = 35.030f, .semiAperture = 448.4f, .isAir = false, .index = 1.517f, .abbeN = 64.2f },
@@ -1043,7 +1029,31 @@ void PrometheusInstance::initResources () {
 		{ .radius = -82.104f, .thickness = 62.819f, .semiAperture = 22.1f, .isAir = true },
 	};
 
-	AddElementList( 10.0f, vec2( ImageBufferResolution.width / 2.0f - 400.0f, ImageBufferResolution.height / 2.0f ), elementsHypergon );
+	// AddElementList( 10.0f, vec2( ImageBufferResolution.width / 2.0f - 400.0f, ImageBufferResolution.height / 2.0f ), elementsSonnar );
+
+
+	std::mt19937 seedRNG( [] {
+		std::random_device rd;
+		std::seed_seq seq{  rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd() };
+		return std::mt19937( seq );
+	} () );
+
+	for ( int i = 0; i < 1000; i++ ) {
+		const vec2 p = vec2(
+			std::uniform_real_distribution< float >( 500, ImageBufferResolution.width - 500 )( seedRNG ),
+			std::uniform_real_distribution< float >( 500, ImageBufferResolution.height - 500 )( seedRNG )
+		);
+		const float r = std::uniform_real_distribution< float >( 25.0f, 35.0f )( seedRNG );
+		const float t0 = std::uniform_real_distribution< float >( 0.0f, pi * 2.0f )( seedRNG );
+		const float t1 = std::uniform_real_distribution< float >( pi / 2.0f, pi )( seedRNG );
+		const float idx0 = std::uniform_real_distribution< float >( 1.0f, 1.6f )( seedRNG );
+		const float abbe0 = std::uniform_real_distribution< float >( 20.0f, 90.0f )( seedRNG );
+		const float idx1 = std::uniform_real_distribution< float >( 1.0f, 1.6f )( seedRNG );
+		const float abbe1 = std::uniform_real_distribution< float >( 20.0f, 90.0f )( seedRNG );
+
+		// addArc( p, r, 0.0f, 2.0f * pi, 0 );
+		addArc( p, r, t0, t1, 1.0f, packHalf2ToFloat( IndexAbbeToCauchyAB( idx0, abbe0 ) ), packHalf2ToFloat( IndexAbbeToCauchyAB( idx1, abbe1 ) ) );
+	}
 
 	float airType = packHalf2ToFloat( IndexAbbeToCauchyAB( 1.0f, 89.3f ) );
 	float glassType = packHalf2ToFloat( vec2( 1.7046f, 0.00420f ) );
