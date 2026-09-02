@@ -133,7 +133,7 @@ struct GlobalData {
 
 	glm::vec4 mouseLoc;
 
-	int numRays{ 64 * 200 };
+	int numRays{ 64 * 300 };
 	int numBounces{ 64 };
 
 	int frameNumber{ 0 };
@@ -144,12 +144,17 @@ struct GlobalData {
 	float resolutionScalar{ 1.0f };
 
 	// for the BVH
-	float gridScalar = 1.0f; // how big to make the grid?
+	float gridScalar = 3.0f; // how big to make the grid?
 	glm::ivec2 gridDims;
 
 	// for mapping into the geometry buffer
 	uint32_t numPrimitives{ 0 };		// setting where the pointer into the primitive buffer is
 	uint32_t maxPrimitives{ 10000000 };	// setting the max primitive count (100k is 5x more than I've done so far... aka "plenty")
+
+	// need to advance the state of the light buffer
+	uint32_t numAnimationFrames = 10;
+	uint32_t currentAnimationFrame = 0;
+
 };
 
 // smallest scope CPU->GPU passing of information
