@@ -1,0 +1,58 @@
+globalBrightness: 0.80204546
+lights:
+  - positionX: 2039
+    positionY: 104
+    rotation: 0.10999999
+    angleScalar: 0
+    cauchyMix: 0.002312
+    repeats: 1
+    emitterSpacing: 0
+    width: 8.1
+    lightSource: 21
+    gels:
+      []
+  - positionX: 856
+    positionY: 1475
+    rotation: -3.1899993
+    angleScalar: 0
+    cauchyMix: 0.002312
+    repeats: 1
+    emitterSpacing: 0
+    width: 8.1
+    lightSource: 15
+    gels:
+      []
+  - positionX: 1374
+    positionY: 199
+    rotation: -6.5899963
+    angleScalar: 0
+    cauchyMix: 0.002312
+    repeats: 1
+    emitterSpacing: 0
+    width: 8.1
+    lightSource: 9
+    gels:
+      - 52
+  - positionX: 1579
+    positionY: 1436
+    rotation: -8.689998
+    angleScalar: 0
+    cauchyMix: 0.002312
+    repeats: 1
+    emitterSpacing: 0
+    width: 8.1
+    lightSource: 0
+    gels:
+      - 7
+  - positionX: 973
+    positionY: 205
+    rotation: -11.89001
+    angleScalar: 0
+    cauchyMix: 0.002312
+    repeats: 1
+    emitterSpacing: 0
+    width: 8.1
+    lightSource: 0
+    gels:
+      - 22
+numLights: 5

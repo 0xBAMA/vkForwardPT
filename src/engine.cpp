@@ -469,6 +469,8 @@ void PrometheusInstance::MainLoop () {
 							// clear the light list
 							lightManager.clearList();
 
+							uint32_t numLights = root[ "numLights" ].as< uint32_t >();
+
 							// load the config specified
 							YAML::Node lightsNode = root[ "lights" ];
 							if ( lightsNode && lightsNode.IsSequence() ) {
@@ -513,6 +515,9 @@ void PrometheusInstance::MainLoop () {
 							// output the light list
 							YAML::Node outputNode;
 							outputNode[ "globalBrightness" ] = globalData.brightnessScalar;
+
+							uint32_t numLights = 0;
+
 							for ( auto& l : lightManager.lights ) {
 								YAML::Node node;
 								node[ "positionX" ] = l.parameters.position.x;
@@ -528,7 +533,9 @@ void PrometheusInstance::MainLoop () {
 								node[ "gels" ] = l.filterStack;
 
 								outputNode[ "lights" ].push_back( node );
+								numLights++;
 							}
+							outputNode[ "numLights" ] = numLights;
 							std::ofstream fout( "../lightingConfigs/" + std::string( currentExportFilename ) + ".yaml" );
 							fout << outputNode;
 
@@ -1029,7 +1036,8 @@ void PrometheusInstance::initResources () {
 		{ .radius = -82.104f, .thickness = 62.819f, .semiAperture = 22.1f, .isAir = true },
 	};
 
-	// AddElementList( 10.0f, vec2( ImageBufferResolution.width / 2.0f - 400.0f, ImageBufferResolution.height / 2.0f ), elementsSonnar );
+	AddElementList( 9.0f, vec2( ImageBufferResolution.width / 2.0f + 400.0f, ImageBufferResolution.height / 2.0f - 100 ), elementsSonnar );
+	// AddElementList( 0.5f, vec2( ImageBufferResolution.width / 2.0f - 400.0f, ImageBufferResolution.height / 2.0f + 200 ), elementsFisheye );
 
 
 	std::mt19937 seedRNG( [] {
@@ -1038,21 +1046,21 @@ void PrometheusInstance::initResources () {
 		return std::mt19937( seq );
 	} () );
 
-	for ( int i = 0; i < 1000; i++ ) {
+	for ( int i = 0; i < 200; i++ ) {
 		const vec2 p = vec2(
-			std::uniform_real_distribution< float >( 500, ImageBufferResolution.width - 500 )( seedRNG ),
-			std::uniform_real_distribution< float >( 500, ImageBufferResolution.height - 500 )( seedRNG )
+			std::uniform_real_distribution< float >( 600, ImageBufferResolution.width - 1800 )( seedRNG ),
+			std::uniform_real_distribution< float >( 600, ImageBufferResolution.height - 600 )( seedRNG )
 		);
-		const float r = std::uniform_real_distribution< float >( 25.0f, 35.0f )( seedRNG );
+		const float r = std::uniform_real_distribution< float >( 15.0f, 35.0f )( seedRNG );
 		const float t0 = std::uniform_real_distribution< float >( 0.0f, pi * 2.0f )( seedRNG );
-		const float t1 = std::uniform_real_distribution< float >( pi / 2.0f, pi )( seedRNG );
+		const float t1 = std::uniform_real_distribution< float >( pi, pi )( seedRNG );
 		const float idx0 = std::uniform_real_distribution< float >( 1.0f, 1.6f )( seedRNG );
 		const float abbe0 = std::uniform_real_distribution< float >( 20.0f, 90.0f )( seedRNG );
-		const float idx1 = std::uniform_real_distribution< float >( 1.0f, 1.6f )( seedRNG );
+		const float idx1 = std::uniform_real_distribution< float >( 1.1f, 1.6f )( seedRNG );
 		const float abbe1 = std::uniform_real_distribution< float >( 20.0f, 90.0f )( seedRNG );
 
 		// addArc( p, r, 0.0f, 2.0f * pi, 0 );
-		addArc( p, r, t0, t1, 1.0f, packHalf2ToFloat( IndexAbbeToCauchyAB( idx0, abbe0 ) ), packHalf2ToFloat( IndexAbbeToCauchyAB( idx1, abbe1 ) ) );
+		addArc( p, r, t0,  t1, 1.0f, packHalf2ToFloat( IndexAbbeToCauchyAB( 1.0f, 89.3f ) ), packHalf2ToFloat( IndexAbbeToCauchyAB( idx1, abbe1 ) ) );
 	}
 
 	float airType = packHalf2ToFloat( IndexAbbeToCauchyAB( 1.0f, 89.3f ) );

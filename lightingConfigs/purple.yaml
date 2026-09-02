@@ -55,3 +55,4 @@ lights:
     lightSource: 10
     gels:
       - 304
+numLights: 5

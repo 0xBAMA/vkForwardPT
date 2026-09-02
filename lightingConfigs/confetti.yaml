@@ -1,0 +1,91 @@
+globalBrightness: 0.78711975
+lights:
+  - positionX: 1627
+    positionY: 1520
+    rotation: -1.9000003
+    angleScalar: 0
+    cauchyMix: 0.070716
+    repeats: 1
+    emitterSpacing: 0
+    width: 10
+    lightSource: 5
+    gels:
+      []
+  - positionX: 1554
+    positionY: 1577
+    rotation: 2.0000002
+    angleScalar: 0
+    cauchyMix: 0.070716
+    repeats: 1
+    emitterSpacing: 0
+    width: 10
+    lightSource: 10
+    gels:
+      - 65
+  - positionX: 1543
+    positionY: 1509
+    rotation: -3.499999
+    angleScalar: 0
+    cauchyMix: 0.070716
+    repeats: 1
+    emitterSpacing: 0
+    width: 10
+    lightSource: 10
+    gels:
+      - 63
+  - positionX: 2568
+    positionY: 1350
+    rotation: -3.499999
+    angleScalar: 0
+    cauchyMix: 0.070716
+    repeats: 1
+    emitterSpacing: 0
+    width: 10
+    lightSource: 10
+    gels:
+      - 223
+  - positionX: 902
+    positionY: 1710
+    rotation: -3.499999
+    angleScalar: 0
+    cauchyMix: 0.070716
+    repeats: 1
+    emitterSpacing: 0
+    width: 10
+    lightSource: 10
+    gels:
+      - 19
+  - positionX: 1255
+    positionY: 1800
+    rotation: -3.499999
+    angleScalar: 0
+    cauchyMix: 0.070716
+    repeats: 1
+    emitterSpacing: 0
+    width: 10
+    lightSource: 19
+    gels:
+      - 198
+  - positionX: 2040
+    positionY: 1728
+    rotation: -3.499999
+    angleScalar: 0
+    cauchyMix: 0.070716
+    repeats: 1
+    emitterSpacing: 0
+    width: 10
+    lightSource: 19
+    gels:
+      - 45
+  - positionX: 448
+    positionY: 1316
+    rotation: -2.6
+    angleScalar: 0
+    cauchyMix: 0.070716
+    repeats: 1
+    emitterSpacing: 0
+    width: 10
+    lightSource: 19
+    gels:
+      - 111
+numLights: 5

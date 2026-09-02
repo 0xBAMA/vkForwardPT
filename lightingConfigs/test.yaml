@@ -44,3 +44,4 @@ lights:
     lightSource: 20
     gels:
       - 225
+numLights: 5
