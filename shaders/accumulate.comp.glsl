@@ -18,7 +18,8 @@ void main () {
 	// get the sum
 	const ivec2 loc = ivec2( gl_GlobalInvocationID.xy );
 
-	vec4 rasterContribution = texture( rasterImage, ( vec2( loc ) + vec2( NormalizedRandomFloat(), NormalizedRandomFloat() ) ) / ( textureSize( rasterImage, 0 ) / GlobalData.resolutionScalar ) );
+	// vec4 rasterContribution = texture( rasterImage, ( vec2( loc ) + vec2( NormalizedRandomFloat(), NormalizedRandomFloat() ) ) / ( textureSize( rasterImage, 0 ) / GlobalData.resolutionScalar ) );
+	vec4 rasterContribution = texture( rasterImage, ( vec2( loc ) + rFloatN2() ) / ( textureSize( rasterImage, 0 ) / GlobalData.resolutionScalar ) );
 	vec4 accumulatorContents = imageLoad( accumulator, loc );
 
 	vec4 sum = rasterContribution + accumulatorContents;

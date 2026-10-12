@@ -24,6 +24,8 @@ float NormalDistributionRand () {
 #define rFloat() NormalizedRandomFloat()
 #define rFloat2() vec2(NormalizedRandomFloat(),NormalizedRandomFloat())
 
+#define rFloatN2() NormalDistributionRand()
+
 uint rng_state;
 uint PCGHash() {
 	rng_state = rng_state * 747796405u + 2891336453u;
